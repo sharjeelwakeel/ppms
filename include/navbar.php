@@ -48,6 +48,20 @@ if (!file_exists('include/navbar.php')) {
                 </div>
             </li>
             <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkLubricants" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-oil-can mr-1"></i> Stock & Lubricants
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php">Products</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php">Purchases (Inflow)</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php">Sales (Outflow)</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php">Stock Report</a>
+                </div>
+            </li>
+            <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-calculator mr-1"></i> Transactions
                 </a>
