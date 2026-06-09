@@ -6,20 +6,27 @@ if (!userloggedin()) {
 require '../include/config.php';
 
 // Date filters
-$fromDate = isset($_GET['from_date']) ? $_GET['from_date'] : date('Y-m-01');
-$toDate   = isset($_GET['to_date']) ? $_GET['to_date'] : date('Y-m-d');
+$fromDate = isset($_GET['from_date']) ? $_GET['from_date'] : '';
+$toDate   = isset($_GET['to_date']) ? $_GET['to_date'] : '';
 
-$escFrom = mysqli_real_escape_string($connection, $fromDate);
-$escTo   = mysqli_real_escape_string($connection, $toDate);
+$pur_date_cond = "";
+$sal_date_cond = "";
+
+if (!empty($fromDate) && !empty($toDate)) {
+    $escFrom = mysqli_real_escape_string($connection, $fromDate);
+    $escTo   = mysqli_real_escape_string($connection, $toDate);
+    $pur_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
+    $sal_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
+}
 
 // Calculate overall summary metrics in date range
-$total_purchases_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE date BETWEEN '$escFrom' AND '$escTo'");
+$total_purchases_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE 1=1" . $pur_date_cond);
 $total_purchases = floatval(mysqli_fetch_row($total_purchases_res)[0]);
 
-$total_cash_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Cash' AND date BETWEEN '$escFrom' AND '$escTo'");
+$total_cash_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Cash'" . $sal_date_cond);
 $total_cash_sales = floatval(mysqli_fetch_row($total_cash_sales_res)[0]);
 
-$total_credit_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Credit' AND date BETWEEN '$escFrom' AND '$escTo'");
+$total_credit_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Credit'" . $sal_date_cond);
 $total_credit_sales = floatval(mysqli_fetch_row($total_credit_sales_res)[0]);
 
 $total_products_res = mysqli_query($connection, "SELECT COUNT(*) FROM tbl_lubricant_products");
@@ -33,9 +40,9 @@ $sql = "
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id), 0) AS lifetime_sold,
            
            -- Period calculations based on date range
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id AND date BETWEEN '$escFrom' AND '$escTo'), 0) AS period_purchased,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Cash' AND date BETWEEN '$escFrom' AND '$escTo'), 0) AS period_cash_sold,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Credit' AND date BETWEEN '$escFrom' AND '$escTo'), 0) AS period_credit_sold
+           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id" . $pur_date_cond . "), 0) AS period_purchased,
+           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Cash'" . $sal_date_cond . "), 0) AS period_cash_sold,
+           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Credit'" . $sal_date_cond . "), 0) AS period_credit_sold
     FROM tbl_lubricant_products p
     ORDER BY p.name ASC
 ";
@@ -153,6 +160,66 @@ if ($result) {
             50% { transform: scale(1.03); }
             100% { transform: scale(1); }
         }
+        
+        @media print {
+            nav, .navbar, .filter-card, .btn, button, .dataTables_filter, .dataTables_length, .dataTables_paginate, .dataTables_info, th:last-child, td:last-child {
+                display: none !important;
+            }
+            main, .main {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            body {
+                background: #fff !important;
+                color: #000 !important;
+                font-family: Arial, sans-serif;
+            }
+            .container-fluid {
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }
+            .card {
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .table-responsive {
+                overflow: visible !important;
+            }
+            #reportTable {
+                width: 100% !important;
+                border: 1px solid #000 !important;
+                border-collapse: collapse !important;
+            }
+            #reportTable th, #reportTable td {
+                border: 1px solid #000 !important;
+                padding: 4px 6px !important;
+                font-size: 10px !important;
+                color: #000 !important;
+                background: transparent !important;
+                text-align: center !important;
+            }
+            #reportTable td.text-left {
+                text-align: left !important;
+            }
+            .stock-badge-high, .stock-badge-mid, .stock-badge-low {
+                background: none !important;
+                color: #000 !important;
+                padding: 0 !important;
+                font-weight: bold !important;
+            }
+            .metric-card {
+                border: 1px solid #ccc !important;
+                background: #fafafa !important;
+                color: #000 !important;
+                box-shadow: none !important;
+                margin-bottom: 10px !important;
+                padding: 10px !important;
+            }
+            .metric-card .card-title { color: #666 !important; font-weight: bold !important; }
+            .metric-card .card-value { color: #000 !important; font-size: 18px !important; }
+            .metric-card .card-icon { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -160,16 +227,36 @@ if ($result) {
     <main class="main">
         <div class="container-fluid pt-4 pb-5 px-lg-4">
             
+            <!-- Print Header -->
+            <div class="d-none d-print-block text-center mb-4">
+                <h3 class="font-weight-bold">Petrol Pump Management System (PPMS)</h3>
+                <h4 class="text-secondary">Stock & Lubricants Inventory Report</h4>
+                <p class="small text-muted">
+                    <?php if (!empty($fromDate) && !empty($toDate)): ?>
+                        Period: <strong><?php echo date("d-m-Y", strtotime($fromDate)); ?></strong> to <strong><?php echo date("d-m-Y", strtotime($toDate)); ?></strong>
+                    <?php else: ?>
+                        All-Time Inventory Summary
+                    <?php endif; ?>
+                    &nbsp;|&nbsp; Generated on: <?php echo date("d-m-Y h:i A"); ?>
+                </p>
+                <hr style="border-top: 2px solid #333; margin-top: 10px;">
+            </div>
+
             <!-- Page Header -->
-            <div class="row align-items-center mb-4">
-                <div class="col-md-6">
+            <div class="row align-items-center mb-4 d-print-none">
+                <div class="col-md-6 col-sm-12">
                     <h4 class="font-weight-bold"><i class="fas fa-cubes mr-2 text-primary"></i>Stock & Inventory Report</h4>
                     <small class="text-muted">Manage and audit non-fuel stock sales, inflow, outflow, and current availability</small>
+                </div>
+                <div class="col-md-6 col-sm-12 text-md-right mt-2 mt-md-0">
+                    <button onclick="window.print()" class="btn btn-dark btn-sm px-4 font-weight-bold shadow-sm" style="background:#2c3e50; border:none; border-radius:6px;">
+                        <i class="fas fa-print mr-1"></i> Print / Save PDF
+                    </button>
                 </div>
             </div>
 
             <!-- Date Filters -->
-            <div class="filter-card">
+            <div class="filter-card d-print-none">
                 <form method="GET" action="stock-report.php">
                     <div class="row align-items-end">
                         <div class="col-md-3 col-sm-6 mb-2 mb-md-0">
@@ -236,7 +323,13 @@ if ($result) {
                                 <tr>
                                     <th rowspan="2" style="border-bottom:none;">Product Name</th>
                                     <th colspan="3" class="bg-dark text-white text-center py-2" style="font-size:11px; letter-spacing:0.5px;">LIFETIME QUANTITY</th>
-                                    <th colspan="4" class="bg-secondary text-white text-center py-2" style="font-size:11px; letter-spacing:0.5px;">PERIOD QUANTITY (FROM: <?php echo date("d-m-Y", strtotime($fromDate)); ?> TO: <?php echo date("d-m-Y", strtotime($toDate)); ?>)</th>
+                                    <th colspan="4" class="bg-secondary text-white text-center py-2" style="font-size:11px; letter-spacing:0.5px;">
+                                        <?php if (!empty($fromDate) && !empty($toDate)): ?>
+                                            PERIOD QUANTITY (FROM: <?php echo date("d-m-Y", strtotime($fromDate)); ?> TO: <?php echo date("d-m-Y", strtotime($toDate)); ?>)
+                                        <?php else: ?>
+                                            PERIOD QUANTITY (ALL-TIME SUMMARY)
+                                        <?php endif; ?>
+                                    </th>
                                     <th rowspan="2" style="border-bottom:none;">Selling Price</th>
                                     <th rowspan="2" style="border-bottom:none;">Stock Value</th>
                                     <th rowspan="2" style="border-bottom:none; min-width:140px;">Actions</th>
@@ -347,6 +440,7 @@ if ($result) {
     $(document).ready(function() {
         $('#reportTable').DataTable({
             "pageLength": 25,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             "order": [[ 0, "asc" ]]
         });
     });
