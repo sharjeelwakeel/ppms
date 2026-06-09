@@ -48,6 +48,27 @@ $calcGrand = 0;
 foreach ($details as $d) { $calcGrand += floatval($d['amount']); }
 $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 $hasDetails   = count($details) > 0;
+
+// Fetch Card Sales
+$card_sales_sql = "SELECT mrcs.*,
+                          CONCAT(st.first_name,' ',st.last_name) AS exec_name,
+                          cm.name AS machine_name,
+                          i.name AS item_name
+                   FROM tbl_meter_reading_card_sales mrcs
+                   LEFT JOIN tbl_staff st ON mrcs.staff_id = st.id
+                   LEFT JOIN tbl_card_machines cm ON mrcs.card_machine_id = cm.id
+                   LEFT JOIN tbl_items i ON mrcs.item_id = i.id
+                   WHERE mrcs.meter_reading_id = $id
+                   ORDER BY mrcs.id ASC";
+$card_sales_result = mysqli_query($connection, $card_sales_sql);
+$card_sales = [];
+$card_sales_total = 0;
+if ($card_sales_result) {
+    while ($cs = mysqli_fetch_assoc($card_sales_result)) {
+        $card_sales[] = $cs;
+        $card_sales_total += floatval($cs['amount']);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -557,6 +578,72 @@ body {
         </p>
     </div>
 
+    <?php endif; ?>
+
+    <?php if (!empty($header['remarks'])): ?>
+    <div style="margin-top:14px; border:1px solid #ccc; padding:8px 12px; border-radius:4px; background:#fafafa;">
+        <span style="font-size:9px; text-transform:uppercase; color:#777; font-weight:700; display:block; margin-bottom:4px;">Remarks</span>
+        <div style="font-size:11px; color:#333; line-height:1.4; white-space:pre-line;"><?php echo htmlspecialchars($header['remarks']); ?></div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($card_sales)): ?>
+    <div style="margin-top:14px;">
+        <div class="sec-bar" style="background:#17a2b8;">
+            Card Sales Breakdown
+        </div>
+        <table class="nozzle-tbl" style="margin-top:0;">
+            <colgroup>
+                <col style="width:3%">   <!-- # -->
+                <col style="width:15%">  <!-- Sales Executive -->
+                <col style="width:15%">  <!-- Card Machine -->
+                <col style="width:12%">  <!-- Item -->
+                <col style="width:8%">   <!-- Rate -->
+                <col style="width:10%">  <!-- Amount -->
+                <col style="width:10%">  <!-- Quantity -->
+                <col style="width:10%">  <!-- Service Charges -->
+                <col style="width:10%">  <!-- Net Amount -->
+                <col style="width:12%">  <!-- Batch No -->
+            </colgroup>
+            <thead>
+                <tr>
+                    <th style="background:#117a8b;">#</th>
+                    <th style="background:#117a8b;">Sales Executive</th>
+                    <th style="background:#117a8b;">Card Machine</th>
+                    <th style="background:#117a8b;">Item</th>
+                    <th style="background:#117a8b;">Rate<br>(Rs.)</th>
+                    <th style="background:#117a8b;">Amount<br>(Rs.)</th>
+                    <th style="background:#117a8b;">Quantity</th>
+                    <th style="background:#117a8b;">Service Charges</th>
+                    <th style="background:#117a8b;">Net Amount</th>
+                    <th style="background:#117a8b;">Batch No</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php $cn = 1; foreach ($card_sales as $cs): ?>
+            <tr>
+                <td class="c"><?php echo $cn++; ?></td>
+                <td><?php echo htmlspecialchars($cs['exec_name'] ?? '—'); ?></td>
+                <td class="c"><?php echo htmlspecialchars($cs['machine_name'] ?? 'N/A'); ?></td>
+                <td class="c"><?php echo htmlspecialchars($cs['item_name'] ?? 'N/A'); ?></td>
+                <td class="r"><?php echo number_format($cs['rate'], 2); ?></td>
+                <td class="r" style="background:#fff3e0; font-weight:bold;"><?php echo number_format($cs['amount'], 2); ?></td>
+                <td class="r" style="background:#e8f5e9; font-weight:bold;"><?php echo number_format($cs['quantity'], 2); ?></td>
+                <td class="r" style="color:#c62828; font-weight:bold;"><?php echo number_format($cs['service_charges'], 2); ?></td>
+                <td class="r" style="color:#2e7d32; font-weight:bold;"><?php echo number_format($cs['net_amount'], 2); ?></td>
+                <td class="c"><code><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></code></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr class="totals-row">
+                    <td colspan="5" class="r">TOTAL CARD SALE</td>
+                    <td class="r" style="background:#fff3e0; color:#e65100; font-size:11px;"><?php echo number_format($card_sales_total, 2); ?></td>
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
     <?php endif; ?>
 
     <!-- Signatures -->

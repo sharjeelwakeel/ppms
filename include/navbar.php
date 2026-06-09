@@ -31,6 +31,8 @@ if (!file_exists('include/navbar.php')) {
                     <a class="dropdown-item" href="<?php echo $prefix; ?>nozzles/nozzles-list.php">Nozzles</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-list.php">Staff</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php">Card Machines</a>
                 </div>
             </li>
             <li class="nav-item dropdown">

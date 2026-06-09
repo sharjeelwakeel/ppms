@@ -59,6 +59,27 @@ while ($r = mysqli_fetch_assoc($details_result)) { $details[] = $r; }
 // Re-calculate grand total from actual detail rows (cross-check)
 $calcGrand = 0;
 foreach ($details as $d) { $calcGrand += floatval($d['amount']); }
+
+// Fetch Card Sales
+$card_sales_sql = "SELECT mrcs.*,
+                          CONCAT(st.first_name,' ',st.last_name) AS exec_name,
+                          cm.name AS machine_name,
+                          i.name AS item_name
+                   FROM tbl_meter_reading_card_sales mrcs
+                   LEFT JOIN tbl_staff st ON mrcs.staff_id = st.id
+                   LEFT JOIN tbl_card_machines cm ON mrcs.card_machine_id = cm.id
+                   LEFT JOIN tbl_items i ON mrcs.item_id = i.id
+                   WHERE mrcs.meter_reading_id = $id
+                   ORDER BY mrcs.id ASC";
+$card_sales_result = mysqli_query($connection, $card_sales_sql);
+$card_sales = [];
+$card_sales_total = 0;
+if ($card_sales_result) {
+    while ($cs = mysqli_fetch_assoc($card_sales_result)) {
+        $card_sales[] = $cs;
+        $card_sales_total += floatval($cs['amount']);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -450,6 +471,71 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
     <?php endif; ?>
 </div>
 
+<?php if (!empty($header['remarks'])): ?>
+<!-- Remarks -->
+<div class="card-wrap screen-only no-print mt-4">
+    <div class="card-title">
+        <span><i class="fas fa-comment-dots mr-2"></i>Remarks / Notes</span>
+    </div>
+    <div class="card-body py-3" style="font-size:14px; color:#444; background:#fafbff;">
+        <?php echo nl2br(htmlspecialchars($header['remarks'])); ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($card_sales)): ?>
+<!-- Card Sales -->
+<div class="card-wrap screen-only mt-4">
+    <div class="card-title" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);">
+        <span><i class="fas fa-credit-card mr-2"></i>Card Sales Details</span>
+        <span class="badge badge-light" style="color:#117a8b; font-weight:700; font-size:12px;">
+            Total: PKR <?php echo number_format($card_sales_total, 2); ?>
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered rtable">
+            <thead>
+                <tr>
+                    <th style="width:36px; background:#117a8b;">#</th>
+                    <th style="background:#117a8b;">Sales Executive</th>
+                    <th style="background:#117a8b;">Card Machine</th>
+                    <th style="background:#117a8b;">Item</th>
+                    <th style="background:#117a8b; text-align:right;">Rate</th>
+                    <th style="background:#117a8b; text-align:right;">Amount</th>
+                    <th style="background:#117a8b; text-align:right;">Quantity</th>
+                    <th style="background:#117a8b; text-align:right;">Service Charges</th>
+                    <th style="background:#117a8b; text-align:right;">Net Amount</th>
+                    <th style="background:#117a8b;">Batch No</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php $cn = 1; foreach ($card_sales as $cs): ?>
+            <tr>
+                <td class="text-center text-muted font-weight-bold"><?php echo $cn++; ?></td>
+                <td class="td-exec"><?php echo htmlspecialchars($cs['exec_name'] ?? '—'); ?></td>
+                <td><span class="badge badge-info font-weight-bold" style="background:#e0f7fa; color:#006064; padding:3px 9px; border-radius:20px; font-size:11px;"><?php echo htmlspecialchars($cs['machine_name'] ?? 'N/A'); ?></span></td>
+                <td><span class="badge-item"><?php echo htmlspecialchars($cs['item_name'] ?? 'N/A'); ?></span></td>
+                <td class="td-rate"><?php echo number_format($cs['rate'], 2); ?></td>
+                <td class="td-curr" style="background:#fff3e0; color:#e65100; font-weight:700;"><?php echo number_format($cs['amount'], 2); ?></td>
+                <td class="td-sale" style="background:#e8f5e9; color:#2e7d32;"><?php echo number_format($cs['quantity'], 2); ?></td>
+                <td class="text-right text-danger font-weight-bold"><?php echo number_format($cs['service_charges'], 2); ?></td>
+                <td class="text-right text-success font-weight-bold"><?php echo number_format($cs['net_amount'], 2); ?></td>
+                <td><code><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></code></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr style="background:#f8f9fa; font-weight:bold;">
+                    <td colspan="5" class="text-right">TOTALS</td>
+                    <td class="text-right text-primary" style="font-size:15px; font-weight:700;"><?php echo number_format($card_sales_total, 2); ?></td>
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- ════════════ PRINT LAYOUT ════════════ -->
 <div class="print-only">
 
@@ -518,6 +604,56 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
             </tr>
         </tfoot>
     </table>
+
+    <?php if (!empty($header['remarks'])): ?>
+    <div style="margin-top:10px; border:1px solid #ddd; padding:8px 10px; border-radius:3px;">
+        <span style="font-size:8px; text-transform:uppercase; color:#999; font-weight:700; display:block; margin-bottom:3px;">Remarks</span>
+        <div style="font-size:10.5px; color:#333;"><?php echo nl2br(htmlspecialchars($header['remarks'])); ?></div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($card_sales)): ?>
+    <h3 style="font-size:12px; font-weight:700; margin:15px 0 5px; color:#2c3e50; border-bottom:1px solid #2c3e50; padding-bottom:3px;"><i class="fas fa-credit-card mr-1"></i>Card Sales</h3>
+    <table class="pt" style="margin-bottom:10px;">
+        <thead>
+            <tr>
+                <th style="width:30px;">#</th>
+                <th>Sales Executive</th>
+                <th>Card Machine</th>
+                <th>Item</th>
+                <th class="r">Rate</th>
+                <th class="r">Amount</th>
+                <th class="r">Quantity</th>
+                <th class="r">Service Charges</th>
+                <th class="r">Net Amount</th>
+                <th>Batch No</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php $cpn = 1; foreach ($card_sales as $cs): ?>
+            <tr>
+                <td class="c"><?php echo $cpn++; ?></td>
+                <td><?php echo htmlspecialchars($cs['exec_name'] ?? '—'); ?></td>
+                <td><?php echo htmlspecialchars($cs['machine_name'] ?? 'N/A'); ?></td>
+                <td><?php echo htmlspecialchars($cs['item_name'] ?? 'N/A'); ?></td>
+                <td class="r"><?php echo number_format($cs['rate'], 2); ?></td>
+                <td class="r" style="font-weight:700;"><?php echo number_format($cs['amount'], 2); ?></td>
+                <td class="r"><?php echo number_format($cs['quantity'], 2); ?></td>
+                <td class="r"><?php echo number_format($cs['service_charges'], 2); ?></td>
+                <td class="r" style="font-weight:700;"><?php echo number_format($cs['net_amount'], 2); ?></td>
+                <td class="c"><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="font-weight:700;">
+                <td colspan="5" style="text-align:right;">TOTAL CARD SALE</td>
+                <td style="text-align:right; font-size:11px;"><?php echo number_format($card_sales_total, 2); ?></td>
+                <td colspan="4"></td>
+            </tr>
+        </tfoot>
+    </table>
+    <?php endif; ?>
 
     <!-- Print footer -->
     <div class="pfooter">
