@@ -11,12 +11,16 @@ $toDate   = isset($_GET['to_date']) ? $_GET['to_date'] : '';
 
 $pur_date_cond = "";
 $sal_date_cond = "";
+$cum_pur_cond  = "";
+$cum_sal_cond  = "";
 
 if (!empty($fromDate) && !empty($toDate)) {
     $escFrom = mysqli_real_escape_string($connection, $fromDate);
     $escTo   = mysqli_real_escape_string($connection, $toDate);
     $pur_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
     $sal_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
+    $cum_pur_cond  = " AND date <= '$escTo' ";
+    $cum_sal_cond  = " AND date <= '$escTo' ";
 }
 
 // Calculate overall summary metrics in date range
@@ -32,12 +36,12 @@ $total_credit_sales = floatval(mysqli_fetch_row($total_credit_sales_res)[0]);
 $total_products_res = mysqli_query($connection, "SELECT COUNT(*) FROM tbl_lubricant_products");
 $total_products = intval(mysqli_fetch_row($total_products_res)[0]);
 
-// Fetch products with lifetime and period metrics
+// Fetch products with cumulative and period metrics
 $sql = "
     SELECT p.id, p.name, p.price,
-           -- Lifetime stock calculations
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id), 0) AS lifetime_purchased,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id), 0) AS lifetime_sold,
+           -- Cumulative stock calculations up to To Date
+           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id" . $cum_pur_cond . "), 0) AS cumulative_purchased,
+           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id" . $cum_sal_cond . "), 0) AS cumulative_sold,
            
            -- Period calculations based on date range
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id" . $pur_date_cond . "), 0) AS period_purchased,
@@ -52,7 +56,7 @@ $total_valuation = 0;
 
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
-        $row['current_stock'] = $row['lifetime_purchased'] - $row['lifetime_sold'];
+        $row['current_stock'] = $row['cumulative_purchased'] - $row['cumulative_sold'];
         $row['stock_value'] = $row['current_stock'] * $row['price'];
         $total_valuation += $row['stock_value'];
         $products_data[] = $row;
@@ -321,27 +325,15 @@ if ($result) {
                         <table id="reportTable" class="table table-striped table-bordered mb-0">
                             <thead>
                                 <tr>
-                                    <th rowspan="2" style="border-bottom:none;">Product Name</th>
-                                    <th colspan="3" class="bg-dark text-white text-center py-2" style="font-size:11px; letter-spacing:0.5px;">LIFETIME QUANTITY</th>
-                                    <th colspan="4" class="bg-secondary text-white text-center py-2" style="font-size:11px; letter-spacing:0.5px;">
-                                        <?php if (!empty($fromDate) && !empty($toDate)): ?>
-                                            PERIOD QUANTITY (FROM: <?php echo date("d-m-Y", strtotime($fromDate)); ?> TO: <?php echo date("d-m-Y", strtotime($toDate)); ?>)
-                                        <?php else: ?>
-                                            PERIOD QUANTITY (ALL-TIME SUMMARY)
-                                        <?php endif; ?>
-                                    </th>
-                                    <th rowspan="2" style="border-bottom:none;">Selling Price</th>
-                                    <th rowspan="2" style="border-bottom:none;">Stock Value</th>
-                                    <th rowspan="2" style="border-bottom:none; min-width:140px;">Actions</th>
-                                </tr>
-                                <tr>
-                                    <th>Total Purchases</th>
-                                    <th>Total Sales</th>
-                                    <th style="background:#0072ff !important;">Current Stock</th>
-                                    <th>Purchases</th>
+                                    <th>Product Name</th>
+                                    <th>Purchased (Inflow)</th>
                                     <th>Cash Sales</th>
                                     <th>Credit Sales</th>
-                                    <th style="background:#28a745 !important;">Total Sales</th>
+                                    <th style="background:#28a745 !important; color:#fff !important;">Total Sales</th>
+                                    <th style="background:#0072ff !important; color:#fff !important;">Stock In Hand</th>
+                                    <th>Selling Price</th>
+                                    <th>Stock Value</th>
+                                    <th class="d-print-none" style="min-width:140px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -363,16 +355,14 @@ if ($result) {
                                     echo '
                                         <tr>
                                             <td class="text-left font-weight-bold" style="color:var(--primary-color);">' . htmlspecialchars($row['name']) . '</td>
-                                            <td>' . number_format($row['lifetime_purchased'], 1) . '</td>
-                                            <td>' . number_format($row['lifetime_sold'], 1) . '</td>
-                                            <td>' . $stock_badge . '</td>
                                             <td>' . number_format($row['period_purchased'], 1) . '</td>
                                             <td class="text-success">' . number_format($row['period_cash_sold'], 1) . '</td>
                                             <td class="text-warning font-weight-bold">' . number_format($row['period_credit_sold'], 1) . '</td>
                                             <td class="font-weight-bold" style="background:#f4fbf4; color:#28a745;">' . number_format($period_total_sales, 1) . '</td>
+                                            <td>' . $stock_badge . '</td>
                                             <td>' . number_format($row['price'], 2) . '</td>
                                             <td class="font-weight-bold" style="background:#f0f5ff; color:#0052cc;">Rs. ' . number_format($row['stock_value'], 2) . '</td>
-                                            <td>
+                                            <td class="d-print-none">
                                                 <button class="btn btn-outline-info btn-xs py-1 px-2 font-weight-bold" style="font-size:11px; border-radius:5px;" onclick="viewLedger(' . $row['id'] . ', \'' . addslashes(htmlspecialchars($row['name'])) . '\')">
                                                     <i class="fas fa-receipt mr-1"></i> Ledger
                                                 </button>
