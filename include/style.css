@@ -1,0 +1,47 @@
+:root {
+    --primary-color: #04204e; /* Change this one line to change the entire system theme! */
+    --primary-hover: #07347a;
+    --primary-light: #e6f0fa;
+    --primary-gradient: linear-gradient(135deg, var(--primary-color) 0%, #07347a 100%);
+    --gradient-header: linear-gradient(135deg, var(--primary-color) 0%, #094096 100%);
+}
+
+.bg-dark{
+    background-color: var(--primary-color) !important;
+}
+
+.dropdown-item:hover{
+    background-color: var(--primary-color) !important;
+    color:white;
+}
+
+.btn-outline-primary{
+    color:white !important;
+}
+
+.btn-outline-primary:hover{
+    background-color:white !important;
+    color: var(--primary-color) !important;
+}
+
+/* Centralized primary button styles with robust fallbacks */
+.btn-primary {
+    background-color: #04204e !important;
+    background: var(--primary-gradient) !important;
+    border: none !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
+    transition: all 0.2s;
+}
+.btn-primary:hover {
+    background-color: #07347a !important;
+    background: var(--primary-hover) !important;
+    opacity: 0.9;
+}
+
+/* Centralized table header styling across all lists */
+table thead th,
+.table thead th {
+    background-color: #04204e !important;
+    color: #fff !important;
+}
