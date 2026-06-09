@@ -522,55 +522,55 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                 </button>
             </div>
 
+            <!-- Card Sale Modal -->
+            <div class="modal fade" id="cardSaleModal" tabindex="-1" role="dialog" aria-labelledby="cardSaleModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-xl" role="document">
+                    <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                        <div class="modal-header bg-dark text-white py-3">
+                            <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body p-0">
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-bordered table-striped mb-0" id="cardSalesTable" style="font-size:13px;">
+                                    <thead class="bg-light text-secondary">
+                                        <tr>
+                                            <th style="min-width: 160px;">Sales Ex.</th>
+                                            <th style="min-width: 160px;">Ledger / Machine</th>
+                                            <th style="min-width: 160px;">Item</th>
+                                            <th style="width: 100px; text-align:right;">Rate</th>
+                                            <th style="width: 120px; text-align:right;">Amount</th>
+                                            <th style="width: 120px; text-align:right;">Quantity</th>
+                                            <th style="width: 140px;">Batch No</th>
+                                            <th style="width: 50px; text-align:center;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cardSalesBody">
+                                        <!-- Rows added dynamically via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 d-flex justify-content-between">
+                            <div>
+                                <button type="button" class="btn btn-outline-primary btn-sm font-weight-bold" onclick="addCardRow()">
+                                    <i class="fas fa-plus mr-1"></i> Add Row
+                                </button>
+                            </div>
+                            <div>
+                                <span class="mr-3 font-weight-bold text-muted" style="font-size:13px;">Total Card Sale: <span id="modal_card_total_display" class="text-primary font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
+                                <button type="button" class="btn btn-primary btn-sm px-4 font-weight-bold" data-dismiss="modal">Confirm</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </form>
     </div>
 </main>
-
-<!-- Card Sale Modal -->
-<div class="modal fade" id="cardSaleModal" tabindex="-1" role="dialog" aria-labelledby="cardSaleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
-        <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-            <div class="modal-header bg-dark text-white py-3">
-                <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale</h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                    <table class="table table-bordered table-striped mb-0" id="cardSalesTable" style="font-size:13px;">
-                        <thead class="bg-light text-secondary">
-                            <tr>
-                                <th style="min-width: 160px;">Sales Ex.</th>
-                                <th style="min-width: 160px;">Ledger / Machine</th>
-                                <th style="min-width: 160px;">Item</th>
-                                <th style="width: 100px; text-align:right;">Rate</th>
-                                <th style="width: 120px; text-align:right;">Amount</th>
-                                <th style="width: 120px; text-align:right;">Quantity</th>
-                                <th style="width: 140px;">Batch No</th>
-                                <th style="width: 50px; text-align:center;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cardSalesBody">
-                            <!-- Rows added dynamically via JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer bg-light py-2 d-flex justify-content-between">
-                <div>
-                    <button type="button" class="btn btn-outline-primary btn-sm font-weight-bold" onclick="addCardRow()">
-                        <i class="fas fa-plus mr-1"></i> Add Row
-                    </button>
-                </div>
-                <div>
-                    <span class="mr-3 font-weight-bold text-muted" style="font-size:13px;">Total Card Sale: <span id="modal_card_total_display" class="text-primary font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
-                    <button type="button" class="btn btn-primary btn-sm px-4 font-weight-bold" data-dismiss="modal">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
