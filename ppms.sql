@@ -56,42 +56,74 @@ CREATE TABLE `tbl_card_machines` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `charges_percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `contact_person_name` varchar(128) NOT NULL,
+  `contact_person_number` varchar(32) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_card_machines`
 --
 
-INSERT INTO `tbl_card_machines` (`id`, `name`, `charges_percentage`, `created_at`, `updated_at`) VALUES
-(1, 'Mezan Bank', 1.50, '2026-06-09 18:20:55', '2026-06-09 18:20:55'),
-(2, 'HBL', 2.00, '2026-06-09 18:20:55', '2026-06-09 18:20:55'),
-(3, 'DT PLUS CARD', 0.00, '2026-06-09 18:20:55', '2026-06-09 18:20:55');
+INSERT INTO `tbl_card_machines` (`id`, `name`, `charges_percentage`, `contact_person_name`, `contact_person_number`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Mezan Bank', 1.50, 'Mezan Support', '03001234567', '2026-06-09 18:20:55', '2026-06-09 18:20:55', NULL),
+(2, 'HBL', 2.00, 'HBL Support', '03007654321', '2026-06-09 18:20:55', '2026-06-09 18:20:55', NULL),
+(3, 'DT PLUS CARD', 0.00, 'DT Support', '03009999999', '2026-06-09 18:20:55', '2026-06-09 18:20:55', NULL);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_import_items`
+-- Table structure for table `tbl_banks`
 --
 
-CREATE TABLE `tbl_import_items` (
+CREATE TABLE `tbl_banks` (
+  `id` int(11) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `account_number` varchar(128) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_purchases`
+--
+
+CREATE TABLE `tbl_purchases` (
   `id` int(11) NOT NULL,
   `item_id` int(11) NOT NULL,
   `quantity` decimal(10,2) NOT NULL,
   `price` decimal(10,2) NOT NULL,
   `date` date NOT NULL,
-  `payment_status` enum('paid','unpaid') NOT NULL DEFAULT 'unpaid',
+  `route` varchar(256) NOT NULL,
+  `invoice_number` varchar(128) NOT NULL,
+  `carriage_invoice_number` varchar(128) NOT NULL,
+  `payment_status` enum('unpaid','in process','paid') NOT NULL DEFAULT 'unpaid',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `tbl_import_items`
+-- Table structure for table `tbl_purchase_payments`
 --
 
-INSERT INTO `tbl_import_items` (`id`, `item_id`, `quantity`, `price`, `date`, `payment_status`, `created_at`, `updated_at`) VALUES
-(1, 2, 5.00, 44.00, '2026-06-03', 'unpaid', '2026-06-03 14:19:56', '2026-06-03 14:19:56');
+CREATE TABLE `tbl_purchase_payments` (
+  `id` int(11) NOT NULL,
+  `purchase_id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `bank_id` int(11) NOT NULL,
+  `tank_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -102,7 +134,10 @@ INSERT INTO `tbl_import_items` (`id`, `item_id`, `quantity`, `price`, `date`, `p
 CREATE TABLE `tbl_items` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
-  `price` int(11) NOT NULL,
+  `cash_rate` decimal(10,2) NOT NULL,
+  `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `unit` varchar(64) NOT NULL DEFAULT '',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -111,9 +146,9 @@ CREATE TABLE `tbl_items` (
 -- Dumping data for table `tbl_items`
 --
 
-INSERT INTO `tbl_items` (`id`, `name`, `price`, `created_at`, `updated_at`) VALUES
-(2, 'Petrol', 200, '2026-06-03 10:47:28', '2026-06-03 10:47:28'),
-(3, 'Diesel', 375, '2026-06-14 14:39:18', '2026-06-14 14:39:18');
+INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rate`, `unit`, `created_at`, `updated_at`) VALUES
+(2, 'Petrol', 200.00, 205.00, 195.00, 'Litre', '2026-06-03 10:47:28', '2026-06-03 10:47:28'),
+(3, 'Diesel', 375.00, 380.00, 370.00, 'Litre', '2026-06-14 14:39:18', '2026-06-14 14:39:18');
 
 -- --------------------------------------------------------
 
@@ -145,6 +180,8 @@ CREATE TABLE `tbl_lubricant_products` (
   `id` int(11) NOT NULL,
   `name` varchar(256) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `category` varchar(64) NOT NULL DEFAULT 'Stock Item',
+  `shelf_quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
@@ -153,10 +190,10 @@ CREATE TABLE `tbl_lubricant_products` (
 -- Dumping data for table `tbl_lubricant_products`
 --
 
-INSERT INTO `tbl_lubricant_products` (`id`, `name`, `price`, `created_at`, `updated_at`) VALUES
-(1, 'Grease (250g)', 350.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
-(2, 'Engine Oil (4L)', 3200.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
-(3, 'Break Oil (250ml)', 450.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06');
+INSERT INTO `tbl_lubricant_products` (`id`, `name`, `price`, `category`, `shelf_quantity`, `created_at`, `updated_at`) VALUES
+(1, 'Grease (250g)', 350.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
+(2, 'Engine Oil (4L)', 3200.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
+(3, 'Break Oil (250ml)', 450.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06');
 
 -- --------------------------------------------------------
 
@@ -342,29 +379,6 @@ INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_nozzle_filling`
---
-
-CREATE TABLE `tbl_nozzle_filling` (
-  `id` int(11) NOT NULL,
-  `nozzle_id` int(11) NOT NULL,
-  `tank_id` int(11) NOT NULL,
-  `last_reading` decimal(10,2) NOT NULL,
-  `current_reading` decimal(10,2) NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_nozzle_filling`
---
-
-INSERT INTO `tbl_nozzle_filling` (`id`, `nozzle_id`, `tank_id`, `last_reading`, `current_reading`, `created_at`, `updated_at`) VALUES
-(2, 1, 3, 12000.00, 140000.00, '2026-06-14 16:51:15', '2026-06-14 16:51:15');
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `tbl_roles`
 --
 
@@ -437,6 +451,20 @@ INSERT INTO `tbl_staff` (`id`, `first_name`, `last_name`, `role_id`, `joining_da
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_staff_guarantors`
+--
+
+CREATE TABLE `tbl_staff_guarantors` (
+  `id` int(11) NOT NULL,
+  `staff_id` int(11) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `phone` varchar(32) NOT NULL,
+  `address` varchar(512) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_staff_attendance`
 --
 
@@ -472,8 +500,8 @@ INSERT INTO `tbl_staff_attendance` (`id`, `staff_id`, `date`, `status`, `created
 CREATE TABLE `tbl_tanks` (
   `id` int(11) NOT NULL,
   `tank_name` varchar(128) NOT NULL,
-  `start_reading` decimal(10,2) NOT NULL DEFAULT 0.00,
   `item_id` int(11) NOT NULL,
+  `storage_capacity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -482,25 +510,24 @@ CREATE TABLE `tbl_tanks` (
 -- Dumping data for table `tbl_tanks`
 --
 
-INSERT INTO `tbl_tanks` (`id`, `tank_name`, `start_reading`, `item_id`, `created_at`, `updated_at`) VALUES
-(2, 'tankA', 121.00, 2, '2026-06-03 12:57:50', '2026-06-03 12:57:50'),
-(3, 'Tank B', 27500.00, 3, '2026-06-14 14:40:56', '2026-06-14 14:40:56');
+INSERT INTO `tbl_tanks` (`id`, `tank_name`, `item_id`, `storage_capacity`, `created_at`, `updated_at`) VALUES
+(2, 'tankA', 2, 15000.00, '2026-06-03 12:57:50', '2026-06-03 12:57:50'),
+(3, 'Tank B', 3, 20000.00, '2026-06-14 14:40:56', '2026-06-14 14:40:56');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_tank_filling`
+-- Table structure for table `tbl_tank_dip_charts`
 --
 
-CREATE TABLE `tbl_tank_filling` (
+CREATE TABLE `tbl_tank_dip_charts` (
   `id` int(11) NOT NULL,
   `tank_id` int(11) NOT NULL,
-  `date` date NOT NULL,
-  `last_reading` decimal(10,2) NOT NULL,
-  `current_reading` decimal(10,2) NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `dip_label` varchar(64) NOT NULL,
+  `dip_value` decimal(12,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
 
 --
 -- Indexes for dumped tables
@@ -519,11 +546,20 @@ ALTER TABLE `tbl_card_machines`
   ADD PRIMARY KEY (`id`);
 
 --
--- Indexes for table `tbl_import_items`
+-- Indexes for table `tbl_purchases`
 --
-ALTER TABLE `tbl_import_items`
+ALTER TABLE `tbl_purchases`
   ADD PRIMARY KEY (`id`),
   ADD KEY `item_id` (`item_id`);
+
+--
+-- Indexes for table `tbl_purchase_payments`
+--
+ALTER TABLE `tbl_purchase_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `purchase_id` (`purchase_id`),
+  ADD KEY `bank_id` (`bank_id`),
+  ADD KEY `tank_id` (`tank_id`);
 
 --
 -- Indexes for table `tbl_items`
@@ -590,13 +626,7 @@ ALTER TABLE `tbl_nozzles`
   ADD KEY `tank_id` (`tank_id`),
   ADD KEY `item_id` (`item_id`);
 
---
--- Indexes for table `tbl_nozzle_filling`
---
-ALTER TABLE `tbl_nozzle_filling`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `nozzle_id` (`nozzle_id`),
-  ADD KEY `tank_id` (`tank_id`);
+
 
 --
 -- Indexes for table `tbl_roles`
@@ -619,6 +649,13 @@ ALTER TABLE `tbl_staff`
   ADD KEY `shift_id` (`shift_id`);
 
 --
+-- Indexes for table `tbl_staff_guarantors`
+--
+ALTER TABLE `tbl_staff_guarantors`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `staff_id` (`staff_id`);
+
+--
 -- Indexes for table `tbl_staff_attendance`
 --
 ALTER TABLE `tbl_staff_attendance`
@@ -635,11 +672,19 @@ ALTER TABLE `tbl_tanks`
   ADD KEY `item_id` (`item_id`);
 
 --
--- Indexes for table `tbl_tank_filling`
+-- Indexes for table `tbl_tank_dip_charts`
 --
-ALTER TABLE `tbl_tank_filling`
+ALTER TABLE `tbl_tank_dip_charts`
   ADD PRIMARY KEY (`id`),
   ADD KEY `tank_id` (`tank_id`);
+
+
+
+--
+-- Indexes for table `tbl_banks`
+--
+ALTER TABLE `tbl_banks`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -658,10 +703,16 @@ ALTER TABLE `tbl_card_machines`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `tbl_import_items`
+-- AUTO_INCREMENT for table `tbl_purchases`
 --
-ALTER TABLE `tbl_import_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+ALTER TABLE `tbl_purchases`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_purchase_payments`
+--
+ALTER TABLE `tbl_purchase_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_items`
@@ -717,11 +768,7 @@ ALTER TABLE `tbl_meter_reading_details`
 ALTER TABLE `tbl_nozzles`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
---
--- AUTO_INCREMENT for table `tbl_nozzle_filling`
---
-ALTER TABLE `tbl_nozzle_filling`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
 
 --
 -- AUTO_INCREMENT for table `tbl_roles`
@@ -742,6 +789,12 @@ ALTER TABLE `tbl_staff`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `tbl_staff_guarantors`
+--
+ALTER TABLE `tbl_staff_guarantors`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `tbl_staff_attendance`
 --
 ALTER TABLE `tbl_staff_attendance`
@@ -754,9 +807,17 @@ ALTER TABLE `tbl_tanks`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `tbl_tank_filling`
+-- AUTO_INCREMENT for table `tbl_tank_dip_charts`
 --
-ALTER TABLE `tbl_tank_filling`
+ALTER TABLE `tbl_tank_dip_charts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+
+
+--
+-- AUTO_INCREMENT for table `tbl_banks`
+--
+ALTER TABLE `tbl_banks`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
 

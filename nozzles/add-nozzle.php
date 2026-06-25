@@ -9,7 +9,16 @@ $message = '';
 if (isset($_POST['name']) && isset($_POST['tank_id']) && isset($_POST['item_id']) && isset($_POST['start_reading']) && isset($_POST['status'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $tank_id = mysqli_real_escape_string($connection, $_POST['tank_id']);
-    $item_id = mysqli_real_escape_string($connection, $_POST['item_id']);
+    
+    // Server-side database override validation query for item_id associated with the tank
+    $tank_query = mysqli_query($connection, "SELECT item_id FROM tbl_tanks WHERE id = '$tank_id'");
+    $tank_data = mysqli_fetch_assoc($tank_query);
+    if ($tank_data) {
+        $item_id = $tank_data['item_id'];
+    } else {
+        $item_id = mysqli_real_escape_string($connection, $_POST['item_id']);
+    }
+
     $start_reading = mysqli_real_escape_string($connection, $_POST['start_reading']);
     $status = mysqli_real_escape_string($connection, $_POST['status']);
 
@@ -25,7 +34,7 @@ if (isset($_POST['name']) && isset($_POST['tank_id']) && isset($_POST['item_id']
 }
 
 // Fetch tanks
-$tanks_sql = "SELECT id, tank_name FROM tbl_tanks ORDER BY tank_name ASC";
+$tanks_sql = "SELECT id, tank_name, item_id FROM tbl_tanks ORDER BY tank_name ASC";
 $tanks_result = mysqli_query($connection, $tanks_sql);
 
 // Fetch items
@@ -72,20 +81,20 @@ $items_result = mysqli_query($connection, $items_sql);
 							<div class="row">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Nozzle Name</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Nozzle Name</label>
+										<div class="col-lg-8 col-md-7 col-sm-7">
 											<input type="text" name="name" class="form-control" placeholder="e.g. Nozzle 1" required>
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Tank</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Tank</label>
+										<div class="col-lg-8 col-md-7 col-sm-7">
 											<select name="tank_id" class="form-control" required>
                                                 <option value="">Select Tank</option>
                                                 <?php 
                                                 if (mysqli_num_rows($tanks_result) > 0) {
                                                     while ($tank = mysqli_fetch_assoc($tanks_result)) {
-                                                        echo '<option value="' . $tank['id'] . '">' . htmlspecialchars($tank['tank_name']) . '</option>';
+                                                        echo '<option value="' . $tank['id'] . '" data-item-id="' . $tank['item_id'] . '">' . htmlspecialchars($tank['tank_name']) . '</option>';
                                                     }
                                                 }
                                                 ?>
@@ -93,8 +102,8 @@ $items_result = mysqli_query($connection, $items_sql);
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Item</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Item</label>
+										<div class="col-lg-8 col-md-7 col-sm-7">
 											<select name="item_id" class="form-control" required>
                                                 <option value="">Select Item</option>
                                                 <?php 
@@ -108,14 +117,14 @@ $items_result = mysqli_query($connection, $items_sql);
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Start Reading</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Current Reading</label>
+										<div class="col-lg-8 col-md-7 col-sm-7">
 											<input type="number" step="0.01" name="start_reading" class="form-control" placeholder="0.00" required>
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Status</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Status</label>
+										<div class="col-lg-8 col-md-7 col-sm-7">
 											<select name="status" class="form-control" required>
 												<option value="Active">Active</option>
 												<option value="Inactive">Inactive</option>
@@ -138,4 +147,27 @@ $items_result = mysqli_query($connection, $items_sql);
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
 	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script>
+	$(document).ready(function() {
+		// Listen to Tank changes
+		$('select[name="tank_id"]').on('change', function() {
+			var selectedOption = $(this).find(':selected');
+			var itemId = selectedOption.data('item-id');
+			
+			if (itemId) {
+				$('select[name="item_id"]').val(itemId).attr('disabled', true);
+			} else {
+				$('select[name="item_id"]').val('').attr('disabled', false);
+			}
+		});
+
+		// Trigger initially to handle default state
+		$('select[name="tank_id"]').trigger('change');
+
+		// Enable select on form submit so value is posted
+		$('form').on('submit', function() {
+			$('select[name="item_id"]').attr('disabled', false);
+		});
+	});
+	</script>
 </html>

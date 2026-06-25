@@ -60,7 +60,10 @@ require '../include/config.php';
 						<tr>
 							<th>ID</th>
 							<th>Name</th>
-							<th>Price</th>
+							<th>Cash Rate</th>
+							<th>Credit Rate</th>
+							<th>Purchase Rate</th>
+							<th>Unit</th>
 							<th>Created At</th>
 							<th>Updated At</th>
 							<th>Delete</th>
@@ -77,7 +80,10 @@ require '../include/config.php';
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td><a href="edit-item.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a></td>
-										<td>'.number_format($row['price']).'</td>
+										<td>Rs. '.number_format($row['cash_rate'], 2).'</td>
+										<td>Rs. '.number_format($row['credit_rate'], 2).'</td>
+										<td>Rs. '.number_format($row['purchase_rate'], 2).'</td>
+										<td>'.htmlspecialchars($row['unit']).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>
 										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deleteitem('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>

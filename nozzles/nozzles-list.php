@@ -62,7 +62,7 @@ require '../include/config.php';
 							<th>Name</th>
 							<th>Tank</th>
 							<th>Item</th>
-							<th>Start Reading</th>
+							<th>Current Reading</th>
 							<th>Status</th>
 							<th>Created At</th>
 							<th>Updated At</th>

@@ -15,9 +15,18 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
 $message = '';
 if (isset($_POST['submit'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
-    $price = mysqli_real_escape_string($connection, $_POST['price']);
+    $cash_rate = mysqli_real_escape_string($connection, $_POST['cash_rate']);
+    $credit_rate = mysqli_real_escape_string($connection, $_POST['credit_rate']);
+    $purchase_rate = mysqli_real_escape_string($connection, $_POST['purchase_rate']);
+    $unit = mysqli_real_escape_string($connection, $_POST['unit']);
 
-    $query = "UPDATE tbl_items SET name='$name', price='$price' WHERE id='$id'";
+    $query = "UPDATE tbl_items SET 
+                name='$name', 
+                cash_rate='$cash_rate', 
+                credit_rate='$credit_rate', 
+                purchase_rate='$purchase_rate', 
+                unit='$unit' 
+              WHERE id='$id'";
     
     if (mysqli_query($connection, $query)) {
         header('Location: items-list.php');
@@ -77,15 +86,35 @@ if (!$item) {
 							<div class="row">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Item Name</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-form-label">Item Name</label>
+										<div class="col-lg-8 col-md-7">
 											<input type="text" name="name" class="form-control" value="<?php echo htmlspecialchars($item['name']); ?>" required>
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Price</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
-											<input type="number" name="price" class="form-control" value="<?php echo htmlspecialchars($item['price']); ?>" required>
+										<label class="col-lg-4 col-md-5 col-form-label">Unit</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="text" name="unit" class="form-control" value="<?php echo htmlspecialchars($item['unit']); ?>" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Cash Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="cash_rate" class="form-control" value="<?php echo htmlspecialchars($item['cash_rate']); ?>" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Credit Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="credit_rate" class="form-control" value="<?php echo htmlspecialchars($item['credit_rate']); ?>" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Purchase Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="purchase_rate" class="form-control" value="<?php echo htmlspecialchars($item['purchase_rate']); ?>" required>
 										</div>
 									</div>
 								</div>

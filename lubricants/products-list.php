@@ -59,6 +59,8 @@ require '../include/config.php';
 						<tr>
 							<th>ID</th>
 							<th>Product Name</th>
+							<th>Category</th>
+							<th>Shelf Stock</th>
 							<th>Selling Price (Rs.)</th>
 							<th>Created At</th>
 							<th>Updated At</th>
@@ -75,6 +77,8 @@ require '../include/config.php';
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td><a href="edit-product.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a></td>
+										<td>'.htmlspecialchars($row['category'] ?? 'Stock Item').'</td>
+										<td>'.number_format($row['shelf_quantity'] ?? 0, 2).'</td>
 										<td>'.number_format($row['price'], 2).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>

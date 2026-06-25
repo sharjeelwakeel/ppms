@@ -66,21 +66,30 @@ require '../include/config.php';
 							<th>Per Day Salary</th>
 							<th>Phone</th>
 							<th>Address</th>
+							<th>Guarantor</th>
 							<th>Delete</th>
 						</tr>
 					</thead>
 					<tbody>
 						<?php 
-						$sql = "SELECT s.*, r.name as role_name, sh.name as shift_name 
+						$sql = "SELECT s.*, r.name as role_name, sh.name as shift_name, g.name as guarantor_name, g.phone as guarantor_phone 
                                 FROM tbl_staff s 
                                 LEFT JOIN tbl_roles r ON s.role_id = r.id 
                                 LEFT JOIN tbl_shifts sh ON s.shift_id = sh.id 
+                                LEFT JOIN tbl_staff_guarantors g ON s.id = g.staff_id
                                 ORDER BY s.id DESC";
 						$result = mysqli_query($connection, $sql);
 						$resultcheck = mysqli_num_rows($result);
 						if($resultcheck > 0){
 							while($row = mysqli_fetch_assoc($result)){
                                 $fullName = $row['first_name'] . ' ' . $row['last_name'];
+                                $guarantor_display = 'N/A';
+                                if (!empty($row['guarantor_name'])) {
+                                    $guarantor_display = htmlspecialchars($row['guarantor_name']);
+                                    if (!empty($row['guarantor_phone'])) {
+                                        $guarantor_display .= ' (' . htmlspecialchars($row['guarantor_phone']) . ')';
+                                    }
+                                }
 								echo' 
 									<tr>
 										<td>'.$row['id'].'</td>
@@ -91,6 +100,7 @@ require '../include/config.php';
 										<td>'.number_format($row['salary'], 2).'</td>
 										<td>'.htmlspecialchars($row['phone']).'</td>
 										<td>'.htmlspecialchars($row['address'] ?? '').'</td>
+										<td>'.$guarantor_display.'</td>
 										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deletestaff('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
 									</tr>';
 							}

@@ -6,21 +6,34 @@ if (!userloggedin()) {
 require '../include/config.php';
 
 $message = '';
-if (isset($_POST['item_id']) && isset($_POST['quantity']) && isset($_POST['price']) && isset($_POST['date']) && isset($_POST['payment_status'])) {
+if (
+    isset($_POST['item_id']) && 
+    isset($_POST['quantity']) && 
+    isset($_POST['price']) && 
+    isset($_POST['date']) && 
+    isset($_POST['route']) && 
+    isset($_POST['invoice_number']) && 
+    isset($_POST['carriage_invoice_number'])
+) {
     $item_id = mysqli_real_escape_string($connection, $_POST['item_id']);
     $quantity = mysqli_real_escape_string($connection, $_POST['quantity']);
     $price = mysqli_real_escape_string($connection, $_POST['price']);
     $date = mysqli_real_escape_string($connection, $_POST['date']);
-    $payment_status = mysqli_real_escape_string($connection, $_POST['payment_status']);
+    $route = mysqli_real_escape_string($connection, $_POST['route']);
+    $invoice_number = mysqli_real_escape_string($connection, $_POST['invoice_number']);
+    $carriage_invoice_number = mysqli_real_escape_string($connection, $_POST['carriage_invoice_number']);
 
-    $query = "INSERT INTO tbl_import_items (item_id, quantity, price, date, payment_status) 
-              VALUES ('$item_id', '$quantity', '$price', '$date', '$payment_status')";
-    
-    if (mysqli_query($connection, $query)) {
-        header('Location: import-items-list.php');
+    mysqli_begin_transaction($connection);
+    try {
+        $query = "INSERT INTO tbl_purchases (item_id, quantity, price, date, route, invoice_number, carriage_invoice_number, payment_status) 
+                  VALUES ('$item_id', '$quantity', '$price', '$date', '$route', '$invoice_number', '$carriage_invoice_number', 'unpaid')";
+        mysqli_query($connection, $query);
+        mysqli_commit($connection);
+        header('Location: purchases-list.php');
         exit;
-    } else {
-        $message = '<div class="alert alert-danger">Error saving import record: ' . mysqli_error($connection) . '</div>';
+    } catch (Exception $e) {
+        mysqli_rollback($connection);
+        $message = '<div class="alert alert-danger">Error saving purchase record: ' . $e->getMessage() . '</div>';
     }
 }
 
@@ -53,15 +66,15 @@ $items_result = mysqli_query($connection, $items_sql);
             opacity: 0.9;
         }
 		</style>
-		<title>PPMS - Add Import Item</title>
+		<title>PPMS - Add Purchase</title>
 	</head>
 	<body>
         
         <?php include('../include/navbar.php');?>
 		<main class="main">
 			<div class="container pt-4 pb-4">
-				<form action="add-import-item.php" method="POST">
-					<h4 class="mb-5">Add Import Item</h4>
+				<form action="add-purchase.php" method="POST">
+					<h4 class="mb-5">Add Purchase</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -89,7 +102,7 @@ $items_result = mysqli_query($connection, $items_sql);
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Price</label>
+										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Unit Price</label>
 										<div class="col-lg-9 col-md-7 col-sm-8">
 											<input type="number" step="0.01" name="price" class="form-control" placeholder="0.00" required>
 										</div>
@@ -100,13 +113,24 @@ $items_result = mysqli_query($connection, $items_sql);
 											<input type="date" name="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
 										</div>
 									</div>
+								</div>
+								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Payment Status</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
-											<select name="payment_status" class="form-control" required>
-												<option value="unpaid">Unpaid</option>
-												<option value="paid">Paid</option>
-											</select>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Route</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="route" class="form-control" placeholder="e.g. Route A" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Invoice Number</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="invoice_number" class="form-control" placeholder="e.g. INV-1002" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Carriage Invoice</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="carriage_invoice_number" class="form-control" placeholder="e.g. CAR-5022" required>
 										</div>
 									</div>
 								</div>
@@ -114,8 +138,8 @@ $items_result = mysqli_query($connection, $items_sql);
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Import</button>
-                        <a href="import-items-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top">Save Purchase</button>
+                        <a href="purchases-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
 					</div>
 				</form>
 			</div>

@@ -6,11 +6,13 @@ if (!userloggedin()) {
 require '../include/config.php';
 
 $message = '';
-if (isset($_POST['name'])) {
+if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POST['contact_person_number'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $charges_percentage = floatval($_POST['charges_percentage']);
+    $contact_person_name = mysqli_real_escape_string($connection, $_POST['contact_person_name']);
+    $contact_person_number = mysqli_real_escape_string($connection, $_POST['contact_person_number']);
 
-    $query = "INSERT INTO tbl_card_machines (name, charges_percentage) VALUES ('$name', '$charges_percentage')";
+    $query = "INSERT INTO tbl_card_machines (name, charges_percentage, contact_person_name, contact_person_number) VALUES ('$name', '$charges_percentage', '$contact_person_name', '$contact_person_number')";
     
     if (mysqli_query($connection, $query)) {
         header('Location: card-machines-list.php');
@@ -71,6 +73,24 @@ if (isset($_POST['name'])) {
 										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Service Charges (%)</label>
 										<div class="col-lg-7 col-md-6 col-sm-8">
 											<input type="number" step="0.01" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 1.50" value="0.00" required>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-3">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Contact Person</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="contact_person_name" class="form-control" placeholder="e.g. John Smith" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Contact Number</label>
+										<div class="col-lg-7 col-md-6 col-sm-8">
+											<input type="text" name="contact_person_number" class="form-control" placeholder="e.g. 03001234567" required>
 										</div>
 									</div>
 								</div>

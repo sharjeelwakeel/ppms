@@ -54,7 +54,7 @@ require '../include/config.php';
 							<th>ID</th>
 							<th>Tank Name</th>
 							<th>Item</th>
-							<th>Start Reading</th>
+							<th>Storage Capacity</th>
 							<th>Created At</th>
 							<th>Updated At</th>
 							<th>Delete</th>
@@ -62,19 +62,20 @@ require '../include/config.php';
 					</thead>
 					<tbody>
 						<?php 
-						$sql = "SELECT t.id, t.tank_name, t.start_reading, t.created_at, t.updated_at, i.name AS item_name
+						$sql = "SELECT t.id, t.tank_name, t.storage_capacity, t.created_at, t.updated_at, i.name AS item_name, i.unit AS item_unit
 								FROM tbl_tanks t
 								LEFT JOIN tbl_items i ON t.item_id = i.id
 								ORDER BY t.id DESC";
 						$result = mysqli_query($connection, $sql);
 						if ($result && mysqli_num_rows($result) > 0) {
 							while ($row = mysqli_fetch_assoc($result)) {
+								$unit_suffix = !empty($row['item_unit']) ? ' ' . htmlspecialchars($row['item_unit']) : ' Litres';
 								echo'
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td><a href="edit-tank.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['tank_name']).'</a></td>
 										<td>'.htmlspecialchars($row['item_name'] ?? '-').'</td>
-										<td>'.number_format($row['start_reading'], 2).'</td>
+										<td>'.number_format($row['storage_capacity'], 2) . $unit_suffix . '</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>
 										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deletetank('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size:20px;"></i></a></td>

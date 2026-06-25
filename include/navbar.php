@@ -33,19 +33,12 @@ if (!file_exists('include/navbar.php')) {
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-list.php">Staff</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php">Card Machines</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>banks/banks-list.php">Banks</a>
                 </div>
             </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="fas fa-exchange-alt mr-1"></i> Import Export Items
-                </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink2">
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>items/import-items-list.php">Import Items</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>nozzles/nozzle-filling-list.php">Nozzle Filling</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>tanks/tank-filling-list.php">Tank Filling</a>
-                </div>
+            <li class="nav-item">
+                <a class="nav-link" href="<?php echo $prefix; ?>purchases/purchases-list.php"><i class="fas fa-shopping-cart mr-1"></i> Purchases</a>
             </li>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkLubricants" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

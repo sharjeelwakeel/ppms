@@ -1,12 +1,16 @@
 <?php
+require 'session.php';
+if (!userloggedin()) {
+    header('Location:../login.php');
+}
 require 'config.php';
 if (isset($_POST['id']) && !empty($_POST['id'])) {
     $id = mysqli_real_escape_string($connection, $_POST['id']);
-    $sql = "DELETE FROM tbl_nozzle_filling WHERE id='$id'";
+    $sql = "UPDATE tbl_banks SET deleted_at = NOW() WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
-        echo 'Nozzle filling record deleted.';
+        echo 'deleted';
     } else {
-        echo "Error: " . mysqli_error($connection);
+        echo 'error:' . mysqli_error($connection);
     }
 }
 mysqli_close($connection);

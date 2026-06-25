@@ -12,8 +12,10 @@ if (isset($_POST['id'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $charges_percentage = floatval($_POST['charges_percentage']);
+    $contact_person_name = mysqli_real_escape_string($connection, $_POST['contact_person_name']);
+    $contact_person_number = mysqli_real_escape_string($connection, $_POST['contact_person_number']);
 
-    $query = "UPDATE tbl_card_machines SET name='$name', charges_percentage='$charges_percentage' WHERE id='$id'";
+    $query = "UPDATE tbl_card_machines SET name='$name', charges_percentage='$charges_percentage', contact_person_name='$contact_person_name', contact_person_number='$contact_person_number' WHERE id='$id'";
     
     if (mysqli_query($connection, $query)) {
         header('Location: card-machines-list.php');
@@ -85,6 +87,24 @@ if (!$machine) {
 										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Service Charges (%)</label>
 										<div class="col-lg-7 col-md-6 col-sm-8">
 											<input type="number" step="0.01" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 1.50" value="<?php echo htmlspecialchars($machine['charges_percentage']); ?>" required>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-3">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Contact Person</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="contact_person_name" class="form-control" placeholder="e.g. John Smith" value="<?php echo htmlspecialchars($machine['contact_person_name']); ?>" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Contact Number</label>
+										<div class="col-lg-7 col-md-6 col-sm-8">
+											<input type="text" name="contact_person_number" class="form-control" placeholder="e.g. 03001234567" value="<?php echo htmlspecialchars($machine['contact_person_number']); ?>" required>
 										</div>
 									</div>
 								</div>

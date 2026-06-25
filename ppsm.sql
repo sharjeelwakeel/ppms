@@ -256,17 +256,20 @@ DROP TABLE IF EXISTS `tbl_items`;
 CREATE TABLE `tbl_items` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
-  `price` int(11) NOT NULL
+  `cash_rate` decimal(10,2) NOT NULL,
+  `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `unit` varchar(64) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- Dumping data for table `tbl_items`
 --
 
-INSERT INTO `tbl_items` (`id`, `name`, `price`) VALUES
-(1, 'چکن بریانی', 70),
-(2, 'سموسہ', 10),
-(3, 'کولڈ ڈرنک', 30);
+INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rate`, `unit`) VALUES
+(1, 'چکن بریانی', 70.00, 75.00, 60.00, 'Plate'),
+(2, 'سموسہ', 10.00, 12.00, 8.00, 'Piece'),
+(3, 'کولڈ ڈرنک', 30.00, 35.00, 25.00, 'Bottle');
 
 -- --------------------------------------------------------
 

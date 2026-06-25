@@ -6,11 +6,15 @@ if (!userloggedin()) {
 require '../include/config.php';
 
 $message = '';
-if (isset($_POST['name']) && isset($_POST['price'])) {
+if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_rate']) && isset($_POST['purchase_rate']) && isset($_POST['unit'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
-    $price = mysqli_real_escape_string($connection, $_POST['price']);
+    $cash_rate = mysqli_real_escape_string($connection, $_POST['cash_rate']);
+    $credit_rate = mysqli_real_escape_string($connection, $_POST['credit_rate']);
+    $purchase_rate = mysqli_real_escape_string($connection, $_POST['purchase_rate']);
+    $unit = mysqli_real_escape_string($connection, $_POST['unit']);
 
-    $query = "INSERT INTO tbl_items (name, price) VALUES ('$name', '$price')";
+    $query = "INSERT INTO tbl_items (name, cash_rate, credit_rate, purchase_rate, unit) 
+              VALUES ('$name', '$cash_rate', '$credit_rate', '$purchase_rate', '$unit')";
     
     if (mysqli_query($connection, $query)) {
         header('Location: items-list.php');
@@ -60,15 +64,35 @@ if (isset($_POST['name']) && isset($_POST['price'])) {
 							<div class="row">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Item Name</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
+										<label class="col-lg-4 col-md-5 col-form-label">Item Name</label>
+										<div class="col-lg-8 col-md-7">
 											<input type="text" name="name" class="form-control" placeholder="e.g. Petrol" required>
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Price</label>
-										<div class="col-lg-9 col-md-7 col-sm-8">
-											<input type="number" name="price" class="form-control" placeholder="e.g. 50" required>
+										<label class="col-lg-4 col-md-5 col-form-label">Unit</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="text" name="unit" class="form-control" placeholder="e.g. Litre" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Cash Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="cash_rate" class="form-control" placeholder="e.g. 200.00" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Credit Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="credit_rate" class="form-control" placeholder="e.g. 205.00" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Purchase Rate (Rs.)</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="number" step="0.01" name="purchase_rate" class="form-control" placeholder="e.g. 195.00" required>
 										</div>
 									</div>
 								</div>

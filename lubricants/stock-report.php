@@ -38,7 +38,7 @@ $total_products = intval(mysqli_fetch_row($total_products_res)[0]);
 
 // Fetch products with cumulative and period metrics
 $sql = "
-    SELECT p.id, p.name, p.price,
+    SELECT p.id, p.name, p.price, p.category, p.shelf_quantity,
            -- Cumulative stock calculations up to To Date
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id" . $cum_pur_cond . "), 0) AS cumulative_purchased,
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id" . $cum_sal_cond . "), 0) AS cumulative_sold,
@@ -57,6 +57,8 @@ $total_valuation = 0;
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
         $row['current_stock'] = $row['cumulative_purchased'] - $row['cumulative_sold'];
+        $row['shelf_stock'] = floatval($row['shelf_quantity'] ?? 0);
+        $row['warehouse_stock'] = $row['current_stock'] - $row['shelf_stock'];
         $row['stock_value'] = $row['current_stock'] * $row['price'];
         $total_valuation += $row['stock_value'];
         $products_data[] = $row;
@@ -326,11 +328,14 @@ if ($result) {
                             <thead>
                                 <tr>
                                     <th>Product Name</th>
+                                    <th>Category</th>
                                     <th>Purchased (Inflow)</th>
                                     <th>Cash Sales</th>
                                     <th>Credit Sales</th>
                                     <th style="background:#28a745 !important; color:#fff !important;">Total Sales</th>
-                                    <th style="background:#0072ff !important; color:#fff !important;">Stock In Hand</th>
+                                    <th style="background:#6c757d !important; color:#fff !important;">Warehouse Stock</th>
+                                    <th style="background:#17a2b8 !important; color:#fff !important;">Shelf Stock</th>
+                                    <th style="background:#0072ff !important; color:#fff !important;">Total Stock</th>
                                     <th>Selling Price</th>
                                     <th>Stock Value</th>
                                     <th class="d-print-none" style="min-width:140px;">Actions</th>
@@ -355,10 +360,13 @@ if ($result) {
                                     echo '
                                         <tr>
                                             <td class="text-left font-weight-bold" style="color:var(--primary-color);">' . htmlspecialchars($row['name']) . '</td>
+                                            <td>' . htmlspecialchars($row['category'] ?? 'Stock Item') . '</td>
                                             <td>' . number_format($row['period_purchased'], 1) . '</td>
                                             <td class="text-success">' . number_format($row['period_cash_sold'], 1) . '</td>
                                             <td class="text-warning font-weight-bold">' . number_format($row['period_credit_sold'], 1) . '</td>
                                             <td class="font-weight-bold" style="background:#f4fbf4; color:#28a745;">' . number_format($period_total_sales, 1) . '</td>
+                                            <td>' . number_format($row['warehouse_stock'], 1) . '</td>
+                                            <td>' . number_format($row['shelf_stock'], 1) . '</td>
                                             <td>' . $stock_badge . '</td>
                                             <td>' . number_format($row['price'], 2) . '</td>
                                             <td class="font-weight-bold" style="background:#f0f5ff; color:#0052cc;">Rs. ' . number_format($row['stock_value'], 2) . '</td>

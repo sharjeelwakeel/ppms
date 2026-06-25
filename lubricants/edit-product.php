@@ -8,12 +8,14 @@ require '../include/config.php';
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-if (isset($_POST['id'])) {
+if (isset($_POST['id']) && isset($_POST['category']) && isset($_POST['shelf_quantity'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $price = floatval($_POST['price']);
+    $category = mysqli_real_escape_string($connection, $_POST['category']);
+    $shelf_quantity = floatval($_POST['shelf_quantity']);
 
-    $query = "UPDATE tbl_lubricant_products SET name='$name', price='$price' WHERE id='$id'";
+    $query = "UPDATE tbl_lubricant_products SET name='$name', price='$price', category='$category', shelf_quantity='$shelf_quantity' WHERE id='$id'";
     
     if (mysqli_query($connection, $query)) {
         header('Location: products-list.php');
@@ -85,6 +87,27 @@ if (!$product) {
 										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Selling Price</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
 											<input type="number" step="0.01" min="0" name="price" class="form-control" placeholder="e.g. 350.00" value="<?php echo htmlspecialchars($product['price']); ?>" required>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-3">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Category</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<select name="category" class="form-control" required>
+												<option value="Stock Item" <?php if (($product['category'] ?? 'Stock Item') == 'Stock Item') echo 'selected'; ?>>Stock Item</option>
+												<option value="Mobil Oil Company" <?php if (($product['category'] ?? '') == 'Mobil Oil Company') echo 'selected'; ?>>Mobil Oil Company</option>
+											</select>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Shelf Quantity</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="number" step="0.01" min="0" name="shelf_quantity" class="form-control" value="<?php echo htmlspecialchars($product['shelf_quantity'] ?? '0.00'); ?>" required>
 										</div>
 									</div>
 								</div>

@@ -23,22 +23,40 @@ if (isset($_POST['submit'])) {
     $address = isset($_POST['address']) ? mysqli_real_escape_string($connection, $_POST['address']) : '';
     $phone = mysqli_real_escape_string($connection, $_POST['phone']);
 
-    $query = "UPDATE tbl_staff SET 
-                first_name='$first_name', 
-                last_name='$last_name', 
-                role_id='$role_id', 
-                joining_date='$joining_date', 
-                shift_id='$shift_id', 
-                salary='$salary', 
-                address=" . ($address === '' ? "NULL" : "'$address'") . ", 
-                phone='$phone' 
-              WHERE id='$id'";
-    
-    if (mysqli_query($connection, $query)) {
+    $guar_name = mysqli_real_escape_string($connection, $_POST['guarantor_name']);
+    $guar_phone = mysqli_real_escape_string($connection, $_POST['guarantor_phone']);
+    $guar_address = isset($_POST['guarantor_address']) ? mysqli_real_escape_string($connection, $_POST['guarantor_address']) : '';
+
+    mysqli_begin_transaction($connection);
+    try {
+        $query = "UPDATE tbl_staff SET 
+                    first_name='$first_name', 
+                    last_name='$last_name', 
+                    role_id='$role_id', 
+                    joining_date='$joining_date', 
+                    shift_id='$shift_id', 
+                    salary='$salary', 
+                    address=" . ($address === '' ? "NULL" : "'$address'") . ", 
+                    phone='$phone' 
+                  WHERE id='$id'";
+        mysqli_query($connection, $query);
+
+        // Check if guarantor exists, then update or insert
+        $check_guar = mysqli_query($connection, "SELECT id FROM tbl_staff_guarantors WHERE staff_id='$id' LIMIT 1");
+        if (mysqli_num_rows($check_guar) > 0) {
+            $guar_row = mysqli_fetch_assoc($check_guar);
+            $guar_id = $guar_row['id'];
+            mysqli_query($connection, "UPDATE tbl_staff_guarantors SET name='$guar_name', phone='$guar_phone', address=" . ($guar_address === '' ? "NULL" : "'$guar_address'") . " WHERE id='$guar_id'");
+        } else {
+            mysqli_query($connection, "INSERT INTO tbl_staff_guarantors (staff_id, name, phone, address) VALUES ('$id', '$guar_name', '$guar_phone', " . ($guar_address === '' ? "NULL" : "'$guar_address'") . ")");
+        }
+
+        mysqli_commit($connection);
         header('Location: staff-list.php');
         exit;
-    } else {
-        $message = '<div class="alert alert-danger">Error updating staff: ' . mysqli_error($connection) . '</div>';
+    } catch (Exception $e) {
+        mysqli_rollback($connection);
+        $message = '<div class="alert alert-danger">Error updating staff: ' . $e->getMessage() . '</div>';
     }
 }
 
@@ -51,6 +69,11 @@ if (!$staff) {
     header('Location: staff-list.php');
     exit;
 }
+
+// Fetch guarantor details
+$guar_sql = "SELECT * FROM tbl_staff_guarantors WHERE staff_id='$id' LIMIT 1";
+$guar_result = mysqli_query($connection, $guar_sql);
+$guarantor = mysqli_fetch_assoc($guar_result) ?: [];
 
 // Fetch roles
 $roles_sql = "SELECT id, name FROM tbl_roles ORDER BY name ASC";
@@ -173,6 +196,36 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
 							</div>
 						</div>	
 					</div>
+					<h5 class="mb-4 mt-5"><i class="fas fa-user-shield mr-2 text-primary"></i>Reference Person (Guarantor) Information</h5>
+					<div class="card mb-5">
+						<div class="card-body">
+							<div class="row">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Name</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="guarantor_name" class="form-control" value="<?php echo htmlspecialchars($guarantor['name'] ?? ''); ?>" placeholder="e.g. Robert Smith" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Phone</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="guarantor_phone" class="form-control" value="<?php echo htmlspecialchars($guarantor['phone'] ?? ''); ?>" placeholder="e.g. 03009876543" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Address</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<textarea name="guarantor_address" class="form-control" rows="3" placeholder="Optional guarantor address"><?php echo htmlspecialchars($guarantor['address'] ?? ''); ?></textarea>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div class="txt-center">
 						<input type="submit" name="submit" value="Save Staff" class="btn btn-primary m-top">
                         <a href="staff-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>

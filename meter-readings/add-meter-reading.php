@@ -87,7 +87,7 @@ if (isset($_POST['submit'])) {
 }
 
 // Fetch all active nozzles with item info and price
-$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, i.name AS item_name, i.price, t.tank_name
+$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, i.name AS item_name, i.cash_rate AS price, t.tank_name
                 FROM tbl_nozzles n
                 LEFT JOIN tbl_items i ON n.item_id = i.id
                 LEFT JOIN tbl_tanks t ON n.tank_id = t.id
@@ -114,7 +114,7 @@ $machines_list = [];
 while ($m = mysqli_fetch_assoc($machines_result)) { $machines_list[] = $m; }
 
 // Fetch items list
-$items_sql = "SELECT id, name, price FROM tbl_items ORDER BY name ASC";
+$items_sql = "SELECT id, name, cash_rate AS price FROM tbl_items ORDER BY name ASC";
 $items_result = mysqli_query($connection, $items_sql);
 $items_list = [];
 while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }

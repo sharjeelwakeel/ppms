@@ -13,7 +13,9 @@ if (
     isset($_POST['joining_date']) && 
     isset($_POST['shift_id']) && 
     isset($_POST['salary']) && 
-    isset($_POST['phone'])
+    isset($_POST['phone']) &&
+    isset($_POST['guarantor_name']) &&
+    isset($_POST['guarantor_phone'])
 ) {
     $first_name = mysqli_real_escape_string($connection, $_POST['first_name']);
     $last_name = mysqli_real_escape_string($connection, $_POST['last_name']);
@@ -24,14 +26,27 @@ if (
     $address = isset($_POST['address']) ? mysqli_real_escape_string($connection, $_POST['address']) : '';
     $phone = mysqli_real_escape_string($connection, $_POST['phone']);
 
-    $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, salary, address, phone) 
-              VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$salary', " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
-    
-    if (mysqli_query($connection, $query)) {
+    $guar_name = mysqli_real_escape_string($connection, $_POST['guarantor_name']);
+    $guar_phone = mysqli_real_escape_string($connection, $_POST['guarantor_phone']);
+    $guar_address = isset($_POST['guarantor_address']) ? mysqli_real_escape_string($connection, $_POST['guarantor_address']) : '';
+
+    mysqli_begin_transaction($connection);
+    try {
+        $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, salary, address, phone) 
+                  VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$salary', " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
+        mysqli_query($connection, $query);
+        $staff_id = mysqli_insert_id($connection);
+
+        $guar_query = "INSERT INTO tbl_staff_guarantors (staff_id, name, phone, address) 
+                       VALUES ('$staff_id', '$guar_name', '$guar_phone', " . ($guar_address === '' ? "NULL" : "'$guar_address'") . ")";
+        mysqli_query($connection, $guar_query);
+
+        mysqli_commit($connection);
         header('Location: staff-list.php');
         exit;
-    } else {
-        $message = '<div class="alert alert-danger">Error saving staff: ' . mysqli_error($connection) . '</div>';
+    } catch (Exception $e) {
+        mysqli_rollback($connection);
+        $message = '<div class="alert alert-danger">Error saving staff: ' . $e->getMessage() . '</div>';
     }
 }
 
@@ -154,6 +169,36 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
 							</div>
 						</div>	
 					</div>
+					<h5 class="mb-4 mt-5"><i class="fas fa-user-shield mr-2 text-primary"></i>Reference Person (Guarantor) Information</h5>
+					<div class="card mb-5">
+						<div class="card-body">
+							<div class="row">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Name</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="guarantor_name" class="form-control" placeholder="e.g. Robert Smith" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Phone</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="guarantor_phone" class="form-control" placeholder="e.g. 03009876543" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Guarantor Address</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<textarea name="guarantor_address" class="form-control" rows="3" placeholder="Optional guarantor address"></textarea>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div class="txt-center">
 						<button type="submit" class="btn btn-primary m-top">Save Staff</button>
                         <a href="staff-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>

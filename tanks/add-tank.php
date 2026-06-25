@@ -6,13 +6,13 @@ if (!userloggedin()) {
 require '../include/config.php';
 
 $message = '';
-if (isset($_POST['tank_name']) && isset($_POST['start_reading']) && isset($_POST['item_id'])) {
-    $tank_name     = mysqli_real_escape_string($connection, $_POST['tank_name']);
-    $start_reading = mysqli_real_escape_string($connection, $_POST['start_reading']);
-    $item_id       = mysqli_real_escape_string($connection, $_POST['item_id']);
+if (isset($_POST['tank_name']) && isset($_POST['storage_capacity']) && isset($_POST['item_id'])) {
+    $tank_name        = mysqli_real_escape_string($connection, $_POST['tank_name']);
+    $storage_capacity = mysqli_real_escape_string($connection, $_POST['storage_capacity']);
+    $item_id          = mysqli_real_escape_string($connection, $_POST['item_id']);
 
-    $query = "INSERT INTO tbl_tanks (tank_name, start_reading, item_id)
-              VALUES ('$tank_name', '$start_reading', '$item_id')";
+    $query = "INSERT INTO tbl_tanks (tank_name, storage_capacity, item_id)
+              VALUES ('$tank_name', '$storage_capacity', '$item_id')";
 
     if (mysqli_query($connection, $query)) {
         header('Location: tanks-list.php');
@@ -81,9 +81,9 @@ $items_result = mysqli_query($connection, $items_sql);
 										</div>
 									</div>
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Start Reading</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Storage Capacity</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="number" step="0.01" name="start_reading" class="form-control" placeholder="e.g. 0.00" required>
+											<input type="number" step="0.01" name="storage_capacity" class="form-control" placeholder="e.g. 15000.00" required>
 										</div>
 									</div>
 								</div>

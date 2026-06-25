@@ -60,6 +60,8 @@ require '../include/config.php';
 							<th>ID</th>
 							<th>Machine Name</th>
 							<th>Service Charges (%)</th>
+							<th>Contact Person</th>
+							<th>Contact Number</th>
 							<th>Created At</th>
 							<th>Updated At</th>
 							<th>Delete</th>
@@ -67,7 +69,7 @@ require '../include/config.php';
 					</thead>
 					<tbody>
 						<?php 
-						$sql = "SELECT * FROM tbl_card_machines ORDER BY id DESC";
+						$sql = "SELECT * FROM tbl_card_machines WHERE deleted_at IS NULL ORDER BY id DESC";
 						$result = mysqli_query($connection, $sql);
 						if($result && mysqli_num_rows($result) > 0){
 							while($row = mysqli_fetch_assoc($result)){
@@ -76,6 +78,8 @@ require '../include/config.php';
 										<td>'.$row['id'].'</td>
 										<td><a href="edit-card-machine.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a></td>
 										<td>'.number_format($row['charges_percentage'], 2).'%</td>
+										<td>'.htmlspecialchars($row['contact_person_name']).'</td>
+										<td>'.htmlspecialchars($row['contact_person_number']).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>
 										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deleteMachine('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
