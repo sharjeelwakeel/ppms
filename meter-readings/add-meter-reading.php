@@ -3,12 +3,42 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 
+// Auto-migrate tbl_meter_reading_card_sales schema if columns are missing
+$check_columns = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'nozzle_id'");
+if (mysqli_num_rows($check_columns) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN nozzle_id INT DEFAULT NULL");
+}
+$check_columns2 = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'no_of_cards'");
+if (mysqli_num_rows($check_columns2) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN no_of_cards INT DEFAULT 0");
+}
+
+// Auto-migrate tbl_meter_reading_credit_sales table if it does not exist
+mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `meter_reading_id` INT NOT NULL,
+  `nozzle_id` INT NOT NULL,
+  `slip_date` DATE NOT NULL,
+  `slip_no` VARCHAR(64) NOT NULL,
+  `account_number` VARCHAR(128) NOT NULL,
+  `vehicle_number` VARCHAR(64) NOT NULL,
+  `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `cash_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `issue_quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `balance_1` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `balance_2` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `wasoli` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
+)");
+
 $message = '';
 
 if (isset($_POST['submit'])) {
     $date         = mysqli_real_escape_string($connection, $_POST['date']);
     $shift_id     = mysqli_real_escape_string($connection, $_POST['shift_id']);
-    $payment_type = mysqli_real_escape_string($connection, $_POST['payment_type']);
+    $payment_type = 'Cash';
     $remarks      = mysqli_real_escape_string($connection, $_POST['remarks'] ?? '');
     $grand_total  = 0;
 
@@ -28,7 +58,7 @@ if (isset($_POST['submit'])) {
                 $last_reading    = floatval($_POST['last_reading'][$idx] ?? 0);
                 $current_reading = floatval($_POST['current_reading'][$idx] ?? 0);
                 $test_reading    = floatval($_POST['test_reading'][$idx] ?? 0);
-                $row_payment     = mysqli_real_escape_string($connection, $_POST['row_payment_type'][$idx] ?? $payment_type);
+                $row_payment     = 'Cash';
 
                 $sale_reading = $current_reading - $last_reading;
                 if ($sale_reading < 0) $sale_reading = 0;
@@ -45,34 +75,64 @@ if (isset($_POST['submit'])) {
                     VALUES ('$reading_id','$nozzle_id','$row_staff_id','$item_type','$price',
                             '$last_reading','$current_reading','$sale_reading','$test_reading','$net_sale','$amount','$row_payment')";
                 mysqli_query($connection, $detail_sql);
+
+                // Update start_reading in tbl_nozzles with the new current_reading
+                $update_nozzle_sql = "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'";
+                mysqli_query($connection, $update_nozzle_sql);
             }
         }
 
-        // Loop through card sales rows
-        if (isset($_POST['card_staff_id']) && is_array($_POST['card_staff_id'])) {
-            foreach ($_POST['card_staff_id'] as $c_idx => $c_staff_id) {
-                $c_staff_id   = intval($c_staff_id);
-                $c_machine_id = intval($_POST['card_machine_id'][$c_idx] ?? 0);
-                $c_item_id    = intval($_POST['card_item_id'][$c_idx] ?? 0);
-                $c_rate       = floatval($_POST['card_rate'][$c_idx] ?? 0);
-                $c_amount     = floatval($_POST['card_amount'][$c_idx] ?? 0);
-                $c_quantity   = floatval($_POST['card_quantity'][$c_idx] ?? 0);
-                $c_batch_no   = mysqli_real_escape_string($connection, $_POST['card_batch_no'][$c_idx] ?? '');
+        // Insert single card sale entry if amount is greater than 0
+        $card_amount = floatval($_POST['card_amount'] ?? 0);
+        if ($card_amount > 0) {
+            $c_nozzle_id   = intval($_POST['card_nozzle_id'] ?? 0);
+            $c_machine_id  = intval($_POST['card_machine_id'] ?? 0);
+            $c_batch_no    = mysqli_real_escape_string($connection, $_POST['card_batch_no'] ?? '');
+            $c_no_of_cards = intval($_POST['card_no_of_cards'] ?? 0);
 
-                if ($c_staff_id > 0 && $c_machine_id > 0 && $c_item_id > 0 && $c_amount > 0) {
-                    // Fetch charges percentage for this machine
-                    $charge_query = mysqli_query($connection, "SELECT charges_percentage FROM tbl_card_machines WHERE id='$c_machine_id'");
-                    $charge_row   = mysqli_fetch_assoc($charge_query);
-                    $charges_pct  = floatval($charge_row['charges_percentage'] ?? 0);
-                    
-                    $service_charges = $c_amount * ($charges_pct / 100);
-                    $net_amount      = $c_amount - $service_charges;
+            // Fetch item_id for the selected nozzle
+            $item_query = mysqli_query($connection, "SELECT item_id FROM tbl_nozzles WHERE id='$c_nozzle_id'");
+            $item_row = mysqli_fetch_assoc($item_query);
+            $c_item_id = intval($item_row['item_id'] ?? 0);
 
-                    $card_sales_sql = "INSERT INTO tbl_meter_reading_card_sales 
-                        (meter_reading_id, staff_id, card_machine_id, item_id, quantity, rate, amount, batch_no, service_charges, net_amount)
+            // Fetch charges percentage for this machine
+            $charge_query = mysqli_query($connection, "SELECT charges_percentage FROM tbl_card_machines WHERE id='$c_machine_id'");
+            $charge_row   = mysqli_fetch_assoc($charge_query);
+            $charges_pct  = floatval($charge_row['charges_percentage'] ?? 0);
+            
+            $service_charges = $card_amount * ($charges_pct / 100);
+            $net_amount      = $card_amount - $service_charges;
+
+            $card_sales_sql = "INSERT INTO tbl_meter_reading_card_sales 
+                (meter_reading_id, staff_id, card_machine_id, item_id, quantity, rate, amount, batch_no, service_charges, net_amount, nozzle_id, no_of_cards, created_at)
+                VALUES 
+                ('$reading_id', 0, '$c_machine_id', '$c_item_id', 0, 0, '$card_amount', '$c_batch_no', '$service_charges', '$net_amount', '$c_nozzle_id', '$c_no_of_cards', NOW())";
+            mysqli_query($connection, $card_sales_sql);
+        }
+
+        // Loop through credit sales rows and save them
+        if (isset($_POST['credit_nozzle_id']) && is_array($_POST['credit_nozzle_id'])) {
+            foreach ($_POST['credit_nozzle_id'] as $idx => $c_nozzle_id) {
+                $c_nozzle_id      = intval($c_nozzle_id);
+                $c_slip_date      = mysqli_real_escape_string($connection, $_POST['credit_slip_date'][$idx] ?? '');
+                $c_slip_no        = mysqli_real_escape_string($connection, $_POST['credit_slip_no'][$idx] ?? '');
+                $c_account_number = mysqli_real_escape_string($connection, $_POST['credit_account_number'][$idx] ?? '');
+                $c_vehicle_number = mysqli_real_escape_string($connection, $_POST['credit_vehicle_number'][$idx] ?? '');
+                $c_quantity       = floatval($_POST['credit_quantity'][$idx] ?? 0);
+                $c_rate           = floatval($_POST['credit_rate'][$idx] ?? 0);
+                $c_amount         = floatval($_POST['credit_amount'][$idx] ?? 0);
+                $c_cash_rate      = floatval($_POST['credit_cash_rate'][$idx] ?? 0);
+                $c_issue_quantity = floatval($_POST['credit_issue_quantity'][$idx] ?? 0);
+                $c_balance_1      = floatval($_POST['credit_balance_1'][$idx] ?? 0);
+                $c_balance_2      = floatval($_POST['credit_balance_2'][$idx] ?? 0);
+                $c_wasoli         = floatval($_POST['credit_wasoli'][$idx] ?? 0);
+
+                if ($c_nozzle_id > 0 && $c_amount > 0) {
+                    $credit_sales_sql = "INSERT INTO tbl_meter_reading_credit_sales 
+                        (meter_reading_id, nozzle_id, slip_date, slip_no, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
                         VALUES 
-                        ('$reading_id', '$c_staff_id', '$c_machine_id', '$c_item_id', '$c_quantity', '$c_rate', '$c_amount', '$c_batch_no', '$service_charges', '$net_amount')";
-                    mysqli_query($connection, $card_sales_sql);
+                        ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
+                    mysqli_query($connection, $credit_sales_sql);
                 }
             }
         }
@@ -86,8 +146,8 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// Fetch all active nozzles with item info and price
-$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, i.name AS item_name, i.cash_rate AS price, t.tank_name
+// Fetch all active nozzles with item info, price, and last reading (from tbl_nozzles.start_reading)
+$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, n.start_reading, i.name AS item_name, i.cash_rate AS price, t.tank_name
                 FROM tbl_nozzles n
                 LEFT JOIN tbl_items i ON n.item_id = i.id
                 LEFT JOIN tbl_tanks t ON n.tank_id = t.id
@@ -319,17 +379,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label><i class="fas fa-credit-card mr-1 text-primary"></i> Payment Type (Default)</label>
-                            <select name="payment_type" class="form-control" id="globalPayment">
-                                <option value="Cash">Cash</option>
-                                <option value="Credit">Credit</option>
-                                <option value="Online">Online</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-3 d-flex align-items-center">
+                    <div class="col-md-6 d-flex align-items-center">
                         <div class="form-group w-100">
                             <label>&nbsp;</label>
                             <div class="alert alert-info mb-0 py-2 px-3" style="font-size:12px; border-radius:8px;">
@@ -376,7 +426,6 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                     Amount
                                     <br><small style="color:#ffc107;font-weight:400;">(Auto)</small>
                                 </th>
-                                <th>Payment Type</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -433,7 +482,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                            name="last_reading[]"
                                            id="last_<?php echo $i; ?>"
                                            class="form-control last_reading"
-                                           value="0"
+                                           value="<?php echo htmlspecialchars($nozzle['start_reading']); ?>"
                                            oninput="calculate(<?php echo $i; ?>)">
                                 </td>
 
@@ -466,16 +515,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                 <!-- Amount (auto) -->
                                 <td class="amount-field" id="amount_<?php echo $i; ?>">0.00</td>
 
-                                <!-- Per-row Payment Type -->
-                                <td>
-                                    <select name="row_payment_type[]" class="form-control row-payment"
-                                            id="rpt_<?php echo $i; ?>"
-                                            style="width:110px;font-size:12px;">
-                                        <option value="Cash">Cash</option>
-                                        <option value="Credit">Credit</option>
-                                        <option value="Online">Online</option>
-                                    </select>
-                                </td>
+                                <!-- Per-row Payment Type Removed (default to Cash) -->
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -485,29 +525,33 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                     <i class="fas fa-sigma mr-2"></i>GRAND TOTAL
                                 </td>
                                 <td class="grand-total-value" id="grand_total_display">0.00</td>
-                                <td></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
 
-            <!-- Bottom Details (Remarks, Card Sale Button & Total) -->
+            <!-- Bottom Details (Remarks, Card Sale & Credit Sale Buttons & Totals) -->
             <div class="row align-items-center mb-4 mt-3">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <div class="form-group mb-0">
                         <label class="font-weight-bold" style="font-size:13px; color:#444;"><i class="fas fa-comment-dots mr-1 text-primary"></i> Remarks</label>
                         <input type="text" name="remarks" class="form-control" placeholder="Enter any remarks or notes here..." style="border-radius:7px; font-size:13px;">
                     </div>
                 </div>
-                <div class="col-md-3 text-center">
-                    <button type="button" class="btn btn-info font-weight-bold px-4 py-2" data-toggle="modal" data-target="#cardSaleModal" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); border:none; box-shadow:0 4px 12px rgba(23,162,184,0.25); border-radius:8px; font-size:13px;" onclick="if($('#cardSalesBody tr').length === 0) addCardRow();">
+                <div class="col-md-4 text-center">
+                    <button type="button" class="btn btn-info font-weight-bold px-3 py-2 mr-2" data-toggle="modal" data-target="#cardSaleModal" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); border:none; box-shadow:0 4px 12px rgba(23,162,184,0.25); border-radius:8px; font-size:12px;">
                         <i class="fas fa-credit-card mr-1"></i> Card Sale
+                    </button>
+                    <button type="button" class="btn btn-warning font-weight-bold px-3 py-2 text-white" data-toggle="modal" data-target="#creditSaleModal" style="background:linear-gradient(135deg, #ffc107 0%, #e0a800 100%); border:none; box-shadow:0 4px 12px rgba(255,193,7,0.25); border-radius:8px; font-size:12px;" onclick="if($('#creditSalesBody tr').length === 0) addCreditRow();">
+                        <i class="fas fa-file-invoice mr-1"></i> Credit Sale
                     </button>
                 </div>
                 <div class="col-md-4 text-right">
-                    <div class="font-weight-bold text-muted" style="font-size:13px; letter-spacing:0.5px;">
-                        CARD SALE TOTAL: <span id="card_sale_total_display" class="text-primary font-weight-bold" style="font-size:18px; margin-left:8px;">0.00</span>
+                    <div class="font-weight-bold text-muted" style="font-size:11px; letter-spacing:0.3px;">
+                        CARD SALE: <span id="card_sale_total_display" class="text-primary font-weight-bold" style="font-size:15px; margin-left:4px;">0.00</span>
+                        &nbsp;&nbsp;&nbsp;&nbsp;
+                        CREDIT SALE: <span id="credit_sale_total_display" class="text-warning font-weight-bold" style="font-size:15px; margin-left:4px;">0.00</span>
                     </div>
                 </div>
             </div>
@@ -524,45 +568,104 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
 
             <!-- Card Sale Modal -->
             <div class="modal fade" id="cardSaleModal" tabindex="-1" role="dialog" aria-labelledby="cardSaleModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-xl" role="document">
+                <div class="modal-dialog modal-lg" role="document">
                     <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
                         <div class="modal-header bg-dark text-white py-3">
-                            <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale</h5>
+                            <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale Details</h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body p-0">
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                <table class="table table-bordered table-striped mb-0" id="cardSalesTable" style="font-size:13px;">
-                                    <thead class="bg-light text-secondary">
-                                        <tr>
-                                            <th style="min-width: 160px;">Sales Ex.</th>
-                                            <th style="min-width: 160px;">Ledger / Machine</th>
-                                            <th style="min-width: 160px;">Item</th>
-                                            <th style="width: 100px; text-align:right;">Rate</th>
-                                            <th style="width: 120px; text-align:right;">Amount</th>
-                                            <th style="width: 120px; text-align:right;">Quantity</th>
-                                            <th style="width: 140px;">Batch No</th>
-                                            <th style="width: 50px; text-align:center;">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="cardSalesBody">
-                                        <!-- Rows added dynamically via JavaScript -->
-                                    </tbody>
-                                </table>
+                        <div class="modal-body p-4">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Nozzle</label>
+                                    <select name="card_nozzle_id" class="form-control">
+                                        <option value="">-- Select Nozzle --</option>
+                                        <?php foreach ($nozzles as $nz): ?>
+                                        <option value="<?php echo $nz['id']; ?>">
+                                            <?php echo htmlspecialchars($nz['nozzle_name']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Card Machine</label>
+                                    <select name="card_machine_id" class="form-control">
+                                        <option value="">-- Select Machine --</option>
+                                        <?php foreach ($machines_list as $cm): ?>
+                                        <option value="<?php echo $cm['id']; ?>">
+                                            <?php echo htmlspecialchars($cm['name'] . ' (' . $cm['charges_percentage'] . '%)'); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Batch Number</label>
+                                    <input type="text" name="card_batch_no" class="form-control" placeholder="Enter Batch No">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">No of Cards</label>
+                                    <input type="number" name="card_no_of_cards" class="form-control" min="0" placeholder="0">
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Amount (Rs.)</label>
+                                    <input type="number" step="0.01" name="card_amount" class="form-control" min="0" placeholder="0.00">
+                                </div>
                             </div>
                         </div>
-                        <div class="modal-footer bg-light py-2 d-flex justify-content-between">
-                            <div>
-                                <button type="button" class="btn btn-outline-primary btn-sm font-weight-bold" onclick="addCardRow()">
+                        <div class="modal-footer bg-light py-2">
+                            <span class="mr-auto font-weight-bold text-muted" style="font-size:13px;">Total Card Sale: <span id="modal_card_total_display" class="text-primary font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
+                            <button type="button" class="btn btn-primary px-4 font-weight-bold btn-sm" data-dismiss="modal">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credit Sale Modal -->
+            <div class="modal fade" id="creditSaleModal" tabindex="-1" role="dialog" aria-labelledby="creditSaleModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-xl" role="document" style="max-width: 95%;">
+                    <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                        <div class="modal-header bg-dark text-white py-3">
+                            <h5 class="modal-title font-weight-bold" id="creditSaleModalLabel"><i class="fas fa-file-invoice mr-2 text-warning"></i>Credit Sale Details (Multiple Entries)</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body p-4" style="overflow-x: auto;">
+                            <table class="table table-bordered table-striped text-center table-sm" id="creditSalesTable" style="min-width: 1400px; font-size: 12px;">
+                                <thead class="bg-secondary text-white">
+                                    <tr>
+                                        <th style="width: 140px;">Nozzle <span class="text-danger">*</span></th>
+                                        <th style="width: 120px;">Slip Date</th>
+                                        <th style="width: 100px;">Slip No</th>
+                                        <th style="width: 110px;">Account No</th>
+                                        <th style="width: 110px;">Vehicle No</th>
+                                        <th style="width: 120px;">Item Name</th>
+                                        <th style="width: 80px;">Qty</th>
+                                        <th style="width: 80px;">Sale Rate</th>
+                                        <th style="width: 90px;">Amount <span class="text-danger">*</span></th>
+                                        <th style="width: 80px;">Cash Rate</th>
+                                        <th style="width: 80px;">Issue Qty</th>
+                                        <th style="width: 80px;">Balance 1</th>
+                                        <th style="width: 80px;">Balance 2</th>
+                                        <th style="width: 80px;">Wasoli</th>
+                                        <th style="width: 50px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="creditSalesBody">
+                                    <!-- Rows will be added dynamically here -->
+                                </tbody>
+                            </table>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-success btn-sm font-weight-bold" onclick="addCreditRow()">
                                     <i class="fas fa-plus mr-1"></i> Add Row
                                 </button>
                             </div>
-                            <div>
-                                <span class="mr-3 font-weight-bold text-muted" style="font-size:13px;">Total Card Sale: <span id="modal_card_total_display" class="text-primary font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
-                                <button type="button" class="btn btn-primary btn-sm px-4 font-weight-bold" data-dismiss="modal">Confirm</button>
-                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2">
+                            <span class="mr-auto font-weight-bold text-muted" style="font-size:13px;">Total Credit Sale: <span id="modal_credit_total_display" class="text-warning font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
+                            <button type="button" class="btn btn-primary px-4 font-weight-bold btn-sm" data-dismiss="modal">Confirm</button>
                         </div>
                     </div>
                 </div>
@@ -577,6 +680,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 <script>
 var totalRows = <?php echo count($nozzles); ?>;
+var nozzlesData = <?php echo json_encode($nozzles); ?>;
 
 /**
  * Recalculate a single nozzle row:
@@ -610,105 +714,74 @@ function updateGrandTotal() {
     $('#grand_total_display').text(grand.toFixed(2));
 }
 
-/** When global payment type changes, update all row selects */
-$('#globalPayment').on('change', function () {
-    var val = $(this).val();
-    $('.row-payment').val(val);
+// Recalculate card sale total dynamically
+$('input[name="card_amount"]').on('input', function() {
+    var val = parseFloat($(this).val()) || 0;
+    $('#card_sale_total_display').text(val.toFixed(2));
+    $('#modal_card_total_display').text(val.toFixed(2));
 });
 
-// Dynamic card options from PHP
-var staffOptionsHtml = '<?php 
-    echo "<option value=\"\">-- Executive --</option>";
-    foreach ($staff_list as $st) {
-        echo "<option value=\"" . $st['id'] . "\">" . addslashes(htmlspecialchars($st['full_name'])) . "</option>";
-    }
-?>';
-
-var machineOptionsHtml = '<?php 
-    echo "<option value=\"\">-- Machine --</option>";
-    foreach ($machines_list as $m) {
-        echo "<option value=\"" . $m['id'] . "\">" . addslashes(htmlspecialchars($m['name'])) . " (" . $m['charges_percentage'] . "% )</option>";
-    }
-?>';
-
-var itemOptionsHtml = '<?php 
-    echo "<option value=\"\">-- Item --</option>";
-    foreach ($items_list as $item) {
-        echo "<option value=\"" . $item['id'] . "\" data-price=\"" . $item['price'] . "\">" . addslashes(htmlspecialchars($item['name'])) . "</option>";
-    }
-?>';
-
-var cardRowCount = 0;
-
-function addCardRow() {
-    var index = cardRowCount++;
-    var rowHtml = `
-        <tr id="card_row_${index}">
-            <td>
-                <select name="card_staff_id[]" class="form-control form-control-sm" required>
-                    ${staffOptionsHtml}
-                </select>
-            </td>
-            <td>
-                <select name="card_machine_id[]" class="form-control form-control-sm" required>
-                    ${machineOptionsHtml}
-                </select>
-            </td>
-            <td>
-                <select name="card_item_id[]" class="form-control form-control-sm card-item-select" onchange="updateCardRowRate(${index})" required>
-                    ${itemOptionsHtml}
-                </select>
-            </td>
-            <td>
-                <input type="text" name="card_rate[]" id="card_rate_${index}" class="form-control form-control-sm card-rate-field" readonly style="background:#f8f9fa; font-weight:bold; text-align:right;">
-            </td>
-            <td>
-                <input type="number" step="0.01" min="0" name="card_amount[]" id="card_amount_${index}" class="form-control form-control-sm card-amount-field" oninput="calculateCardRowQuantity(${index})" placeholder="0.00" required>
-            </td>
-            <td>
-                <input type="text" name="card_quantity[]" id="card_quantity_${index}" class="form-control form-control-sm card-quantity-field" readonly style="background:#f8f9fa; font-weight:bold; text-align:right;">
-            </td>
-            <td>
-                <input type="text" name="card_batch_no[]" class="form-control form-control-sm" placeholder="Batch No">
-            </td>
-            <td style="text-align:center; vertical-align:middle;">
-                <button type="button" class="btn btn-sm text-danger p-0" onclick="removeCardRow(${index})"><i class="fas fa-trash-alt" style="font-size:16px;"></i></button>
-            </td>
-        </tr>
-    `;
-    $('#cardSalesBody').append(rowHtml);
-}
-
-function updateCardRowRate(index) {
-    var selectedOption = $('#card_row_' + index + ' .card-item-select option:selected');
-    var price = parseFloat(selectedOption.data('price')) || 0;
-    $('#card_rate_' + index).val(price.toFixed(2));
-    calculateCardRowQuantity(index);
-}
-
-function calculateCardRowQuantity(index) {
-    var rate = parseFloat($('#card_rate_' + index).val()) || 0;
-    var amount = parseFloat($('#card_amount_' + index).val()) || 0;
-    var quantity = 0;
-    if (rate > 0 && amount > 0) {
-        quantity = amount / rate;
-    }
-    $('#card_quantity_' + index).val(quantity.toFixed(2));
-    updateCardSalesGrandTotal();
-}
-
-function removeCardRow(index) {
-    $('#card_row_' + index).remove();
-    updateCardSalesGrandTotal();
-}
-
-function updateCardSalesGrandTotal() {
-    var total = 0;
-    $('.card-amount-field').each(function() {
-        total += parseFloat($(this).val()) || 0;
+// Dynamic Credit Sale rows
+function addCreditRow() {
+    var today = new Date().toISOString().slice(0, 10);
+    
+    var nozzleOptions = '<option value="">-- Select --</option>';
+    nozzlesData.forEach(function(nz) {
+        nozzleOptions += '<option value="' + nz.id + '">' + nz.nozzle_name + '</option>';
     });
-    $('#modal_card_total_display').text(total.toFixed(2));
-    $('#card_sale_total_display').text(total.toFixed(2));
+
+    var rowHtml = '<tr>' +
+        '<td><select name="credit_nozzle_id[]" class="form-control form-control-sm credit-nozzle-select" onchange="updateCreditItem(this)" required>' + nozzleOptions + '</select></td>' +
+        '<td><input type="date" name="credit_slip_date[]" class="form-control form-control-sm" value="' + today + '"></td>' +
+        '<td><input type="text" name="credit_slip_no[]" class="form-control form-control-sm"></td>' +
+        '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm"></td>' +
+        '<td><input type="text" name="credit_vehicle_number[]" class="form-control form-control-sm"></td>' +
+        '<td><input type="text" class="form-control form-control-sm credit-item-name" disabled></td>' +
+        '<td><input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="0" oninput="calculateCreditTotal()" required></td>' +
+        '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_balance_1[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_balance_2[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_wasoli[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCreditRow(this)"><i class="fas fa-trash-alt"></i></button></td>' +
+        '</tr>';
+
+    $('#creditSalesBody').append(rowHtml);
+}
+
+function updateCreditItem(selectElement) {
+    var $row = $(selectElement).closest('tr');
+    var nozzleId = $(selectElement).val();
+    
+    if (nozzleId) {
+        var nozzle = nozzlesData.find(function(nz) {
+            return nz.id == nozzleId;
+        });
+        if (nozzle) {
+            $row.find('.credit-item-name').val(nozzle.item_name || 'N/A');
+            $row.find('.credit-cash-rate').val(nozzle.price || 0);
+        }
+    } else {
+        $row.find('.credit-item-name').val('');
+        $row.find('.credit-cash-rate').val(0);
+    }
+}
+
+function calculateCreditTotal() {
+    var total = 0;
+    $('.credit-amount-field').each(function() {
+        var val = parseFloat($(this).val()) || 0;
+        total += val;
+    });
+    $('#credit_sale_total_display').text(total.toFixed(2));
+    $('#modal_credit_total_display').text(total.toFixed(2));
+}
+
+function removeCreditRow(btn) {
+    $(btn).closest('tr').remove();
+    calculateCreditTotal();
 }
 </script>
 </html>

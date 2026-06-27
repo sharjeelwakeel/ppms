@@ -29,19 +29,29 @@ if (isset($_POST['submit'])) {
     $start_reading = mysqli_real_escape_string($connection, $_POST['start_reading']);
     $status = mysqli_real_escape_string($connection, $_POST['status']);
 
-    $query = "UPDATE tbl_nozzles SET 
-                name='$name', 
-                tank_id='$tank_id', 
-                item_id='$item_id', 
-                start_reading='$start_reading', 
-                status='$status' 
-              WHERE id='$id'";
-    
-    if (mysqli_query($connection, $query)) {
-        header('Location: nozzles-list.php');
-        exit;
+    // Validate that the updated reading is greater than the previous stored reading
+    $nozzle_query = mysqli_query($connection, "SELECT start_reading FROM tbl_nozzles WHERE id = '$id'");
+    $nozzle_data = mysqli_fetch_assoc($nozzle_query);
+    $previous_reading = floatval($nozzle_data['start_reading'] ?? 0);
+    $new_reading = floatval($start_reading);
+
+    if ($new_reading <= $previous_reading) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: The new reading must be greater than the previous reading (' . number_format($previous_reading, 2) . ').</div>';
     } else {
-        $message = '<div class="alert alert-danger">Error updating nozzle: ' . mysqli_error($connection) . '</div>';
+        $query = "UPDATE tbl_nozzles SET 
+                    name='$name', 
+                    tank_id='$tank_id', 
+                    item_id='$item_id', 
+                    start_reading='$start_reading', 
+                    status='$status' 
+                  WHERE id='$id'";
+        
+        if (mysqli_query($connection, $query)) {
+            header('Location: nozzles-list.php');
+            exit;
+        } else {
+            $message = '<div class="alert alert-danger">Error updating nozzle: ' . mysqli_error($connection) . '</div>';
+        }
     }
 }
 

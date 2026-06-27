@@ -51,13 +51,11 @@ $hasDetails   = count($details) > 0;
 
 // Fetch Card Sales
 $card_sales_sql = "SELECT mrcs.*,
-                          CONCAT(st.first_name,' ',st.last_name) AS exec_name,
                           cm.name AS machine_name,
-                          i.name AS item_name
+                          n.name AS nozzle_name
                    FROM tbl_meter_reading_card_sales mrcs
-                   LEFT JOIN tbl_staff st ON mrcs.staff_id = st.id
                    LEFT JOIN tbl_card_machines cm ON mrcs.card_machine_id = cm.id
-                   LEFT JOIN tbl_items i ON mrcs.item_id = i.id
+                   LEFT JOIN tbl_nozzles n ON mrcs.nozzle_id = n.id
                    WHERE mrcs.meter_reading_id = $id
                    ORDER BY mrcs.id ASC";
 $card_sales_result = mysqli_query($connection, $card_sales_sql);
@@ -67,6 +65,25 @@ if ($card_sales_result) {
     while ($cs = mysqli_fetch_assoc($card_sales_result)) {
         $card_sales[] = $cs;
         $card_sales_total += floatval($cs['amount']);
+    }
+}
+
+// Fetch Credit Sales
+$credit_sales_sql = "SELECT mrcs.*,
+                            n.name AS nozzle_name,
+                            i.name AS item_name
+                     FROM tbl_meter_reading_credit_sales mrcs
+                     LEFT JOIN tbl_nozzles n ON mrcs.nozzle_id = n.id
+                     LEFT JOIN tbl_items i ON n.item_id = i.id
+                     WHERE mrcs.meter_reading_id = $id
+                     ORDER BY mrcs.id ASC";
+$credit_sales_result = mysqli_query($connection, $credit_sales_sql);
+$credit_sales = [];
+$credit_sales_total = 0;
+if ($credit_sales_result) {
+    while ($cs = mysqli_fetch_assoc($credit_sales_result)) {
+        $credit_sales[] = $cs;
+        $credit_sales_total += floatval($cs['amount']);
     }
 }
 ?>
@@ -374,10 +391,6 @@ body {
             <div class="val"><?php echo htmlspecialchars($header['shift_name'] ?? 'N/A'); ?></div>
         </div>
         <div class="info-cell">
-            <div class="lbl">Payment Type</div>
-            <div class="val"><?php echo htmlspecialchars($header['payment_type']); ?></div>
-        </div>
-        <div class="info-cell">
             <div class="lbl">Total Nozzles</div>
             <div class="val"><?php echo $hasDetails ? count($details) : 'N/A'; ?></div>
         </div>
@@ -423,7 +436,6 @@ body {
             <col style="width:7%">   <!-- Test -->
             <col style="width:9%">   <!-- Net -->
             <col style="width:10%">  <!-- Amount -->
-            <col style="width:7%">   <!-- Payment -->
         </colgroup>
         <thead>
             <tr>
@@ -438,7 +450,6 @@ body {
                 <th class="th-test">Test<br>Reading</th>
                 <th class="th-net">Net Sale<br><span style="font-size:8px;font-weight:400;">(Sale&minus;Test)</span></th>
                 <th class="th-amt">Amount (Rs.)<br><span style="font-size:8px;font-weight:400;">(Net&times;Rate)</span></th>
-                <th>Payment</th>
             </tr>
         </thead>
         <tbody>
@@ -476,7 +487,6 @@ body {
                 Rs. <?php echo number_format($amt, 2); ?>
                 <span class="sub-formula">(<?php echo number_format($netS,2); ?>&times;<?php echo number_format($price,2); ?>)</span>
             </td>
-            <td class="c"><?php echo htmlspecialchars($d['payment_type']); ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>
@@ -489,14 +499,12 @@ body {
                 <td class="r col-test"><?php echo number_format($sumTest,2); ?></td>
                 <td class="r col-net"><?php echo number_format($sumNet,2); ?></td>
                 <td class="r col-amt">Rs. <?php echo number_format($sumAmt,2); ?></td>
-                <td></td>
             </tr>
             <tr class="grand-row">
                 <td colspan="10" style="text-align:right;letter-spacing:0.8px;">
                     GRAND TOTAL &mdash; Sum of All Nozzle Amounts
                 </td>
                 <td class="r">Rs. <?php echo number_format($grandDisplay,2); ?></td>
-                <td></td>
             </tr>
         </tfoot>
     </table>
@@ -587,59 +595,101 @@ body {
     </div>
     <?php endif; ?>
 
-    <?php if (!empty($card_sales)): ?>
+    <?php if (!empty($card_sales)): 
+        $cs = $card_sales[0];
+    ?>
     <div style="margin-top:14px;">
         <div class="sec-bar" style="background:#17a2b8;">
-            Card Sales Breakdown
+            Card Sale Details
         </div>
-        <table class="nozzle-tbl" style="margin-top:0;">
-            <colgroup>
-                <col style="width:3%">   <!-- # -->
-                <col style="width:15%">  <!-- Sales Executive -->
-                <col style="width:15%">  <!-- Card Machine -->
-                <col style="width:12%">  <!-- Item -->
-                <col style="width:8%">   <!-- Rate -->
-                <col style="width:10%">  <!-- Amount -->
-                <col style="width:10%">  <!-- Quantity -->
-                <col style="width:10%">  <!-- Service Charges -->
-                <col style="width:10%">  <!-- Net Amount -->
-                <col style="width:12%">  <!-- Batch No -->
-            </colgroup>
+        <div style="border:1px solid #ccc; padding:10px; border-radius:3px; font-size:10px; display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-top:5px; background:#fff;">
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Nozzle</span>
+                <strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Card Machine</span>
+                <strong><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Batch No</span>
+                <strong><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">No. of Cards</span>
+                <strong><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Amount</span>
+                <strong>Rs. <?php echo number_format($cs['amount'], 2); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Service Charges</span>
+                <strong>Rs. <?php echo number_format($cs['service_charges'], 2); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Net Amount</span>
+                <strong>Rs. <?php echo number_format($cs['net_amount'], 2); ?></strong>
+            </div>
+            <div>
+                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Date / Time</span>
+                <strong><?php echo date('d-m-Y h:i A', strtotime($cs['created_at'])); ?></strong>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($credit_sales)): ?>
+    <div style="margin-top:14px;">
+        <div class="sec-bar" style="background:#ffc107; color:#000;">
+            Credit Sale Details
+        </div>
+        <table class="nozzle-tbl" style="margin-top:5px; font-size:9.5px;">
             <thead>
-                <tr>
-                    <th style="background:#117a8b;">#</th>
-                    <th style="background:#117a8b;">Sales Executive</th>
-                    <th style="background:#117a8b;">Card Machine</th>
-                    <th style="background:#117a8b;">Item</th>
-                    <th style="background:#117a8b;">Rate<br>(Rs.)</th>
-                    <th style="background:#117a8b;">Amount<br>(Rs.)</th>
-                    <th style="background:#117a8b;">Quantity</th>
-                    <th style="background:#117a8b;">Service Charges</th>
-                    <th style="background:#117a8b;">Net Amount</th>
-                    <th style="background:#117a8b;">Batch No</th>
+                <tr style="background:#f5f5f5;">
+                    <th style="width:3%; color:#000; background:#ddd;">#</th>
+                    <th style="width:10%; color:#000; background:#ddd;">Nozzle</th>
+                    <th style="width:10%; color:#000; background:#ddd;">Item</th>
+                    <th style="width:8%; color:#000; background:#ddd;">Slip Date</th>
+                    <th style="width:8%; color:#000; background:#ddd;">Slip No</th>
+                    <th style="width:10%; color:#000; background:#ddd;">Account No</th>
+                    <th style="width:10%; color:#000; background:#ddd;">Vehicle No</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Qty</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Rate</th>
+                    <th style="width:8%; color:#000; background:#ddd;" class="r">Amount</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Cash Rate</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Issue Qty</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Bal 1</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Bal 2</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Wasoli</th>
                 </tr>
             </thead>
             <tbody>
-            <?php $cn = 1; foreach ($card_sales as $cs): ?>
-            <tr>
-                <td class="c"><?php echo $cn++; ?></td>
-                <td><?php echo htmlspecialchars($cs['exec_name'] ?? '—'); ?></td>
-                <td class="c"><?php echo htmlspecialchars($cs['machine_name'] ?? 'N/A'); ?></td>
-                <td class="c"><?php echo htmlspecialchars($cs['item_name'] ?? 'N/A'); ?></td>
-                <td class="r"><?php echo number_format($cs['rate'], 2); ?></td>
-                <td class="r" style="background:#fff3e0; font-weight:bold;"><?php echo number_format($cs['amount'], 2); ?></td>
-                <td class="r" style="background:#e8f5e9; font-weight:bold;"><?php echo number_format($cs['quantity'], 2); ?></td>
-                <td class="r" style="color:#c62828; font-weight:bold;"><?php echo number_format($cs['service_charges'], 2); ?></td>
-                <td class="r" style="color:#2e7d32; font-weight:bold;"><?php echo number_format($cs['net_amount'], 2); ?></td>
-                <td class="c"><code><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></code></td>
-            </tr>
-            <?php endforeach; ?>
+                <?php $pcrn = 1; foreach ($credit_sales as $crs): ?>
+                <tr>
+                    <td class="c"><?php echo $pcrn++; ?></td>
+                    <td><strong><?php echo htmlspecialchars($crs['nozzle_name'] ?? '—'); ?></strong></td>
+                    <td class="c"><?php echo htmlspecialchars($crs['item_name'] ?? '—'); ?></td>
+                    <td class="c"><?php echo date('d-m-Y', strtotime($crs['slip_date'])); ?></td>
+                    <td class="c"><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></td>
+                    <td class="c"><?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?></td>
+                    <td class="c"><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></td>
+                    <td class="r"><?php echo number_format($crs['quantity'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['rate'], 2); ?></td>
+                    <td class="r col-amt" style="font-weight:bold; color:#000;">Rs. <?php echo number_format($crs['amount'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['cash_rate'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['issue_quantity'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['balance_1'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['balance_2'], 2); ?></td>
+                    <td class="r"><?php echo number_format($crs['wasoli'], 2); ?></td>
+                </tr>
+                <?php endforeach; ?>
             </tbody>
             <tfoot>
                 <tr class="totals-row">
-                    <td colspan="5" class="r">TOTAL CARD SALE</td>
-                    <td class="r" style="background:#fff3e0; color:#e65100; font-size:11px;"><?php echo number_format($card_sales_total, 2); ?></td>
-                    <td colspan="4"></td>
+                    <td colspan="9" class="r">Total Credit Sale:</td>
+                    <td class="r col-amt">Rs. <?php echo number_format($credit_sales_total, 2); ?></td>
+                    <td colspan="5"></td>
                 </tr>
             </tfoot>
         </table>

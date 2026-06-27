@@ -104,7 +104,6 @@ if ($result_active === false) {
                         <th>ID</th>
                         <th>Date</th>
                         <th>Shift</th>
-                        <th>Payment Type</th>
                         <th style="text-align:right;">Grand Total</th>
                         <th>Created At</th>
                         <th style="text-align:center;">Actions</th>
@@ -113,18 +112,16 @@ if ($result_active === false) {
                 <tbody>
                 <?php if ($result_active && mysqli_num_rows($result_active) > 0):
                     while ($row = mysqli_fetch_assoc($result_active)):
-                        $ptClass = ($row['payment_type']=='Cash') ? 'pt-cash'
-                                 : ($row['payment_type']=='Credit' ? 'pt-credit' : 'pt-online');
                 ?>
                 <tr>
-                    <td><strong>#<?php echo $row['id']; ?></strong></td>
-                    <td><?php echo date('d-m-Y', strtotime($row['date'])); ?></td>
+                    <td data-order="<?php echo $row['id']; ?>"><strong>#<?php echo $row['id']; ?></strong></td>
+                    <td data-order="<?php echo strtotime($row['date']); ?>"><?php echo date('d-m-Y', strtotime($row['date'])); ?></td>
                     <td><?php echo htmlspecialchars($row['shift_name'] ?? 'N/A'); ?></td>
-                    <td><span class="<?php echo $ptClass; ?>"><?php echo htmlspecialchars($row['payment_type']); ?></span></td>
-                    <td style="text-align:right;font-weight:700;color: var(--primary-color);">
+
+                    <td style="text-align:right;font-weight:700;color: var(--primary-color);" data-order="<?php echo $row['grand_total']; ?>">
                         <?php echo number_format($row['grand_total'], 2); ?>
                     </td>
-                    <td><?php echo date('d-m-Y h:i A', strtotime($row['created_at'])); ?></td>
+                    <td data-order="<?php echo strtotime($row['created_at']); ?>"><?php echo date('d-m-Y h:i A', strtotime($row['created_at'])); ?></td>
                     <td style="text-align:center;">
                         <a href="view-meter-reading.php?id=<?php echo $row['id']; ?>"
                            class="btn btn-sm btn-info" title="View" style="background: var(--primary-gradient); border: none;">
@@ -138,7 +135,7 @@ if ($result_active === false) {
                     </td>
                 </tr>
                 <?php endwhile; else: ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No active meter readings. <a href="add-meter-reading.php">Create one now.</a></td></tr>
+                <tr><td colspan="6" class="text-center text-muted py-4">No active meter readings. <a href="add-meter-reading.php">Create one now.</a></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
