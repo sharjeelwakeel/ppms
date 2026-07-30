@@ -60,7 +60,7 @@ while ($r = mysqli_fetch_assoc($details_result)) { $details[] = $r; }
 $calcGrand = 0;
 foreach ($details as $d) { $calcGrand += floatval($d['amount']); }
 
-// Fetch Card Sales
+// Fetch Card Sales (All entries)
 $card_sales_sql = "SELECT mrcs.*,
                           cm.name AS machine_name,
                           n.name AS nozzle_name
@@ -79,7 +79,7 @@ if ($card_sales_result) {
     }
 }
 
-// Fetch Credit Sales
+// Fetch Credit Sales (All entries)
 $credit_sales_sql = "SELECT mrcs.*,
                             n.name AS nozzle_name,
                             i.name AS item_name
@@ -111,7 +111,7 @@ if ($credit_sales_result) {
     <style>
         body { background:#f4f6fb; font-family:'Roboto',sans-serif; }
 
-        /* ── Page header ─────────────────────────────────── */
+        /* Page header */
         .page-header {
             background: var(--gradient-header);
             color:#fff; padding:16px 24px; border-radius:10px;
@@ -121,7 +121,7 @@ if ($credit_sales_result) {
         }
         .page-header h4 { margin:0; font-weight:700; font-size:1.2rem; }
 
-        /* ── Info bar ────────────────────────────────────── */
+        /* Info bar */
         .info-bar {
             background:#fff; border-radius:10px;
             box-shadow:0 2px 10px rgba(0,0,0,0.07);
@@ -133,14 +133,14 @@ if ($credit_sales_result) {
         .info-item .val { font-size:15px; font-weight:700; color: var(--primary-color); margin-top:1px; }
         .info-item .val.grand { font-size:22px; color: var(--primary-hover); }
 
-        /* ── Deleted banner ──────────────────────────────── */
+        /* Deleted banner */
         .deleted-banner {
             background:#ffebee; border-left:5px solid #c62828;
             color:#b71c1c; padding:10px 18px; border-radius:6px;
             margin-bottom:14px; font-weight:600; font-size:13px;
         }
 
-        /* ── Card wrapper ────────────────────────────────── */
+        /* Card wrapper */
         .card-wrap {
             background:#fff; border-radius:10px;
             box-shadow:0 2px 10px rgba(0,0,0,0.07);
@@ -153,7 +153,7 @@ if ($credit_sales_result) {
             display:flex; align-items:center; justify-content:space-between;
         }
 
-        /* ── Main reading table ──────────────────────────── */
+        /* Main reading table */
         .rtable { margin:0; font-size:13px; }
         .rtable thead th {
             background:#2c3e50; color:#fff;
@@ -166,10 +166,7 @@ if ($credit_sales_result) {
         .rtable tbody tr:hover { background: var(--primary-light) !important; }
         .rtable td { vertical-align:middle; padding:9px 10px; border-color:#e8ecf0; font-size:13px; }
 
-        /* Column-specific colouring */
         .td-nozzle  { font-weight:700; color: var(--primary-color); }
-        .td-item    { }
-        .td-exec    { color:#555; font-size:12px; }
         .td-rate    { background:#fff8e1; font-weight:700; color:#e65100; text-align:right; }
         .td-last    { background:#fafafa; text-align:right; color:#555; }
         .td-curr    { background:#fafafa; font-weight:600; text-align:right; color:#333; }
@@ -177,14 +174,6 @@ if ($credit_sales_result) {
         .td-test    { background:#fff3e0; text-align:right; color:#e65100; }
         .td-net     { background:#e3f2fd; font-weight:700; color:#1565c0; text-align:right; font-size:14px; }
         .td-amount  { background:#ede7f6; font-weight:700; color:#4527a0; text-align:right; font-size:14px; }
-        .td-pay     { text-align:center; }
-
-        /* Formula hint row */
-        .formula-row td {
-            font-size:10px; color:#aaa; text-align:center;
-            padding:3px 6px; border-top:none !important;
-            font-style:italic; background:#fafbff;
-        }
 
         /* Grand total row */
         .grand-row td {
@@ -199,7 +188,6 @@ if ($credit_sales_result) {
             text-align:center; padding:40px 20px; color:#999;
         }
         .empty-details .icon { font-size:48px; color:#ddd; margin-bottom:12px; }
-        .empty-details p { margin:0; font-size:14px; }
 
         /* badges */
         .badge-nozzle { background: var(--primary-gradient);
@@ -208,12 +196,6 @@ if ($credit_sales_result) {
         .badge-petrol { background:#2e7d32; color:#fff; padding:2px 9px; border-radius:20px; font-size:11px; }
         .badge-diesel { background:#bf360c; color:#fff; padding:2px 9px; border-radius:20px; font-size:11px; }
         .badge-item   { background:#4a148c; color:#fff; padding:2px 9px; border-radius:20px; font-size:11px; }
-        .pt-cash   { background:#c8e6c9; color:#1b5e20; padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-        .pt-credit { background:#fff3e0; color:#e65100; padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-        .pt-online { background:#e3f2fd; color:#1565c0; padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-
-        /* calc arrow visual */
-        .calc-arrow { color:#bbb; font-size:11px; }
 
         /* Print btn */
         .btn-print {
@@ -225,7 +207,7 @@ if ($credit_sales_result) {
         }
         .btn-print:hover { background: var(--primary-hover); transform:translateY(-1px); color:#fff; }
 
-        /* ── Print Layout ── */
+        /* Print Layout */
         .print-only { display:none; }
 
         @media print {
@@ -237,18 +219,15 @@ if ($credit_sales_result) {
             .screen-only { display:none !important; }
             .print-only  { display:block !important; }
 
-            /* print header */
             .ph { text-align:center; border-bottom:2px solid var(--primary-color); padding-bottom:8px; margin-bottom:10px; }
             .ph h2 { font-size:18px; font-weight:700; color: var(--primary-color); margin:0 0 2px; }
             .ph p  { margin:0; font-size:11px; color:#666; }
 
-            /* print meta */
             .pm { display:grid; grid-template-columns:repeat(4,1fr); gap:5px;
                   border:1px solid #ddd; padding:8px 10px; margin-bottom:10px; border-radius:3px; }
             .pm-item .lbl2 { font-size:8px; text-transform:uppercase; color:#999; font-weight:700; }
             .pm-item .val2 { font-size:12px; font-weight:700; color: var(--primary-color); }
 
-            /* print table */
             .pt { width:100%; border-collapse:collapse; font-size:10.5px; }
             .pt th { background: var(--primary-color) !important; color:#fff !important;
                      padding:6px 5px; font-size:9.5px; font-weight:700;
@@ -258,16 +237,8 @@ if ($credit_sales_result) {
             .pt td.r { text-align:right; font-weight:600; }
             .pt td.c { text-align:center; }
             .pt tbody tr:nth-child(even) td { background:#f5f7ff; }
-            .pt-sale   { background:#e8f5e9 !important; font-weight:700; color:#2e7d32; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-            .pt-net    { background:#e3f2fd !important; font-weight:700; color:#1565c0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-            .pt-amount { background:#ede7f6 !important; font-weight:700; color:#4527a0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-            .pt-grand  { background: var(--primary-color) !important; color:#fff !important; font-weight:700;
-                         text-align:right; padding:8px 5px;
-                         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
             .pfooter { margin-top:14px; border-top:1px solid #ccc; padding-top:6px;
                        display:flex; justify-content:space-between; font-size:9px; color:#999; }
-            .del-stamp { color:#c62828; font-weight:700; text-align:center; margin-top:6px;
-                         border:1.5px solid #c62828; padding:2px 10px; border-radius:3px; display:inline-block; }
         }
     </style>
 </head>
@@ -277,14 +248,10 @@ if ($credit_sales_result) {
 <div class="container-fluid pt-4 pb-5 px-4">
 
 <?php
-$ptClassMap = ['Cash'=>'pt-cash','Credit'=>'pt-credit','Online'=>'pt-online'];
-$ptClass    = $ptClassMap[$header['payment_type']] ?? 'pt-cash';
 $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 ?>
 
-<!-- ════════════ SCREEN LAYOUT ════════════ -->
-
-<!-- Page header -->
+<!-- SCREEN LAYOUT -->
 <div class="page-header no-print">
     <div>
         <h4><i class="fas fa-tachometer-alt mr-2"></i>Meter Reading &nbsp;#<?php echo $id; ?></h4>
@@ -344,7 +311,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
     </div>
 </div>
 
-<!-- ── Main Nozzle Detail Table ─────────────────────────────── -->
+<!-- Main Nozzle Detail Table -->
 <div class="card-wrap screen-only">
     <div class="card-title">
         <span><i class="fas fa-gas-pump mr-2"></i>Nozzle Readings &amp; Calculations</span>
@@ -354,16 +321,9 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
     </div>
 
     <?php if (empty($details)): ?>
-    <!-- No details saved -->
     <div class="empty-details">
         <div class="icon"><i class="fas fa-database"></i></div>
         <p><strong>No nozzle detail rows found for this reading.</strong></p>
-        <p class="mt-2" style="font-size:12px;color:#bbb;">
-            This usually means the record was saved before the
-            <code>tbl_meter_reading_details</code> table was created,<br>
-            or the <code>staff_id</code> column was missing during save.<br><br>
-            Please <a href="add-meter-reading.php">create a new meter reading</a> to see full details.
-        </p>
     </div>
     <?php else: ?>
 
@@ -378,22 +338,10 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                     <th>Rate</th>
                     <th>Last Reading</th>
                     <th>Current Reading</th>
-                    <th style="background:#1b5e20;">
-                        Sale Reading<br>
-                        <span style="font-size:9px;font-weight:400;opacity:.8;">(Current − Last)</span>
-                    </th>
-                    <th style="background:#bf360c;">
-                        Test Reading<br>
-                        <span style="font-size:9px;font-weight:400;opacity:.8;">(Deducted)</span>
-                    </th>
-                    <th style="background:#0d47a1;">
-                        Net Sale<br>
-                        <span style="font-size:9px;font-weight:400;opacity:.8;">(Sale − Test)</span>
-                    </th>
-                    <th style="background:#4a148c;">
-                        Amount<br>
-                        <span style="font-size:9px;font-weight:400;opacity:.8;">(Net × Rate)</span>
-                    </th>
+                    <th style="background:#1b5e20;">Sale Reading</th>
+                    <th style="background:#bf360c;">Test Reading</th>
+                    <th style="background:#0d47a1;">Net Sale</th>
+                    <th style="background:#4a148c;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -401,7 +349,6 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 $itLow   = strtolower($d['item_type'] ?? '');
                 $itClass = strpos($itLow,'petrol')!==false ? 'badge-petrol'
                          : (strpos($itLow,'diesel')!==false ? 'badge-diesel' : 'badge-item');
-                $dptClass = $ptClassMap[$d['payment_type']] ?? 'pt-cash';
 
                 $saleR  = floatval($d['sale_reading']);
                 $testR  = floatval($d['test_reading']);
@@ -412,57 +359,19 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 $currR  = floatval($d['current_reading']);
             ?>
             <tr>
-                <!-- # -->
                 <td class="text-center text-muted font-weight-bold"><?php echo $rn++; ?></td>
-
-                <!-- Nozzle -->
                 <td class="td-nozzle">
                     <span class="badge-nozzle"><?php echo htmlspecialchars($d['nozzle_name'] ?? 'N/A'); ?></span>
                 </td>
-
-                <!-- Item -->
                 <td><span class="<?php echo $itClass; ?>"><?php echo htmlspecialchars($d['item_type'] ?? 'N/A'); ?></span></td>
-
-                <!-- Sales Exec -->
                 <td class="td-exec"><?php echo htmlspecialchars($d['exec_name'] ?? '—'); ?></td>
-
-                <!-- Rate -->
                 <td class="td-rate"><?php echo number_format($price, 2); ?></td>
-
-                <!-- Last Reading -->
                 <td class="td-last"><?php echo number_format($lastR, 2); ?></td>
-
-                <!-- Current Reading -->
                 <td class="td-curr"><?php echo number_format($currR, 2); ?></td>
-
-                <!-- Sale Reading (Current - Last) -->
-                <td class="td-sale">
-                    <?php echo number_format($saleR, 2); ?>
-                    <div style="font-size:10px;color:#81c784;font-weight:400;">
-                        <?php echo number_format($currR,2).' − '.number_format($lastR,2); ?>
-                    </div>
-                </td>
-
-                <!-- Test Reading -->
+                <td class="td-sale"><?php echo number_format($saleR, 2); ?></td>
                 <td class="td-test"><?php echo number_format($testR, 2); ?></td>
-
-                <!-- Net Sale (Sale - Test) -->
-                <td class="td-net">
-                    <?php echo number_format($netS, 2); ?>
-                    <div style="font-size:10px;color:#90caf9;font-weight:400;">
-                        <?php echo number_format($saleR,2).' − '.number_format($testR,2); ?>
-                    </div>
-                </td>
-
-                <!-- Amount (Net × Rate) -->
-                <td class="td-amount">
-                    <?php echo number_format($amt, 2); ?>
-                    <div style="font-size:10px;color:#ce93d8;font-weight:400;">
-                        <?php echo number_format($netS,2).' × '.number_format($price,2); ?>
-                    </div>
-                </td>
-
-
+                <td class="td-net"><?php echo number_format($netS, 2); ?></td>
+                <td class="td-amount"><?php echo number_format($amt, 2); ?></td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -491,65 +400,66 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 </div>
 <?php endif; ?>
 
-<?php if (!empty($card_sales)): 
-    $cs = $card_sales[0]; // Get the single entry
-?>
-<!-- Card Sale Details -->
+<!-- Card Sale Details (ALL Entries Table) -->
+<?php if (!empty($card_sales)): ?>
 <div class="card-wrap screen-only mt-4">
     <div class="card-title" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);">
-        <span><i class="fas fa-credit-card mr-2"></i>Card Sale Details</span>
+        <span><i class="fas fa-credit-card mr-2"></i>Card Sale Details (<?php echo count($card_sales); ?> Entries)</span>
     </div>
-    <div class="card-body p-4">
-        <div class="row">
-            <div class="col-md-3 mb-2">
-                <span class="text-muted d-block small">Nozzle</span>
-                <strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2">
-                <span class="text-muted d-block small">Card Machine</span>
-                <strong><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2">
-                <span class="text-muted d-block small">Batch Number</span>
-                <strong><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2">
-                <span class="text-muted d-block small">No. of Cards</span>
-                <strong><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2 mt-2">
-                <span class="text-muted d-block small">Amount</span>
-                <strong class="text-info">PKR <?php echo number_format($cs['amount'], 2); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2 mt-2">
-                <span class="text-muted d-block small">Service Charges</span>
-                <strong class="text-danger">PKR <?php echo number_format($cs['service_charges'], 2); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2 mt-2">
-                <span class="text-muted d-block small">Net Amount</span>
-                <strong class="text-success">PKR <?php echo number_format($cs['net_amount'], 2); ?></strong>
-            </div>
-            <div class="col-md-3 mb-2 mt-2">
-                <span class="text-muted d-block small">Recorded At</span>
-                <strong><?php echo date('d-m-Y h:i A', strtotime($cs['created_at'])); ?></strong>
-            </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped mb-0" style="font-size:13px;">
+                <thead class="bg-light">
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Nozzle</th>
+                        <th>Card Machine</th>
+                        <th>Batch No</th>
+                        <th class="text-center">No. of Cards</th>
+                        <th class="text-right">Amount (Rs.)</th>
+                        <th class="text-right">Service Charges</th>
+                        <th class="text-right">Net Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php $csn = 1; foreach ($card_sales as $cs): ?>
+                    <tr>
+                        <td class="text-center font-weight-bold text-muted"><?php echo $csn++; ?></td>
+                        <td><strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong></td>
+                        <td><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></td>
+                        <td><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></td>
+                        <td class="text-center"><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></td>
+                        <td class="text-right font-weight-bold text-info"><?php echo number_format($cs['amount'], 2); ?></td>
+                        <td class="text-right text-danger"><?php echo number_format($cs['service_charges'], 2); ?></td>
+                        <td class="text-right font-weight-bold text-success"><?php echo number_format($cs['net_amount'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr class="font-weight-bold bg-light">
+                        <td colspan="5" class="text-right">Total Card Sale:</td>
+                        <td class="text-right text-info">PKR <?php echo number_format($card_sales_total, 2); ?></td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
     </div>
 </div>
 <?php endif; ?>
 
+<!-- Credit Sale Details (ALL Entries Table) -->
 <?php if (!empty($credit_sales)): ?>
-<!-- Credit Sale Details -->
 <div class="card-wrap screen-only mt-4">
-    <div class="card-title" style="background:linear-gradient(135deg, #ffc107 0%, #e0a800 100%); font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:space-between;">
-        <span><i class="fas fa-file-invoice mr-2"></i>Credit Sale Details</span>
+    <div class="card-title" style="background:linear-gradient(135deg, #ffc107 0%, #e0a800 100%);">
+        <span><i class="fas fa-file-invoice mr-2"></i>Credit Sale Details (<?php echo count($credit_sales); ?> Entries)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-bordered table-striped mb-0" style="font-size:12px;">
                 <thead class="bg-light">
                     <tr>
-                        <th>#</th>
+                        <th style="width:40px;">#</th>
                         <th>Nozzle</th>
                         <th>Item</th>
                         <th>Slip Date</th>
@@ -569,7 +479,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 <tbody>
                     <?php $crn = 1; foreach ($credit_sales as $crs): ?>
                     <tr>
-                        <td class="text-center"><?php echo $crn++; ?></td>
+                        <td class="text-center font-weight-bold text-muted"><?php echo $crn++; ?></td>
                         <td><strong><?php echo htmlspecialchars($crs['nozzle_name'] ?? '—'); ?></strong></td>
                         <td><?php echo htmlspecialchars($crs['item_name'] ?? '—'); ?></td>
                         <td><?php echo date('d-m-Y', strtotime($crs['slip_date'])); ?></td>
@@ -588,7 +498,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
-                    <tr class="font-weight-bold">
+                    <tr class="font-weight-bold bg-light">
                         <td colspan="9" class="text-right">Total Credit Sale:</td>
                         <td class="text-right text-warning">PKR <?php echo number_format($credit_sales_total, 2); ?></td>
                         <td colspan="5"></td>
@@ -600,10 +510,9 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 </div>
 <?php endif; ?>
 
-<!-- ════════════ PRINT LAYOUT ════════════ -->
+<!-- PRINT LAYOUT -->
 <div class="print-only">
 
-    <!-- Company header -->
     <div class="ph">
         <h2>PPMS &mdash; Petrol Pump Management System</h2>
         <p>Meter Reading Report &nbsp;&bull;&nbsp; Document #<?php echo $id; ?></p>
@@ -612,7 +521,6 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
         <?php endif; ?>
     </div>
 
-    <!-- Meta grid -->
     <div class="pm">
         <div class="pm-item"><div class="lbl2">Reading #</div><div class="val2"><?php echo $id; ?></div></div>
         <div class="pm-item"><div class="lbl2">Date</div><div class="val2"><?php echo date('d-m-Y', strtotime($header['date'])); ?></div></div>
@@ -623,7 +531,6 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
         <div class="pm-item"><div class="lbl2">Printed At</div><div class="val2"><?php echo date('d-m-Y h:i A'); ?></div></div>
     </div>
 
-    <!-- Detail table -->
     <table class="pt">
         <thead>
             <tr>
@@ -634,10 +541,10 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 <th class="r">Rate</th>
                 <th class="r">Last Rdg.</th>
                 <th class="r">Curr. Rdg.</th>
-                <th class="r">Sale Rdg.<br><span style="font-size:8px;font-weight:400;">(Curr−Last)</span></th>
+                <th class="r">Sale Rdg.</th>
                 <th class="r">Test Rdg.</th>
-                <th class="r">Net Sale<br><span style="font-size:8px;font-weight:400;">(Sale−Test)</span></th>
-                <th class="r">Amount<br><span style="font-size:8px;font-weight:400;">(Net&times;Rate)</span></th>
+                <th class="r">Net Sale</th>
+                <th class="r">Amount</th>
             </tr>
         </thead>
         <tbody>
@@ -654,7 +561,6 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
             <td class="r"><?php echo number_format($d['test_reading'], 2); ?></td>
             <td class="r pt-net"><?php echo number_format($d['net_sale'], 2); ?></td>
             <td class="r pt-amount"><?php echo number_format($d['amount'], 2); ?></td>
-
         </tr>
         <?php endforeach; ?>
         </tbody>
@@ -673,51 +579,50 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
     </div>
     <?php endif; ?>
 
-    <?php if (!empty($card_sales)): 
-        $cs = $card_sales[0];
-    ?>
+    <?php if (!empty($card_sales)): ?>
     <h3 style="font-size:12px; font-weight:700; margin:15px 0 5px; color:#2c3e50; border-bottom:1px solid #2c3e50; padding-bottom:3px;"><i class="fas fa-credit-card mr-1"></i>Card Sale Details</h3>
-    <div style="border:1px solid #ccc; padding:10px; border-radius:3px; font-size:11px; display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:15px;">
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Nozzle</span>
-            <strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Card Machine</span>
-            <strong><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Batch No</span>
-            <strong><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">No. of Cards</span>
-            <strong><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Amount</span>
-            <strong>Rs. <?php echo number_format($cs['amount'], 2); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Service Charges</span>
-            <strong>Rs. <?php echo number_format($cs['service_charges'], 2); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Net Amount</span>
-            <strong>Rs. <?php echo number_format($cs['net_amount'], 2); ?></strong>
-        </div>
-        <div>
-            <span style="color:#777; display:block; font-size:9px; text-transform:uppercase;">Date / Time</span>
-            <strong><?php echo date('d-m-Y h:i A', strtotime($cs['created_at'])); ?></strong>
-        </div>
-    </div>
+    <table class="pt" style="font-size:9.5px;">
+        <thead>
+            <tr style="background:#f5f5f5;">
+                <th>#</th>
+                <th>Nozzle</th>
+                <th>Card Machine</th>
+                <th>Batch No</th>
+                <th class="c">Cards</th>
+                <th class="r">Amount (Rs.)</th>
+                <th class="r">Service Charges</th>
+                <th class="r">Net Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php $pcsn = 1; foreach ($card_sales as $cs): ?>
+            <tr>
+                <td class="c"><?php echo $pcsn++; ?></td>
+                <td><strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong></td>
+                <td><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></td>
+                <td><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></td>
+                <td class="c"><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></td>
+                <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($cs['amount'], 2); ?></td>
+                <td class="r">Rs. <?php echo number_format($cs['service_charges'], 2); ?></td>
+                <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($cs['net_amount'], 2); ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="font-weight:bold; background:#eceff1;">
+                <td colspan="5" style="text-align:right;">Total Card Sale:</td>
+                <td class="r">Rs. <?php echo number_format($card_sales_total, 2); ?></td>
+                <td colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
     <?php endif; ?>
 
     <?php if (!empty($credit_sales)): ?>
     <h3 style="font-size:12px; font-weight:700; margin:15px 0 5px; color:#2c3e50; border-bottom:1px solid #2c3e50; padding-bottom:3px;"><i class="fas fa-file-invoice mr-1"></i>Credit Sale Details</h3>
     <table class="pt" style="font-size:9.5px;">
         <thead>
-            <tr>
+            <tr style="background:#f5f5f5;">
                 <th>#</th>
                 <th>Nozzle</th>
                 <th>Item</th>
@@ -766,7 +671,6 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
     </table>
     <?php endif; ?>
 
-    <!-- Print footer -->
     <div class="pfooter">
         <span>PPMS &mdash; Petrol Pump Management System</span>
         <span>Reading #<?php echo $id; ?> &nbsp;|&nbsp; Printed: <?php echo date('d-m-Y h:i A'); ?></span>

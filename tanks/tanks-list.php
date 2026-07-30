@@ -20,7 +20,7 @@ require '../include/config.php';
 		.m-top { margin-top: 20px; }
 		.m-bot  { margin-bottom: 20px; }
         .btn-primary {
-            background-color: #04204e !important; /* Fallback */
+            background-color: #04204e !important;
             background: var(--primary-gradient) !important;
             border: none !important;
             color: #fff !important;
@@ -29,7 +29,7 @@ require '../include/config.php';
             opacity: 0.9;
         }
         #tanksListTable thead th {
-            background-color: #04204e !important; /* Fallback */
+            background-color: #04204e !important;
             background: var(--primary-color) !important;
             color: #fff !important;
         }
@@ -40,12 +40,12 @@ require '../include/config.php';
         <?php include('../include/navbar.php');?>
 		<main class="main">
 			<div class="container pt-4 pb-4">
-				<div class="row mb-5 align-items-center">
+				<div class="row mb-4 align-items-center">
 					<div class="col-md-6">
-						<h4>View Tanks</h4>
+						<h4><i class="fas fa-gas-pump mr-2 text-primary"></i>View Tanks</h4>
 					</div>
 					<div class="col-md-6 text-right">
-						<a href="add-tank.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Tank</a>
+						<a href="add-tank.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Tank</a>
 					</div>
 				</div>
 				<table id="tanksListTable" class="table table-striped table-bordered">
@@ -57,6 +57,7 @@ require '../include/config.php';
 							<th>Storage Capacity</th>
 							<th>Created At</th>
 							<th>Updated At</th>
+							<th>Actions</th>
 							<th>Delete</th>
 						</tr>
 					</thead>
@@ -78,6 +79,9 @@ require '../include/config.php';
 										<td>'.number_format($row['storage_capacity'], 2) . $unit_suffix . '</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>
+										<td>
+											<a href="dip-chart.php?tank_id='.$row['id'].'" class="btn btn-sm btn-info text-white" title="View Dip Chart"><i class="fas fa-chart-line mr-1"></i> Dip Chart</a>
+										</td>
 										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deletetank('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size:20px;"></i></a></td>
 									</tr>';
 							}

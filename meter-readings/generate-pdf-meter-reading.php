@@ -49,7 +49,7 @@ foreach ($details as $d) { $calcGrand += floatval($d['amount']); }
 $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 $hasDetails   = count($details) > 0;
 
-// Fetch Card Sales
+// Fetch Card Sales (All entries)
 $card_sales_sql = "SELECT mrcs.*,
                           cm.name AS machine_name,
                           n.name AS nozzle_name
@@ -68,7 +68,7 @@ if ($card_sales_result) {
     }
 }
 
-// Fetch Credit Sales
+// Fetch Credit Sales (All entries)
 $credit_sales_sql = "SELECT mrcs.*,
                             n.name AS nozzle_name,
                             i.name AS item_name
@@ -104,7 +104,7 @@ body {
     padding: 20px;
 }
 
-/* ── Screen toolbar ── */
+/* Screen toolbar */
 .screen-bar {
     background: var(--primary-color);
     color: #fff;
@@ -141,16 +141,16 @@ body {
     display: inline-block;
 }
 
-/* ── A4 Landscape paper ── */
+/* Paper */
 .paper {
     background: #fff;
-    width: 1050px;          /* ~A4 landscape width at 96dpi */
+    width: 1050px;
     margin: 0 auto;
     padding: 24px 28px;
     border: 1px solid #aaa;
 }
 
-/* ── Document header ── */
+/* Document header */
 .doc-header {
     text-align: center;
     border-bottom: 2px solid var(--primary-color);
@@ -160,7 +160,7 @@ body {
 .doc-header h1 { font-size: 16px; color: var(--primary-color); font-weight: bold; }
 .doc-header p  { font-size: 11px; color: #555; margin-top: 2px; }
 
-/* ── Info grid ── */
+/* Info grid */
 .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -183,10 +183,8 @@ body {
 }
 .info-cell .val { font-size: 13px; font-weight: bold; color: var(--primary-color); margin-top: 2px; }
 .info-cell .val.big { font-size: 17px; }
-.info-cell.full { grid-column: span 4; }
-.info-cell.half { grid-column: span 2; }
 
-/* ── Section bar ── */
+/* Section bar */
 .sec-bar {
     background: var(--primary-color);
     color: #fff;
@@ -197,7 +195,7 @@ body {
 }
 .sec-bar.dark { background: #263238; }
 
-/* ── Main nozzle table ── */
+/* Main nozzle table */
 .nozzle-tbl {
     width: 100%;
     border-collapse: collapse;
@@ -237,7 +235,7 @@ body {
 
 .sub-formula { font-size: 8.5px; color: #777; display: block; margin-top: 1px; }
 
-/* ── Totals row ── */
+/* Totals row */
 .totals-row td {
     background: #eceff1;
     font-weight: bold;
@@ -246,7 +244,7 @@ body {
     font-size: 10.5px;
 }
 
-/* ── Grand total row ── */
+/* Grand total row */
 .grand-row td {
     background: var(--primary-color);
     color: #fff;
@@ -256,7 +254,7 @@ body {
 }
 .grand-row td.r { text-align: right; font-size: 13px; }
 
-/* ── Calc breakdown table ── */
+/* Calc breakdown table */
 .calc-tbl {
     width: 100%;
     border-collapse: collapse;
@@ -287,27 +285,7 @@ body {
     font-size: 11px;
 }
 
-/* ── No-detail box ── */
-.no-detail-box {
-    border: 2px solid #e65100;
-    background: #fff3e0;
-    padding: 16px 20px;
-    margin-top: 10px;
-    text-align: center;
-}
-.no-detail-box p { font-size: 12px; color: #333; margin-bottom: 8px; }
-.grand-stored {
-    font-size: 20px;
-    font-weight: bold;
-    color: var(--primary-color);
-    border: 2px solid var(--primary-color);
-    display: inline-block;
-    padding: 8px 28px;
-    margin-top: 4px;
-    background: #fff;
-}
-
-/* ── Signatures ── */
+/* Signatures */
 .sig-section {
     display: flex;
     justify-content: space-between;
@@ -325,7 +303,7 @@ body {
     margin-top: 34px;
 }
 
-/* ── Footer ── */
+/* Footer */
 .doc-footer {
     margin-top: 14px;
     border-top: 1px solid #ccc;
@@ -336,17 +314,12 @@ body {
     color: #666;
 }
 
-/* ════════════════════
-   PRINT
-   ════════════════════ */
 @media print {
     body    { background:#fff !important; padding:0 !important; }
     .screen-bar { display:none !important; }
     .paper  { border:none; padding:6mm 8mm; width:100%; }
     * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     @page   { size: A4 landscape; margin: 6mm 8mm; }
-
-    /* Shrink fonts slightly for print */
     .nozzle-tbl { font-size: 9px !important; }
     .nozzle-tbl th { font-size: 8.5px !important; padding: 4px 3px !important; }
     .nozzle-tbl td { padding: 4px 3px !important; }
@@ -425,17 +398,17 @@ body {
     </div>
     <table class="nozzle-tbl">
         <colgroup>
-            <col style="width:3%">   <!-- # -->
-            <col style="width:8%">   <!-- Nozzle -->
-            <col style="width:7%">   <!-- Fuel -->
-            <col style="width:10%">  <!-- Staff -->
-            <col style="width:6%">   <!-- Rate -->
-            <col style="width:8%">   <!-- Last -->
-            <col style="width:8%">   <!-- Current -->
-            <col style="width:9%">   <!-- Sale -->
-            <col style="width:7%">   <!-- Test -->
-            <col style="width:9%">   <!-- Net -->
-            <col style="width:10%">  <!-- Amount -->
+            <col style="width:3%">
+            <col style="width:8%">
+            <col style="width:7%">
+            <col style="width:10%">
+            <col style="width:6%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:9%">
+            <col style="width:7%">
+            <col style="width:9%">
+            <col style="width:10%">
         </colgroup>
         <thead>
             <tr>
@@ -476,16 +449,13 @@ body {
             <td class="r"><?php echo number_format($currR, 2); ?></td>
             <td class="r col-sale">
                 <?php echo number_format($saleR, 2); ?>
-                <span class="sub-formula">(<?php echo number_format($currR,2); ?>&minus;<?php echo number_format($lastR,2); ?>)</span>
             </td>
             <td class="r col-test"><?php echo number_format($testR, 2); ?></td>
             <td class="r col-net">
                 <?php echo number_format($netS, 2); ?>
-                <span class="sub-formula">(<?php echo number_format($saleR,2); ?>&minus;<?php echo number_format($testR,2); ?>)</span>
             </td>
             <td class="r col-amt">
                 Rs. <?php echo number_format($amt, 2); ?>
-                <span class="sub-formula">(<?php echo number_format($netS,2); ?>&times;<?php echo number_format($price,2); ?>)</span>
             </td>
         </tr>
         <?php endforeach; ?>
@@ -509,83 +479,6 @@ body {
         </tfoot>
     </table>
 
-    <!-- Calculation breakdown -->
-    <div style="margin-top:14px;">
-        <div class="sec-bar dark">
-            Grand Total Calculation &mdash; Step-by-Step per Nozzle
-        </div>
-        <table class="calc-tbl">
-            <colgroup>
-                <col style="width:10%">
-                <col style="width:8%"><col style="width:3%"><col style="width:8%">
-                <col style="width:3%"><col style="width:8%">
-                <col style="width:3%"><col style="width:8%">
-                <col style="width:3%"><col style="width:8%">
-                <col style="width:3%"><col style="width:8%">
-                <col style="width:3%"><col style="width:10%">
-            </colgroup>
-            <thead>
-                <tr>
-                    <th style="text-align:left;">Nozzle</th>
-                    <th>Current</th><th>&minus;</th><th>Last</th>
-                    <th>=</th><th>Sale</th>
-                    <th>&minus;</th><th>Test</th>
-                    <th>=</th><th>Net Sale</th>
-                    <th>&times;</th><th>Rate (Rs.)</th>
-                    <th>=</th><th>Amount (Rs.)</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($details as $d):
-                $p = floatval($d['price']); $l = floatval($d['last_reading']);
-                $c = floatval($d['current_reading']); $s = floatval($d['sale_reading']);
-                $t = floatval($d['test_reading']); $n = floatval($d['net_sale']);
-                $a = floatval($d['amount']);
-            ?>
-            <tr>
-                <td class="name"><?php echo htmlspecialchars($d['nozzle_name'] ?? 'N/A'); ?></td>
-                <td><?php echo number_format($c,2); ?></td>
-                <td class="op">&minus;</td>
-                <td><?php echo number_format($l,2); ?></td>
-                <td class="op">=</td>
-                <td style="background:#e8f5e9;font-weight:bold;"><?php echo number_format($s,2); ?></td>
-                <td class="op">&minus;</td>
-                <td><?php echo number_format($t,2); ?></td>
-                <td class="op">=</td>
-                <td style="background:#e3f2fd;font-weight:bold;"><?php echo number_format($n,2); ?></td>
-                <td class="op">&times;</td>
-                <td style="background:#fff8e1;font-weight:bold;"><?php echo number_format($p,2); ?></td>
-                <td class="op">=</td>
-                <td style="background:#ede7f6;font-weight:bold;color:#4a148c;">Rs. <?php echo number_format($a,2); ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="13" style="text-align:right;">
-                        GRAND TOTAL = Sum of all Amount columns above
-                    </td>
-                    <td>Rs. <?php echo number_format($grandDisplay,2); ?></td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
-
-    <?php else: ?>
-
-    <!-- Old record — no detail rows -->
-    <div class="no-detail-box">
-        <p>
-            <strong>Note:</strong> This record (ID #<?php echo $id; ?>) was saved before the nozzle detail
-            tracking system was set up. Individual nozzle data is not available.
-        </p>
-        <p>Grand Total stored at the time of saving:</p>
-        <div class="grand-stored">Rs. <?php echo number_format(floatval($header['grand_total']),2); ?></div>
-        <p style="margin-top:10px;font-size:11px;color:#777;">
-            Create a new meter reading to get a full nozzle-wise breakdown.
-        </p>
-    </div>
-
     <?php endif; ?>
 
     <?php if (!empty($header['remarks'])): ?>
@@ -595,54 +488,55 @@ body {
     </div>
     <?php endif; ?>
 
-    <?php if (!empty($card_sales)): 
-        $cs = $card_sales[0];
-    ?>
+    <!-- Card Sale Details Table (PDF Export - ALL Entries) -->
+    <?php if (!empty($card_sales)): ?>
     <div style="margin-top:14px;">
         <div class="sec-bar" style="background:#17a2b8;">
-            Card Sale Details
+            Card Sale Details (<?php echo count($card_sales); ?> Entries)
         </div>
-        <div style="border:1px solid #ccc; padding:10px; border-radius:3px; font-size:10px; display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-top:5px; background:#fff;">
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Nozzle</span>
-                <strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Card Machine</span>
-                <strong><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Batch No</span>
-                <strong><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">No. of Cards</span>
-                <strong><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Amount</span>
-                <strong>Rs. <?php echo number_format($cs['amount'], 2); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Service Charges</span>
-                <strong>Rs. <?php echo number_format($cs['service_charges'], 2); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Net Amount</span>
-                <strong>Rs. <?php echo number_format($cs['net_amount'], 2); ?></strong>
-            </div>
-            <div>
-                <span style="color:#777; display:block; font-size:8px; text-transform:uppercase;">Date / Time</span>
-                <strong><?php echo date('d-m-Y h:i A', strtotime($cs['created_at'])); ?></strong>
-            </div>
-        </div>
+        <table class="nozzle-tbl" style="margin-top:5px; font-size:9.5px;">
+            <thead>
+                <tr style="background:#f5f5f5;">
+                    <th style="width:4%; color:#000; background:#ddd;">#</th>
+                    <th style="width:16%; color:#000; background:#ddd;">Nozzle</th>
+                    <th style="width:20%; color:#000; background:#ddd;">Card Machine</th>
+                    <th style="width:14%; color:#000; background:#ddd;">Batch No</th>
+                    <th style="width:10%; color:#000; background:#ddd;" class="c">Cards</th>
+                    <th style="width:12%; color:#000; background:#ddd;" class="r">Amount (Rs.)</th>
+                    <th style="width:12%; color:#000; background:#ddd;" class="r">Service Charges</th>
+                    <th style="width:12%; color:#000; background:#ddd;" class="r">Net Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $pcsn = 1; foreach ($card_sales as $cs): ?>
+                <tr>
+                    <td class="c"><?php echo $pcsn++; ?></td>
+                    <td><strong><?php echo htmlspecialchars($cs['nozzle_name'] ?? '—'); ?></strong></td>
+                    <td><?php echo htmlspecialchars($cs['machine_name'] ?? '—'); ?></td>
+                    <td class="c"><?php echo htmlspecialchars($cs['batch_no'] ?? '—'); ?></td>
+                    <td class="c"><?php echo htmlspecialchars($cs['no_of_cards'] ?? '0'); ?></td>
+                    <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($cs['amount'], 2); ?></td>
+                    <td class="r">Rs. <?php echo number_format($cs['service_charges'], 2); ?></td>
+                    <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($cs['net_amount'], 2); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr class="totals-row">
+                    <td colspan="5" class="r">Total Card Sale:</td>
+                    <td class="r col-amt">Rs. <?php echo number_format($card_sales_total, 2); ?></td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
     </div>
     <?php endif; ?>
 
+    <!-- Credit Sale Details Table (PDF Export - ALL Entries) -->
     <?php if (!empty($credit_sales)): ?>
     <div style="margin-top:14px;">
         <div class="sec-bar" style="background:#ffc107; color:#000;">
-            Credit Sale Details
+            Credit Sale Details (<?php echo count($credit_sales); ?> Entries)
         </div>
         <table class="nozzle-tbl" style="margin-top:5px; font-size:9.5px;">
             <thead>

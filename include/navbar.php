@@ -35,6 +35,8 @@ if (!file_exists('include/navbar.php')) {
                     <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php">Card Machines</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>banks/banks-list.php">Banks</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>dip-lookup/dip-lookup-list.php">Dip Lookup</a>
                 </div>
             </li>
             <li class="nav-item">

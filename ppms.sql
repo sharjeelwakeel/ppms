@@ -943,6 +943,25 @@ ALTER TABLE `tbl_staff_guarantors`
 --
 ALTER TABLE `tbl_tank_dip_charts`
   ADD CONSTRAINT `tbl_tank_dip_charts_ibfk_1` FOREIGN KEY (`tank_id`) REFERENCES `tbl_tanks` (`id`) ON DELETE CASCADE;
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_dip_lookup`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_dip_lookup` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `dip_mm` decimal(10,2) NOT NULL,
+  `dip_litre` decimal(10,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_dip_mm` (`dip_mm`),
+  KEY `idx_deleted_at` (`deleted_at`),
+  KEY `idx_deleted_mm` (`deleted_at`, `dip_mm`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

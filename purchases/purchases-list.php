@@ -4,6 +4,18 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+
+// Auto-migrate tbl_purchase_tank_links schema if needed
+mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `purchase_id` INT(11) NOT NULL,
+  `tank_id` INT(11) NOT NULL,
+  `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  PRIMARY KEY (`id`),
+  KEY `idx_purchase_id` (`purchase_id`),
+  KEY `idx_tank_id` (`tank_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -24,7 +36,7 @@ require '../include/config.php';
 			margin-bottom:20px;
 		}
         .btn-primary {
-            background-color: #04204e !important; /* Fallback */
+            background-color: #04204e !important;
             background: var(--primary-gradient) !important;
             border: none !important;
             color: #fff !important;
@@ -33,7 +45,7 @@ require '../include/config.php';
             opacity: 0.9;
         }
         #purchasesTable thead th {
-            background-color: #04204e !important; /* Fallback */
+            background-color: #04204e !important;
             background: var(--primary-color) !important;
             color: #fff !important;
             white-space: nowrap;
@@ -71,13 +83,15 @@ require '../include/config.php';
 								<th>Route</th>
 								<th>Invoice No</th>
 								<th>Carriage Invoice No</th>
-								<th>Delete</th>
+								<th style="text-align: center;">Linked To</th>
+								<th style="text-align: center;">Delete</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php 
 							$sql = "SELECT p.*, i.name as item_name, 
-									       COALESCE((SELECT SUM(pay.amount) FROM tbl_purchase_payments pay WHERE pay.purchase_id = p.id AND pay.deleted_at IS NULL), 0) as paid_amount
+									       COALESCE((SELECT SUM(pay.amount) FROM tbl_purchase_payments pay WHERE pay.purchase_id = p.id AND pay.deleted_at IS NULL), 0) as paid_amount,
+									       COALESCE((SELECT SUM(link.quantity) FROM tbl_purchase_tank_links link WHERE link.purchase_id = p.id), 0) as stored_quantity
 									FROM tbl_purchases p 
 									LEFT JOIN tbl_items i ON p.item_id = i.id 
 									WHERE p.deleted_at IS NULL
@@ -85,9 +99,19 @@ require '../include/config.php';
 							$result = mysqli_query($connection, $sql);
 							if($result && mysqli_num_rows($result) > 0){
 								while($row = mysqli_fetch_assoc($result)){
-									$total_amount = $row['quantity'] * $row['price'];
-									$paid_amount = $row['paid_amount'];
+									$total_amount = floatval($row['quantity']) * floatval($row['price']);
+									$paid_amount = floatval($row['paid_amount']);
 									$remaining_amount = $total_amount - $paid_amount;
+									
+									$purchased_qty = floatval($row['quantity']);
+									$stored_qty = floatval($row['stored_quantity']);
+
+									$linkStatusColor = 'text-danger';
+									if ($stored_qty >= $purchased_qty && $purchased_qty > 0) {
+										$linkStatusColor = 'text-success';
+									} else if ($stored_qty > 0) {
+										$linkStatusColor = 'text-warning';
+									}
 									
 									$statusBadge = 'badge-danger';
 									if ($row['payment_status'] == 'paid') {
@@ -110,7 +134,14 @@ require '../include/config.php';
 											<td>'.htmlspecialchars($row['route']).'</td>
 											<td>'.htmlspecialchars($row['invoice_number']).'</td>
 											<td>'.htmlspecialchars($row['carriage_invoice_number']).'</td>
-											<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
+											<td class="text-center" style="white-space:nowrap;">
+												<a href="link-purchase-tank.php?id='.$row['id'].'" class="btn btn-sm font-weight-bold px-2 py-1 mb-1" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); color:#fff; border-radius:6px; font-size:12px; text-decoration:none; display:inline-block; border:none; box-shadow:0 2px 6px rgba(23,162,184,0.25);">
+													<i class="fas fa-link mr-1"></i> Linked To
+												</a>
+												<br>
+												<small class="font-weight-bold '.$linkStatusColor.'">'.number_format($stored_qty, 2).' / '.number_format($purchased_qty, 2).' Ltr</small>
+											</td>
+											<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
 										</tr>';
 								}
 							}

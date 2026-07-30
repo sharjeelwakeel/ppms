@@ -5,6 +5,9 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 
+// Auto-migrate tbl_purchase_payments to make tank_id NULLable if not already
+mysqli_query($connection, "ALTER TABLE tbl_purchase_payments MODIFY COLUMN tank_id INT NULL DEFAULT NULL");
+
 if (isset($_GET['id']) && !empty($_GET['id'])) {
     $id = mysqli_real_escape_string($connection, $_GET['id']);
 } else {
@@ -49,7 +52,11 @@ if (isset($_POST['update_purchase'])) {
                     carriage_invoice_number='$carriage_invoice_number',
                     payment_status='$new_status'
                   WHERE id='$id'";
-        mysqli_query($connection, $query);
+        $upd_res = mysqli_query($connection, $query);
+        if (!$upd_res) {
+            throw new Exception(mysqli_error($connection));
+        }
+
         mysqli_commit($connection);
         $message = '<div class="alert alert-success">Purchase details updated successfully.</div>';
     } catch (Exception $e) {
@@ -58,24 +65,26 @@ if (isset($_POST['update_purchase'])) {
     }
 }
 
-// Handle Adding a Partial Payment
+// Handle Adding a Partial Payment (without Tank attachment)
 if (isset($_POST['add_payment'])) {
     $payment_date = mysqli_real_escape_string($connection, $_POST['payment_date']);
     $payment_amount = floatval($_POST['payment_amount']);
     $bank_id = intval($_POST['bank_id']);
-    $tank_id = intval($_POST['tank_id']);
 
     mysqli_begin_transaction($connection);
     try {
-        // 1. Insert Payment
-        $insert_payment = "INSERT INTO tbl_purchase_payments (purchase_id, date, amount, bank_id, tank_id) 
-                           VALUES ('$id', '$payment_date', '$payment_amount', '$bank_id', '$tank_id')";
-        mysqli_query($connection, $insert_payment);
+        // 1. Insert Payment without tank attachment
+        $insert_payment = "INSERT INTO tbl_purchase_payments (purchase_id, date, amount, bank_id) 
+                           VALUES ('$id', '$payment_date', '$payment_amount', '$bank_id')";
+        $ins_res = mysqli_query($connection, $insert_payment);
+        if (!$ins_res) {
+            throw new Exception(mysqli_error($connection));
+        }
 
         // 2. Fetch Purchase details for recalculating status
         $purch_res = mysqli_query($connection, "SELECT quantity, price FROM tbl_purchases WHERE id = '$id' LIMIT 1");
         $purch_row = mysqli_fetch_assoc($purch_res);
-        $total_cost = floatval($purch_row['quantity']) * floatval($purch_row['price']);
+        $total_cost = floatval($purch_row['quantity'] ?? 0) * floatval($purch_row['price'] ?? 0);
 
         // 3. Fetch Sum of Payments
         $sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND deleted_at IS NULL");
@@ -90,7 +99,11 @@ if (isset($_POST['add_payment'])) {
             $new_status = 'in process';
         }
 
-        mysqli_query($connection, "UPDATE tbl_purchases SET payment_status = '$new_status' WHERE id = '$id'");
+        $upd_status_res = mysqli_query($connection, "UPDATE tbl_purchases SET payment_status = '$new_status' WHERE id = '$id'");
+        if (!$upd_status_res) {
+            throw new Exception(mysqli_error($connection));
+        }
+
         mysqli_commit($connection);
         $message = '<div class="alert alert-success">Payment of ' . number_format($payment_amount, 2) . ' recorded successfully.</div>';
     } catch (Exception $e) {
@@ -113,25 +126,20 @@ if (!$purchase) {
 $banks_sql = "SELECT id, name, account_number FROM tbl_banks WHERE deleted_at IS NULL ORDER BY name ASC";
 $banks_result = mysqli_query($connection, $banks_sql);
 
-// Fetch tanks for dropdown
-$tanks_sql = "SELECT id, tank_name FROM tbl_tanks ORDER BY tank_name ASC";
-$tanks_result = mysqli_query($connection, $tanks_sql);
-
 // Fetch items for details dropdown
 $items_sql = "SELECT id, name FROM tbl_items ORDER BY name ASC";
 $items_result = mysqli_query($connection, $items_sql);
 
 // Fetch Payment History
-$payments_sql = "SELECT pay.*, b.name as bank_name, b.account_number as bank_account, t.tank_name 
+$payments_sql = "SELECT pay.*, b.name as bank_name, b.account_number as bank_account
                  FROM tbl_purchase_payments pay
                  LEFT JOIN tbl_banks b ON pay.bank_id = b.id
-                 LEFT JOIN tbl_tanks t ON pay.tank_id = t.id
                  WHERE pay.purchase_id = '$id' AND pay.deleted_at IS NULL
                  ORDER BY pay.id DESC";
 $payments_result = mysqli_query($connection, $payments_sql);
 
 // Calculate Totals for Summary
-$total_cost = $purchase['quantity'] * $purchase['price'];
+$total_cost = floatval($purchase['quantity']) * floatval($purchase['price']);
 $payments_sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND deleted_at IS NULL");
 $payments_sum_row = mysqli_fetch_assoc($payments_sum_res);
 $total_paid = floatval($payments_sum_row['total_paid'] ?? 0);
@@ -299,8 +307,7 @@ $remaining_amount = $total_cost - $total_paid;
 												<th>Date</th>
 												<th>Amount</th>
 												<th>Bank Source</th>
-												<th>Tank Deposited</th>
-												<th>Delete</th>
+												<th style="width: 70px; text-align: center;">Delete</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -312,12 +319,11 @@ $remaining_amount = $total_cost - $total_paid;
 														<td>' . date("d-m-Y", strtotime($pay_row['date'])) . '</td>
 														<td class="font-weight-bold text-success">' . number_format($pay_row['amount'], 2) . '</td>
 														<td>' . htmlspecialchars($pay_row['bank_name']) . '<br><small class="text-muted">' . htmlspecialchars($pay_row['bank_account']) . '</small></td>
-														<td>' . htmlspecialchars($pay_row['tank_name'] ?? 'N/A') . '</td>
-														<td><a class="btn btn-link text-danger p-0" onclick="deletePayment(' . $pay_row['id'] . ')"><i class="fas fa-trash-alt"></i></a></td>
+														<td class="text-center"><a class="btn btn-link text-danger p-0" onclick="deletePayment(' . $pay_row['id'] . ')"><i class="fas fa-trash-alt"></i></a></td>
 													</tr>';
 												}
 											} else {
-												echo '<tr><td colspan="5" class="text-center text-muted">No payments recorded yet for this purchase.</td></tr>';
+												echo '<tr><td colspan="4" class="text-center text-muted">No payments recorded yet for this purchase.</td></tr>';
 											}
 											?>
 										</tbody>
@@ -355,22 +361,6 @@ $remaining_amount = $total_cost - $total_paid;
 													mysqli_data_seek($banks_result, 0);
 													while ($bank_row = mysqli_fetch_assoc($banks_result)) {
 														echo '<option value="' . $bank_row['id'] . '">' . htmlspecialchars($bank_row['name']) . ' (' . htmlspecialchars($bank_row['account_number']) . ')</option>';
-													}
-												}
-												?>
-											</select>
-										</div>
-									</div>
-									<div class="form-group row">
-										<label class="col-sm-4 col-form-label font-weight-bold">Tank Deposited</label>
-										<div class="col-sm-8">
-											<select name="tank_id" class="form-control" required>
-												<option value="">Select Tank</option>
-												<?php 
-												if (mysqli_num_rows($tanks_result) > 0) {
-													mysqli_data_seek($tanks_result, 0);
-													while ($tank_row = mysqli_fetch_assoc($tanks_result)) {
-														echo '<option value="' . $tank_row['id'] . '">' . htmlspecialchars($tank_row['tank_name']) . '</option>';
 													}
 												}
 												?>

@@ -42,107 +42,128 @@ if (isset($_POST['submit'])) {
     $remarks      = mysqli_real_escape_string($connection, $_POST['remarks'] ?? '');
     $grand_total  = 0;
 
-    // Insert header record (staff_id is stored per-nozzle in tbl_meter_reading_details)
-    $header_sql = "INSERT INTO tbl_meter_readings (date, shift_id, payment_type, grand_total, remarks)
-                   VALUES ('$date','$shift_id', '$payment_type', 0, '$remarks')";
-    if (mysqli_query($connection, $header_sql)) {
-        $reading_id = mysqli_insert_id($connection);
-
-        // Loop through nozzle rows
-        if (isset($_POST['nozzle_id']) && is_array($_POST['nozzle_id'])) {
-            foreach ($_POST['nozzle_id'] as $idx => $nozzle_id) {
-                $nozzle_id       = mysqli_real_escape_string($connection, $nozzle_id);
-                $row_staff_id    = mysqli_real_escape_string($connection, $_POST['row_staff_id'][$idx] ?? 0);
-                $item_type       = mysqli_real_escape_string($connection, $_POST['item_type'][$idx] ?? '');
-                $price           = floatval($_POST['price'][$idx] ?? 0);
-                $last_reading    = floatval($_POST['last_reading'][$idx] ?? 0);
-                $current_reading = floatval($_POST['current_reading'][$idx] ?? 0);
-                $test_reading    = floatval($_POST['test_reading'][$idx] ?? 0);
-                $row_payment     = 'Cash';
-
-                $sale_reading = $current_reading - $last_reading;
-                if ($sale_reading < 0) $sale_reading = 0;
-
-                $net_sale = $sale_reading - $test_reading;
-                if ($net_sale < 0) $net_sale = 0;
-
-                $amount = $net_sale * $price;
-                $grand_total += $amount;
-
-                $detail_sql = "INSERT INTO tbl_meter_reading_details
-                    (meter_reading_id, nozzle_id, staff_id, item_type, price,
-                     last_reading, current_reading, sale_reading, test_reading, net_sale, amount, payment_type)
-                    VALUES ('$reading_id','$nozzle_id','$row_staff_id','$item_type','$price',
-                            '$last_reading','$current_reading','$sale_reading','$test_reading','$net_sale','$amount','$row_payment')";
-                mysqli_query($connection, $detail_sql);
-
-                // Update start_reading in tbl_nozzles with the new current_reading
-                $update_nozzle_sql = "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'";
-                mysqli_query($connection, $update_nozzle_sql);
+    // Validate that current_reading >= last_reading for all nozzle rows
+    $validation_failed = false;
+    if (isset($_POST['nozzle_id']) && is_array($_POST['nozzle_id'])) {
+        foreach ($_POST['nozzle_id'] as $idx => $n_id) {
+            $last_rdg = floatval($_POST['last_reading'][$idx] ?? 0);
+            $curr_rdg = floatval($_POST['current_reading'][$idx] ?? 0);
+            if ($curr_rdg < $last_rdg) {
+                $validation_failed = true;
+                break;
             }
         }
+    }
 
-        // Insert single card sale entry if amount is greater than 0
-        $card_amount = floatval($_POST['card_amount'] ?? 0);
-        if ($card_amount > 0) {
-            $c_nozzle_id   = intval($_POST['card_nozzle_id'] ?? 0);
-            $c_machine_id  = intval($_POST['card_machine_id'] ?? 0);
-            $c_batch_no    = mysqli_real_escape_string($connection, $_POST['card_batch_no'] ?? '');
-            $c_no_of_cards = intval($_POST['card_no_of_cards'] ?? 0);
+    if ($validation_failed) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Validation Error: Current Reading must be greater than or equal to Previous Reading.</div>';
+    } else {
+        // Insert header record
+        $header_sql = "INSERT INTO tbl_meter_readings (date, shift_id, payment_type, grand_total, remarks)
+                       VALUES ('$date','$shift_id', '$payment_type', 0, '$remarks')";
+        if (mysqli_query($connection, $header_sql)) {
+            $reading_id = mysqli_insert_id($connection);
 
-            // Fetch item_id for the selected nozzle
-            $item_query = mysqli_query($connection, "SELECT item_id FROM tbl_nozzles WHERE id='$c_nozzle_id'");
-            $item_row = mysqli_fetch_assoc($item_query);
-            $c_item_id = intval($item_row['item_id'] ?? 0);
+            // Loop through nozzle rows
+            if (isset($_POST['nozzle_id']) && is_array($_POST['nozzle_id'])) {
+                foreach ($_POST['nozzle_id'] as $idx => $nozzle_id) {
+                    $nozzle_id       = mysqli_real_escape_string($connection, $nozzle_id);
+                    $row_staff_id    = mysqli_real_escape_string($connection, $_POST['row_staff_id'][$idx] ?? 0);
+                    $item_type       = mysqli_real_escape_string($connection, $_POST['item_type'][$idx] ?? '');
+                    $price           = floatval($_POST['price'][$idx] ?? 0);
+                    $last_reading    = floatval($_POST['last_reading'][$idx] ?? 0);
+                    $current_reading = floatval($_POST['current_reading'][$idx] ?? 0);
+                    $test_reading    = floatval($_POST['test_reading'][$idx] ?? 0);
+                    $row_payment     = 'Cash';
 
-            // Fetch charges percentage for this machine
-            $charge_query = mysqli_query($connection, "SELECT charges_percentage FROM tbl_card_machines WHERE id='$c_machine_id'");
-            $charge_row   = mysqli_fetch_assoc($charge_query);
-            $charges_pct  = floatval($charge_row['charges_percentage'] ?? 0);
-            
-            $service_charges = $card_amount * ($charges_pct / 100);
-            $net_amount      = $card_amount - $service_charges;
+                    $sale_reading = $current_reading - $last_reading;
+                    if ($sale_reading < 0) $sale_reading = 0;
 
-            $card_sales_sql = "INSERT INTO tbl_meter_reading_card_sales 
-                (meter_reading_id, staff_id, card_machine_id, item_id, quantity, rate, amount, batch_no, service_charges, net_amount, nozzle_id, no_of_cards, created_at)
-                VALUES 
-                ('$reading_id', 0, '$c_machine_id', '$c_item_id', 0, 0, '$card_amount', '$c_batch_no', '$service_charges', '$net_amount', '$c_nozzle_id', '$c_no_of_cards', NOW())";
-            mysqli_query($connection, $card_sales_sql);
-        }
+                    $net_sale = $sale_reading - $test_reading;
+                    if ($net_sale < 0) $net_sale = 0;
 
-        // Loop through credit sales rows and save them
-        if (isset($_POST['credit_nozzle_id']) && is_array($_POST['credit_nozzle_id'])) {
-            foreach ($_POST['credit_nozzle_id'] as $idx => $c_nozzle_id) {
-                $c_nozzle_id      = intval($c_nozzle_id);
-                $c_slip_date      = mysqli_real_escape_string($connection, $_POST['credit_slip_date'][$idx] ?? '');
-                $c_slip_no        = mysqli_real_escape_string($connection, $_POST['credit_slip_no'][$idx] ?? '');
-                $c_account_number = mysqli_real_escape_string($connection, $_POST['credit_account_number'][$idx] ?? '');
-                $c_vehicle_number = mysqli_real_escape_string($connection, $_POST['credit_vehicle_number'][$idx] ?? '');
-                $c_quantity       = floatval($_POST['credit_quantity'][$idx] ?? 0);
-                $c_rate           = floatval($_POST['credit_rate'][$idx] ?? 0);
-                $c_amount         = floatval($_POST['credit_amount'][$idx] ?? 0);
-                $c_cash_rate      = floatval($_POST['credit_cash_rate'][$idx] ?? 0);
-                $c_issue_quantity = floatval($_POST['credit_issue_quantity'][$idx] ?? 0);
-                $c_balance_1      = floatval($_POST['credit_balance_1'][$idx] ?? 0);
-                $c_balance_2      = floatval($_POST['credit_balance_2'][$idx] ?? 0);
-                $c_wasoli         = floatval($_POST['credit_wasoli'][$idx] ?? 0);
+                    $amount = $net_sale * $price;
+                    $grand_total += $amount;
 
-                if ($c_nozzle_id > 0 && $c_amount > 0) {
-                    $credit_sales_sql = "INSERT INTO tbl_meter_reading_credit_sales 
-                        (meter_reading_id, nozzle_id, slip_date, slip_no, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
-                        VALUES 
-                        ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
-                    mysqli_query($connection, $credit_sales_sql);
+                    $detail_sql = "INSERT INTO tbl_meter_reading_details
+                        (meter_reading_id, nozzle_id, staff_id, item_type, price,
+                         last_reading, current_reading, sale_reading, test_reading, net_sale, amount, payment_type)
+                        VALUES ('$reading_id','$nozzle_id','$row_staff_id','$item_type','$price',
+                                '$last_reading','$current_reading','$sale_reading','$test_reading','$net_sale','$amount','$row_payment')";
+                    mysqli_query($connection, $detail_sql);
+
+                    // Update start_reading in tbl_nozzles with the new current_reading (stores current meter running position)
+                    $update_nozzle_sql = "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'";
+                    mysqli_query($connection, $update_nozzle_sql);
                 }
             }
-        }
 
-        // Update grand total in header
-        mysqli_query($connection, "UPDATE tbl_meter_readings SET grand_total='$grand_total' WHERE id='$reading_id'");
-        header('Location: view-meter-reading.php?id=' . $reading_id);
-        exit;
-    } else {
-        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: ' . mysqli_error($connection) . '</div>';
+            // Loop through multiple card sale entries
+            if (isset($_POST['card_nozzle_id']) && is_array($_POST['card_nozzle_id'])) {
+                foreach ($_POST['card_nozzle_id'] as $idx => $c_nozzle_id) {
+                    $c_nozzle_id   = intval($c_nozzle_id);
+                    $c_machine_id  = intval($_POST['card_machine_id'][$idx] ?? 0);
+                    $c_batch_no    = mysqli_real_escape_string($connection, $_POST['card_batch_no'][$idx] ?? '');
+                    $c_no_of_cards = intval($_POST['card_no_of_cards'][$idx] ?? 0);
+                    $card_amount   = floatval($_POST['card_amount'][$idx] ?? 0);
+
+                    if ($c_nozzle_id > 0 && $card_amount > 0) {
+                        // Fetch item_id for the selected nozzle
+                        $item_query = mysqli_query($connection, "SELECT item_id FROM tbl_nozzles WHERE id='$c_nozzle_id'");
+                        $item_row = mysqli_fetch_assoc($item_query);
+                        $c_item_id = intval($item_row['item_id'] ?? 0);
+
+                        // Fetch charges percentage for this machine
+                        $charge_query = mysqli_query($connection, "SELECT charges_percentage FROM tbl_card_machines WHERE id='$c_machine_id'");
+                        $charge_row   = mysqli_fetch_assoc($charge_query);
+                        $charges_pct  = floatval($charge_row['charges_percentage'] ?? 0);
+                        
+                        $service_charges = $card_amount * ($charges_pct / 100);
+                        $net_amount      = $card_amount - $service_charges;
+
+                        $card_sales_sql = "INSERT INTO tbl_meter_reading_card_sales 
+                            (meter_reading_id, staff_id, card_machine_id, item_id, quantity, rate, amount, batch_no, service_charges, net_amount, nozzle_id, no_of_cards, created_at)
+                            VALUES 
+                            ('$reading_id', 0, '$c_machine_id', '$c_item_id', 0, 0, '$card_amount', '$c_batch_no', '$service_charges', '$net_amount', '$c_nozzle_id', '$c_no_of_cards', NOW())";
+                        mysqli_query($connection, $card_sales_sql);
+                    }
+                }
+            }
+
+            // Loop through credit sales rows and save them
+            if (isset($_POST['credit_nozzle_id']) && is_array($_POST['credit_nozzle_id'])) {
+                foreach ($_POST['credit_nozzle_id'] as $idx => $c_nozzle_id) {
+                    $c_nozzle_id      = intval($c_nozzle_id);
+                    $c_slip_date      = mysqli_real_escape_string($connection, $_POST['credit_slip_date'][$idx] ?? '');
+                    $c_slip_no        = mysqli_real_escape_string($connection, $_POST['credit_slip_no'][$idx] ?? '');
+                    $c_account_number = mysqli_real_escape_string($connection, $_POST['credit_account_number'][$idx] ?? '');
+                    $c_vehicle_number = mysqli_real_escape_string($connection, $_POST['credit_vehicle_number'][$idx] ?? '');
+                    $c_quantity       = floatval($_POST['credit_quantity'][$idx] ?? 0);
+                    $c_rate           = floatval($_POST['credit_rate'][$idx] ?? 0);
+                    $c_amount         = floatval($_POST['credit_amount'][$idx] ?? 0);
+                    $c_cash_rate      = floatval($_POST['credit_cash_rate'][$idx] ?? 0);
+                    $c_issue_quantity = floatval($_POST['credit_issue_quantity'][$idx] ?? 0);
+                    $c_balance_1      = floatval($_POST['credit_balance_1'][$idx] ?? 0);
+                    $c_balance_2      = floatval($_POST['credit_balance_2'][$idx] ?? 0);
+                    $c_wasoli         = floatval($_POST['credit_wasoli'][$idx] ?? 0);
+
+                    if ($c_nozzle_id > 0 && $c_amount > 0) {
+                        $credit_sales_sql = "INSERT INTO tbl_meter_reading_credit_sales 
+                            (meter_reading_id, nozzle_id, slip_date, slip_no, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
+                            VALUES 
+                            ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
+                        mysqli_query($connection, $credit_sales_sql);
+                    }
+                }
+            }
+
+            // Update grand total in header
+            mysqli_query($connection, "UPDATE tbl_meter_readings SET grand_total='$grand_total' WHERE id='$reading_id'");
+            header('Location: view-meter-reading.php?id=' . $reading_id);
+            exit;
+        } else {
+            $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: ' . mysqli_error($connection) . '</div>';
+        }
     }
 }
 
@@ -219,163 +240,155 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
             background: #fff;
             border-radius: 10px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            overflow: hidden;
+            padding: 20px 24px;
             margin-bottom: 22px;
         }
         .table-card-title {
-            background: var(--primary-gradient);
-            color: #fff;
-            padding: 11px 20px;
-            font-weight: 600;
-            font-size: 14px;
-            letter-spacing: .3px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #04204e;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
         }
 
-        /* Reading table */
-        .reading-table { margin: 0; font-size: 13px; }
         .reading-table thead th {
-            background: var(--primary-color);
+            background: #04204e;
             color: #fff;
             font-size: 12px;
             font-weight: 600;
-            padding: 10px 8px;
-            white-space: nowrap;
-            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
             border: none;
+            vertical-align: middle;
+            text-align: center;
         }
-        .reading-table tbody tr { transition: background .15s; }
-        .reading-table tbody tr:hover { background: var(--primary-light); }
-        .reading-table td {
+        .reading-table tbody td {
             vertical-align: middle;
             font-size: 13px;
-            padding: 7px 8px;
-            border-color: #e9ecef;
+            padding: 8px 10px;
         }
-        .reading-table input[type=number],
-        .reading-table select.form-control {
-            font-size: 13px;
-            padding: 4px 7px;
+        .reading-table .form-control {
             border-radius: 6px;
-            height: 33px;
+            font-size: 13px;
+            padding: 4px 8px;
+            height: auto;
         }
-        .reading-table input[type=number] { width: 115px; }
-        .reading-table select.form-control { width: 130px; }
 
         .nozzle-badge {
+            background: #eef2fa;
+            color: #04204e;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 6px;
             display: inline-block;
-            background: var(--primary-gradient);
-            color: #fff;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
+        }
+        .badge-petrol {
+            background: #e0f2fe;
+            color: #0369a1;
             font-weight: 600;
-        }
-        .item-badge {
-            display: inline-block;
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 3px 10px;
-            border-radius: 20px;
             font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 5px;
+        }
+        .badge-diesel {
+            background: #fef3c7;
+            color: #b45309;
             font-weight: 600;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 5px;
         }
-        .calc-field {
-            background: #f8f9fa;
-            font-weight: 700;
-            text-align: right;
-            color: var(--primary-color);
-            font-size: 13px;
-        }
-        .amount-field {
-            background: #e8eaf6;
-            font-weight: 700;
-            text-align: right;
-            color: var(--primary-color);
-            font-size: 13px;
-        }
-        .rate-field {
-            background: #fff3e0;
-            font-weight: 700;
-            text-align: right;
-            color: #e65100;
-            font-size: 13px;
+        .badge-item {
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 5px;
         }
 
+        .rate-field  { text-align: right; font-weight: 600; color: #222; }
+        .calc-field  { text-align: right; font-weight: 600; color: #04204e; background: #f8fafc; }
+        .amount-field{ text-align: right; font-weight: 700; color: #0b8043; background: #f0fdf4; }
+
         .grand-total-row td {
-            background: var(--primary-gradient);
-            color: #fff;
+            background: #04204e !important;
+            color: #fff !important;
             font-weight: 700;
-            font-size: 15px;
-            padding: 12px 10px;
+            font-size: 14px;
         }
-        .grand-total-label { text-align: right; font-size: 14px; letter-spacing: 1px; }
-        .grand-total-value { text-align: right; font-size: 18px; }
+        .grand-total-label { text-align: right; letter-spacing: 0.5px; }
+        .grand-total-value { text-align: right; font-size: 16px; color: #4ade80 !important; }
 
         .btn-save {
             background: var(--primary-gradient);
-            border: none;
             color: #fff;
-            font-weight: 600;
-            padding: 9px 28px;
+            font-weight: 700;
+            padding: 10px 28px;
             border-radius: 8px;
-            font-size: 14px;
-            letter-spacing: .3px;
-            box-shadow: 0 4px 12px rgba(4,32,78,0.25);
-            transition: all .2s;
+            border: none;
+            box-shadow: 0 4px 14px rgba(4,32,78,0.25);
+            transition: all 0.2s;
         }
-        .btn-save:hover { background: var(--primary-hover); color: #fff; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(4,32,78,0.3); }
+        .btn-save:hover { opacity: 0.95; color: #fff; transform: translateY(-1px); }
 
-        .badge-petrol  { background: #2e7d32; color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 11px; }
-        .badge-diesel  { background: #bf360c; color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 11px; }
-        .badge-item    { background: #4a148c; color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 11px; }
+        .reading-invalid {
+            border-color: #dc3545 !important;
+            background-color: #fff5f5 !important;
+        }
+        .reading-error-text {
+            color: #dc3545;
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 2px;
+            display: block;
+        }
     </style>
 </head>
 <body>
-<?php include('../include/navbar.php'); ?>
+<?php include('../include/navbar.php');?>
 <main class="main">
     <div class="container-fluid pt-4 pb-5 px-4">
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h4><i class="fas fa-plus-circle mr-2"></i>Add Meter Reading</h4>
+                <small class="text-white-50">Record daily shift closing meter readings and calculate sales</small>
+            </div>
+            <a href="meter-reading-list.php" class="btn btn-sm btn-light font-weight-bold" style="border-radius:6px; color:#04204e;">
+                <i class="fas fa-arrow-left mr-1"></i> Back to List
+            </a>
+        </div>
+
+        <?php echo $message; ?>
+
         <form action="add-meter-reading.php" method="POST" id="meterForm">
 
-            <!-- Page Header -->
-            <div class="page-header">
-                <div>
-                    <h4><i class="fas fa-tachometer-alt mr-2"></i>New Meter Reading</h4>
-                    <small style="opacity:.8;">Fill nozzle readings below — calculations are automatic</small>
-                </div>
-                <div>
-                    <a href="meter-reading-list.php" class="btn btn-outline-light btn-sm mr-2">
-                        <i class="fas fa-arrow-left mr-1"></i> Back
-                    </a>
-                    <button type="submit" name="submit" class="btn-save btn">
-                        <i class="fas fa-save mr-1"></i> Save Reading
-                    </button>
-                </div>
-            </div>
-
-            <?php echo $message; ?>
-
-            <!-- Header Fields -->
+            <!-- Header Card (Date & Shift) -->
             <div class="header-card">
                 <div class="row">
                     <div class="col-md-3">
                         <div class="form-group">
-                            <label><i class="fas fa-calendar-alt mr-1 text-primary"></i> Date</label>
-                            <input type="date" name="date" class="form-control"
-                                   value="<?php echo date('Y-m-d'); ?>" required>
+                            <label><i class="fas fa-calendar-alt mr-1 text-primary"></i> Date <span class="text-danger">*</span></label>
+                            <input type="date" name="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="form-group">
-                            <label><i class="fas fa-clock mr-1 text-primary"></i> Shift</label>
+                            <label><i class="fas fa-clock mr-1 text-primary"></i> Shift <span class="text-danger">*</span></label>
                             <select name="shift_id" class="form-control" required>
                                 <option value="">-- Select Shift --</option>
                                 <?php
-                                while ($s = mysqli_fetch_assoc($shifts_result)):
+                                if ($shifts_result) {
+                                    mysqli_data_seek($shifts_result, 0);
+                                    while ($s = mysqli_fetch_assoc($shifts_result)) {
+                                        echo '<option value="' . $s['id'] . '">' . htmlspecialchars($s['name']) . '</option>';
+                                    }
+                                }
                                 ?>
-                                <option value="<?php echo $s['id']; ?>">
-                                    <?php echo htmlspecialchars($s['name']); ?>
-                                </option>
-                                <?php endwhile; ?>
                             </select>
                         </div>
                     </div>
@@ -384,7 +397,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                             <label>&nbsp;</label>
                             <div class="alert alert-info mb-0 py-2 px-3" style="font-size:12px; border-radius:8px;">
                                 <i class="fas fa-info-circle mr-1"></i>
-                                <strong>Sale Reading</strong> = Current − Last<br>
+                                <strong>Sale Reading</strong> = Current − Last (Current must be ≥ Last)<br>
                                 <strong>Net Sale</strong> = Sale − Test<br>
                                 <strong>Amount</strong> = Net Sale × Rate
                             </div>
@@ -492,8 +505,9 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                            name="current_reading[]"
                                            id="curr_<?php echo $i; ?>"
                                            class="form-control current_reading"
-                                           value="0"
+                                           value="<?php echo htmlspecialchars($nozzle['start_reading']); ?>"
                                            oninput="calculate(<?php echo $i; ?>)">
+                                    <span class="reading-error-text" id="err_curr_<?php echo $i; ?>" style="display:none;">Must be ≥ Last Reading</span>
                                 </td>
 
                                 <!-- Sale Reading (auto) -->
@@ -514,8 +528,6 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
 
                                 <!-- Amount (auto) -->
                                 <td class="amount-field" id="amount_<?php echo $i; ?>">0.00</td>
-
-                                <!-- Per-row Payment Type Removed (default to Cash) -->
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -540,7 +552,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                     </div>
                 </div>
                 <div class="col-md-4 text-center">
-                    <button type="button" class="btn btn-info font-weight-bold px-3 py-2 mr-2" data-toggle="modal" data-target="#cardSaleModal" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); border:none; box-shadow:0 4px 12px rgba(23,162,184,0.25); border-radius:8px; font-size:12px;">
+                    <button type="button" class="btn btn-info font-weight-bold px-3 py-2 mr-2" data-toggle="modal" data-target="#cardSaleModal" style="background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); border:none; box-shadow:0 4px 12px rgba(23,162,184,0.25); border-radius:8px; font-size:12px;" onclick="if($('#cardSalesBody tr').length === 0) addCardRow();">
                         <i class="fas fa-credit-card mr-1"></i> Card Sale
                     </button>
                     <button type="button" class="btn btn-warning font-weight-bold px-3 py-2 text-white" data-toggle="modal" data-target="#creditSaleModal" style="background:linear-gradient(135deg, #ffc107 0%, #e0a800 100%); border:none; box-shadow:0 4px 12px rgba(255,193,7,0.25); border-radius:8px; font-size:12px;" onclick="if($('#creditSalesBody tr').length === 0) addCreditRow();">
@@ -561,57 +573,41 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                 <a href="meter-reading-list.php" class="btn btn-secondary mr-2">
                     <i class="fas fa-times mr-1"></i> Cancel
                 </a>
-                <button type="submit" name="submit" class="btn-save btn">
+                <button type="submit" name="submit" id="btnSaveMeterReading" class="btn-save btn">
                     <i class="fas fa-save mr-1"></i> Save Reading
                 </button>
             </div>
 
-            <!-- Card Sale Modal -->
+            <!-- Card Sale Modal (Multiple Entries per Nozzle) -->
             <div class="modal fade" id="cardSaleModal" tabindex="-1" role="dialog" aria-labelledby="cardSaleModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-dialog modal-xl" role="document" style="max-width: 90%;">
                     <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
                         <div class="modal-header bg-dark text-white py-3">
-                            <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale Details</h5>
+                            <h5 class="modal-title font-weight-bold" id="cardSaleModalLabel"><i class="fas fa-credit-card mr-2 text-info"></i>Card Sale Details (Multiple Entries)</h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
-                        <div class="modal-body p-4">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Nozzle</label>
-                                    <select name="card_nozzle_id" class="form-control">
-                                        <option value="">-- Select Nozzle --</option>
-                                        <?php foreach ($nozzles as $nz): ?>
-                                        <option value="<?php echo $nz['id']; ?>">
-                                            <?php echo htmlspecialchars($nz['nozzle_name']); ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Card Machine</label>
-                                    <select name="card_machine_id" class="form-control">
-                                        <option value="">-- Select Machine --</option>
-                                        <?php foreach ($machines_list as $cm): ?>
-                                        <option value="<?php echo $cm['id']; ?>">
-                                            <?php echo htmlspecialchars($cm['name'] . ' (' . $cm['charges_percentage'] . '%)'); ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Batch Number</label>
-                                    <input type="text" name="card_batch_no" class="form-control" placeholder="Enter Batch No">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">No of Cards</label>
-                                    <input type="number" name="card_no_of_cards" class="form-control" min="0" placeholder="0">
-                                </div>
-                                <div class="col-md-12 mb-3">
-                                    <label class="font-weight-bold" style="font-size:13px; color:#555;">Amount (Rs.)</label>
-                                    <input type="number" step="0.01" name="card_amount" class="form-control" min="0" placeholder="0.00">
-                                </div>
+                        <div class="modal-body p-4" style="overflow-x: auto;">
+                            <table class="table table-bordered table-striped text-center table-sm" id="cardSalesTable" style="min-width: 900px; font-size: 12px;">
+                                <thead class="bg-secondary text-white">
+                                    <tr>
+                                        <th style="width: 200px;">Nozzle <span class="text-danger">*</span></th>
+                                        <th style="width: 220px;">Card Machine <span class="text-danger">*</span></th>
+                                        <th style="width: 140px;">Batch No</th>
+                                        <th style="width: 120px;">No of Cards</th>
+                                        <th style="width: 160px;">Amount (Rs.) <span class="text-danger">*</span></th>
+                                        <th style="width: 60px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cardSalesBody">
+                                    <!-- Rows added dynamically -->
+                                </tbody>
+                            </table>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-info btn-sm font-weight-bold" onclick="addCardRow()">
+                                    <i class="fas fa-plus mr-1"></i> Add Card Sale Row
+                                </button>
                             </div>
                         </div>
                         <div class="modal-footer bg-light py-2">
@@ -622,7 +618,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                 </div>
             </div>
 
-            <!-- Credit Sale Modal -->
+            <!-- Credit Sale Modal (Multiple Entries per Nozzle) -->
             <div class="modal fade" id="creditSaleModal" tabindex="-1" role="dialog" aria-labelledby="creditSaleModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-xl" role="document" style="max-width: 95%;">
                     <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -654,12 +650,12 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                     </tr>
                                 </thead>
                                 <tbody id="creditSalesBody">
-                                    <!-- Rows will be added dynamically here -->
+                                    <!-- Rows added dynamically -->
                                 </tbody>
                             </table>
                             <div class="mt-2">
                                 <button type="button" class="btn btn-success btn-sm font-weight-bold" onclick="addCreditRow()">
-                                    <i class="fas fa-plus mr-1"></i> Add Row
+                                    <i class="fas fa-plus mr-1"></i> Add Credit Sale Row
                                 </button>
                             </div>
                         </div>
@@ -681,10 +677,17 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
 <script>
 var totalRows = <?php echo count($nozzles); ?>;
 var nozzlesData = <?php echo json_encode($nozzles); ?>;
+var machinesData = <?php echo json_encode($machines_list); ?>;
+
+$(document).ready(function() {
+    for (var i = 0; i < totalRows; i++) {
+        calculate(i);
+    }
+});
 
 /**
- * Recalculate a single nozzle row:
- *   Sale Reading = Current - Last  (min 0)
+ * Recalculate a single nozzle row & validate current_reading >= last_reading:
+ *   Sale Reading = Current - Last  (Validation: Current >= Last)
  *   Net Sale     = Sale - Test      (min 0)
  *   Amount       = Net Sale × Price
  */
@@ -693,6 +696,14 @@ function calculate(idx) {
     var last        = parseFloat($('#last_'  + idx).val()) || 0;
     var curr        = parseFloat($('#curr_'  + idx).val()) || 0;
     var test        = parseFloat($('#test_'  + idx).val()) || 0;
+
+    if (curr < last) {
+        $('#curr_' + idx).addClass('reading-invalid');
+        $('#err_curr_' + idx).show();
+    } else {
+        $('#curr_' + idx).removeClass('reading-invalid');
+        $('#err_curr_' + idx).hide();
+    }
 
     var saleReading = Math.max(curr - last, 0);
     var netSale     = Math.max(saleReading - test, 0);
@@ -714,18 +725,50 @@ function updateGrandTotal() {
     $('#grand_total_display').text(grand.toFixed(2));
 }
 
-// Recalculate card sale total dynamically
-$('input[name="card_amount"]').on('input', function() {
-    var val = parseFloat($(this).val()) || 0;
-    $('#card_sale_total_display').text(val.toFixed(2));
-    $('#modal_card_total_display').text(val.toFixed(2));
-});
+// Dynamic Card Sale rows (Multiple Entries per Nozzle)
+function addCardRow() {
+    var nozzleOptions = '<option value="">-- Select Nozzle --</option>';
+    nozzlesData.forEach(function(nz) {
+        nozzleOptions += '<option value="' + nz.id + '">' + nz.nozzle_name + '</option>';
+    });
 
-// Dynamic Credit Sale rows
+    var machineOptions = '<option value="">-- Select Machine --</option>';
+    machinesData.forEach(function(m) {
+        machineOptions += '<option value="' + m.id + '">' + m.name + ' (' + m.charges_percentage + '%)</option>';
+    });
+
+    var rowHtml = '<tr>' +
+        '<td><select name="card_nozzle_id[]" class="form-control form-control-sm" required>' + nozzleOptions + '</select></td>' +
+        '<td><select name="card_machine_id[]" class="form-control form-control-sm" required>' + machineOptions + '</select></td>' +
+        '<td><input type="text" name="card_batch_no[]" class="form-control form-control-sm" placeholder="Batch No"></td>' +
+        '<td><input type="number" name="card_no_of_cards[]" class="form-control form-control-sm" value="1" min="1"></td>' +
+        '<td><input type="number" step="0.01" name="card_amount[]" class="form-control form-control-sm card-amount-field" value="0" oninput="calculateCardTotal()" required></td>' +
+        '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCardRow(this)"><i class="fas fa-trash-alt"></i></button></td>' +
+        '</tr>';
+
+    $('#cardSalesBody').append(rowHtml);
+}
+
+function calculateCardTotal() {
+    var total = 0;
+    $('.card-amount-field').each(function() {
+        var val = parseFloat($(this).val()) || 0;
+        total += val;
+    });
+    $('#card_sale_total_display').text(total.toFixed(2));
+    $('#modal_card_total_display').text(total.toFixed(2));
+}
+
+function removeCardRow(btn) {
+    $(btn).closest('tr').remove();
+    calculateCardTotal();
+}
+
+// Dynamic Credit Sale rows (Multiple Entries per Nozzle)
 function addCreditRow() {
     var today = new Date().toISOString().slice(0, 10);
     
-    var nozzleOptions = '<option value="">-- Select --</option>';
+    var nozzleOptions = '<option value="">-- Select Nozzle --</option>';
     nozzlesData.forEach(function(nz) {
         nozzleOptions += '<option value="' + nz.id + '">' + nz.nozzle_name + '</option>';
     });
@@ -783,5 +826,25 @@ function removeCreditRow(btn) {
     $(btn).closest('tr').remove();
     calculateCreditTotal();
 }
+
+// Form submit validation check
+$('#meterForm').on('submit', function(e) {
+    var invalid = false;
+    for (var i = 0; i < totalRows; i++) {
+        var last = parseFloat($('#last_' + i).val()) || 0;
+        var curr = parseFloat($('#curr_' + i).val()) || 0;
+        if (curr < last) {
+            invalid = true;
+            $('#curr_' + i).addClass('reading-invalid');
+            $('#err_curr_' + i).show();
+        }
+    }
+    if (invalid) {
+        e.preventDefault();
+        alert('Validation Error: Current Reading must be greater than or equal to Previous Reading for all nozzles.');
+        return false;
+    }
+});
 </script>
+</body>
 </html>
