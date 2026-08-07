@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding items
+check_access('items', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_rate']) && isset($_POST['purchase_rate']) && isset($_POST['unit'])) {

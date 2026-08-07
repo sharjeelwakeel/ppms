@@ -5,9 +5,17 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing leave setup
+check_access('staff', 'show');
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_leaves') {
+    if (!has_permission('staff', 'edit')) {
+        header('Location: ../unauthorized.php');
+        exit;
+    }
     $staff_id = (int)$_POST['staff_id'];
     $allowed_leaves = (int)$_POST['allowed_leaves'];
 
@@ -35,10 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Fetch staff members with their roles and allowed leaves
-$sql = "SELECT s.id, s.first_name, s.last_name, r.name as role_name, COALESCE(ls.allowed_leaves, 0) as allowed_leaves
-        FROM tbl_staff s
-        LEFT JOIN tbl_roles r ON s.role_id = r.id
-        LEFT JOIN tbl_leave_setup ls ON s.id = ls.staff_id
+$sql = "SELECT s.id, s.first_name, s.last_name, r.name as role_name, ls.monthly_allowed_leaves, ls.leave_deduction_rate 
+        FROM tbl_staff s 
+        LEFT JOIN tbl_staff_roles r ON s.role_id = r.id 
+        LEFT JOIN tbl_leave_setup ls ON s.id = ls.staff_id 
         ORDER BY s.id DESC";
 $result = mysqli_query($connection, $sql);
 ?>

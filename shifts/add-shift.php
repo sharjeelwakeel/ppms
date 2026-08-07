@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding shifts
+check_access('shifts', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['start_time']) && isset($_POST['end_time']) && isset($_POST['status'])) {

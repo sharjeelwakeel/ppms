@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for editing lubricant purchase
+check_access('items', 'edit');
 
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;

@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for editing card machines
+check_access('card_machines', 'edit');
 
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;

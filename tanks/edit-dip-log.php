@@ -5,6 +5,10 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for editing dip logs
+check_access('tanks', 'edit');
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $tank_id = isset($_GET['tank_id']) ? intval($_GET['tank_id']) : 0;
@@ -553,6 +557,8 @@ if (isset($_POST['update_dip_log'])) {
         calculateFormulas();
     }
 
+    const tankCapacity = '<?php echo floatval($tank['storage_capacity']); ?>';
+
     function lookupDipMM() {
         const dipMM = parseFloat($('#dip_mm').val());
         if (isNaN(dipMM) || dipMM < 0) return;
@@ -560,7 +566,7 @@ if (isset($_POST['update_dip_log'])) {
         $.ajax({
             url: '../dip-lookup/lookup-by-mm.php',
             type: 'GET',
-            data: { dip_mm: dipMM },
+            data: { dip_mm: dipMM, capacity: tankCapacity },
             dataType: 'json',
             success: function(res) {
                 if (res.success) {

@@ -2,13 +2,21 @@
 require 'session.php';
 if (!userloggedin()) {
     header('Location:../login.php');
+    exit;
 }
 require 'config.php';
+require 'permissions.php';
+
+if (!has_permission('purchases', 'delete')) {
+    echo 'Error: Unauthorized operation.';
+    exit;
+}
+
 if (isset($_POST['id']) && !empty($_POST['id'])) {
     $id = mysqli_real_escape_string($connection, $_POST['id']);
     $sql = "UPDATE tbl_purchases SET deleted_at = NOW() WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
-        echo 'deleted';
+        echo 'Purchase deleted.';
     } else {
         echo 'error:' . mysqli_error($connection);
     }

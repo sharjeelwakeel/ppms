@@ -50,8 +50,8 @@ if (
     }
 }
 
-// Fetch roles
-$roles_sql = "SELECT id, name FROM tbl_roles ORDER BY name ASC";
+// Fetch staff designations
+$roles_sql = "SELECT id, name FROM tbl_staff_roles WHERE deleted_at IS NULL ORDER BY name ASC";
 $roles_result = mysqli_query($connection, $roles_sql);
 
 // Fetch shifts

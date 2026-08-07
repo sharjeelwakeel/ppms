@@ -2,8 +2,13 @@
 require '../include/session.php';
 if (!userloggedin()) {
     header('Location:../login.php');
+    exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for purchases list
+check_access('purchases', 'show');
 
 // Auto-migrate tbl_purchase_tank_links schema if needed
 mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` (
@@ -24,7 +29,7 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" />
 		<link rel="stylesheet" href="../include/style.css?v=1.0.1" />
@@ -64,7 +69,9 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
 						<h4>View Purchases</h4>
 					</div>
 					<div class="col-md-6 text-right">
+                        <?php if (has_permission('purchases', 'add')): ?>
 						<a href="add-purchase.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Purchase</a>
+                        <?php endif; ?>
 					</div>
 				</div>
 				<div class="table-responsive">
@@ -84,7 +91,9 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
 								<th>Invoice No</th>
 								<th>Carriage Invoice No</th>
 								<th style="text-align: center;">Linked To</th>
+                                <?php if (has_permission('purchases', 'delete')): ?>
 								<th style="text-align: center;">Delete</th>
+                                <?php endif; ?>
 							</tr>
 						</thead>
 						<tbody>
@@ -119,11 +128,16 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
 									} else if ($row['payment_status'] == 'in process') {
 										$statusBadge = 'badge-warning';
 									}
+
+                                    $canEdit = has_permission('purchases', 'edit');
+                                    $itemLink = $canEdit 
+                                        ? '<a href="edit-purchase.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['item_name'] ?? 'N/A').'</a>'
+                                        : '<strong>'.htmlspecialchars($row['item_name'] ?? 'N/A').'</strong>';
 									
 									echo' 
 										<tr>
 											<td>'.$row['id'].'</td>
-											<td><a href="edit-purchase.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['item_name'] ?? 'N/A').'</a></td>
+											<td>'.$itemLink.'</td>
 											<td>'.number_format($row['quantity'], 2).'</td>
 											<td>'.number_format($row['price'], 2).'</td>
 											<td class="font-weight-bold">'.number_format($total_amount, 2).'</td>
@@ -140,9 +154,11 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
 												</a>
 												<br>
 												<small class="font-weight-bold '.$linkStatusColor.'">'.number_format($stored_qty, 2).' / '.number_format($purchased_qty, 2).' Ltr</small>
-											</td>
-											<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
-										</tr>';
+											</td>';
+                                    if (has_permission('purchases', 'delete')) {
+                                        echo '<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>';
+                                    }
+									echo '</tr>';
 								}
 							}
 							?>
@@ -154,8 +170,8 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_purchase_tank_links` 
 
     </body>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 	<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
 	<script>
 	$(document).ready(function() {

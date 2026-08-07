@@ -1,12 +1,24 @@
 <?php
+require 'session.php';
+if (!userloggedin()) {
+    header('Location:../login.php');
+    exit;
+}
 require 'config.php';
+require 'permissions.php';
+
+if (!has_permission('staff', 'delete')) {
+    echo 'Error: Unauthorized operation.';
+    exit;
+}
+
 if (isset($_POST['id']) && !empty($_POST['id'])) {
     $id = mysqli_real_escape_string($connection, $_POST['id']);
-    $sql = "DELETE FROM tbl_staff WHERE id='$id'";
+    $sql = "DELETE FROM tbl_staff WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
         echo 'Staff deleted.';
     } else {
-        echo "Error: " . mysqli_error($connection);
+        echo 'error:' . mysqli_error($connection);
     }
 }
 mysqli_close($connection);

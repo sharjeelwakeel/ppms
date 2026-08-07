@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding nozzles
+check_access('nozzles', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['tank_id']) && isset($_POST['item_id']) && isset($_POST['start_reading']) && isset($_POST['status'])) {

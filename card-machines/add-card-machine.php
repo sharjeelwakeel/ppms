@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding card machines
+check_access('card_machines', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POST['contact_person_number'])) {

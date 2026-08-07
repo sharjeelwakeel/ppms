@@ -5,6 +5,10 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing salary calculator
+check_access('staff', 'show');
 
 // Default to current month and year
 $selected_month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
@@ -28,7 +32,7 @@ $sql = "SELECT
             SUM(CASE WHEN sa.status = 'Absent' THEN 1 ELSE 0 END) as count_absent,
             COUNT(sa.status) as total_attendance_marked
         FROM tbl_staff s
-        LEFT JOIN tbl_roles r ON s.role_id = r.id
+        LEFT JOIN tbl_staff_roles r ON s.role_id = r.id
         LEFT JOIN tbl_leave_setup ls ON s.id = ls.staff_id
         LEFT JOIN tbl_staff_attendance sa ON s.id = sa.staff_id AND sa.date LIKE '$month_str-%'
         GROUP BY s.id

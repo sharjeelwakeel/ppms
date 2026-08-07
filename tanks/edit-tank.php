@@ -5,6 +5,10 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for editing tanks
+check_access('tanks', 'edit');
 
 if (isset($_GET['id']) && !empty($_GET['id'])) {
     $id = mysqli_real_escape_string($connection, $_GET['id']);
@@ -99,7 +103,10 @@ $items_result = mysqli_query($connection, $items_sql);
 									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Storage Capacity</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="number" step="0.01" name="storage_capacity" class="form-control" value="<?php echo htmlspecialchars($tank['storage_capacity']); ?>" required>
+											<select name="storage_capacity" class="form-control" required>
+												<option value="23500" <?php echo (floatval($tank['storage_capacity']) == 23500) ? 'selected' : ''; ?>>23,500 Litres</option>
+												<option value="50000" <?php echo (floatval($tank['storage_capacity']) == 50000) ? 'selected' : ''; ?>>50,000 Litres</option>
+											</select>
 										</div>
 									</div>
 								</div>

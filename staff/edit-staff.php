@@ -75,8 +75,8 @@ $guar_sql = "SELECT * FROM tbl_staff_guarantors WHERE staff_id='$id' LIMIT 1";
 $guar_result = mysqli_query($connection, $guar_sql);
 $guarantor = mysqli_fetch_assoc($guar_result) ?: [];
 
-// Fetch roles
-$roles_sql = "SELECT id, name FROM tbl_roles ORDER BY name ASC";
+// Fetch staff designations
+$roles_sql = "SELECT id, name FROM tbl_staff_roles WHERE deleted_at IS NULL ORDER BY name ASC";
 $roles_result = mysqli_query($connection, $roles_sql);
 
 // Fetch shifts

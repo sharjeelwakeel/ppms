@@ -6,8 +6,12 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
 
 header('Content-Type: application/json');
+
+$canEdit   = has_permission('tanks', 'edit');
+$canDelete = has_permission('tanks', 'delete');
 
 // Read DataTables parameters
 $draw = isset($_POST['draw']) ? intval($_POST['draw']) : (isset($_GET['draw']) ? intval($_GET['draw']) : 1);
@@ -16,8 +20,8 @@ $length = isset($_POST['length']) ? intval($_POST['length']) : (isset($_GET['len
 $searchValue = isset($_POST['search']['value']) ? trim($_POST['search']['value']) : (isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '');
 
 // Order parameters
-$columns = ['id', 'dip_mm', 'dip_litre', 'created_at', 'updated_at'];
-$columnIndex = 1; // Default dip_mm
+$columns = ['id', 'tank_capacity', 'dip_mm', 'dip_litre', 'created_at', 'updated_at'];
+$columnIndex = 2; // Default dip_mm
 $columnName = 'dip_mm';
 $columnSortOrder = 'asc';
 
@@ -49,7 +53,7 @@ $totalRecords = intval($totalRow['total']);
 $searchQuery = "";
 if ($searchValue !== '') {
     $escapedSearch = mysqli_real_escape_string($connection, $searchValue);
-    $searchQuery = " AND (dip_mm LIKE '%$escapedSearch%' OR dip_litre LIKE '%$escapedSearch%')";
+    $searchQuery = " AND (dip_mm LIKE '%$escapedSearch%' OR dip_litre LIKE '%$escapedSearch%' OR tank_capacity LIKE '%$escapedSearch%')";
 }
 
 $filteredQuery = "SELECT COUNT(*) AS total FROM tbl_dip_lookup WHERE deleted_at IS NULL" . $searchQuery;
@@ -69,17 +73,23 @@ $data = [];
 if ($dataRes && mysqli_num_rows($dataRes) > 0) {
     while ($row = mysqli_fetch_assoc($dataRes)) {
         $id = $row['id'];
+        $tank_cap = htmlspecialchars(number_format($row['tank_capacity'] ?? 23500, 0)) . ' Ltrs';
         $dip_mm = htmlspecialchars(number_format($row['dip_mm'], 2));
         $dip_litre = htmlspecialchars(number_format($row['dip_litre'], 2));
         $created_at = date("d-m-Y h:i A", strtotime($row['created_at']));
         $updated_at = date("d-m-Y h:i A", strtotime($row['updated_at']));
 
-        $dip_mm_link = '<a href="edit-dip-lookup.php?id=' . $id . '" class="font-weight-bold" style="color: var(--primary-color);">' . $dip_mm . ' mm</a>';
+        $dip_mm_link = $canEdit 
+            ? '<a href="edit-dip-lookup.php?id=' . $id . '" class="font-weight-bold" style="color: var(--primary-color);">' . $dip_mm . ' mm</a>'
+            : '<strong>' . $dip_mm . ' mm</strong>';
         
-        $actions = '<a class="btn btn-large btn-link p-0 text-danger" onclick="deleteDipLookup(' . $id . ', \'' . $dip_mm . '\')" title="Delete"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a>';
+        $actions = $canDelete 
+            ? '<a class="btn btn-large btn-link p-0 text-danger" onclick="deleteDipLookup(' . $id . ', \'' . $dip_mm . '\')" title="Delete"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a>'
+            : '<span class="text-muted" style="font-size:11px;">No Access</span>';
 
         $data[] = [
             $id,
+            '<span class="badge badge-info">' . $tank_cap . '</span>',
             $dip_mm_link,
             $dip_litre . ' L',
             $created_at,

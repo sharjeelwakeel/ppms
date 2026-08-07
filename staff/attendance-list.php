@@ -5,11 +5,19 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing staff attendance
+check_access('staff', 'show');
 
 $message = '';
 $date = isset($_GET['date']) ? mysqli_real_escape_string($connection, $_GET['date']) : date('Y-m-d');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_attendance') {
+    if (!has_permission('staff', 'edit')) {
+        header('Location: ../unauthorized.php');
+        exit;
+    }
     $attendance_data = isset($_POST['attendance']) ? $_POST['attendance'] : [];
     $post_date = mysqli_real_escape_string($connection, $_POST['date']);
     
@@ -50,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Fetch all active staff members
 $staff_sql = "SELECT s.id, s.first_name, s.last_name, r.name as role_name, sh.name as shift_name
               FROM tbl_staff s
-              LEFT JOIN tbl_roles r ON s.role_id = r.id
+              LEFT JOIN tbl_staff_roles r ON s.role_id = r.id
               LEFT JOIN tbl_shifts sh ON s.shift_id = sh.id
               ORDER BY s.id DESC";
 $staff_result = mysqli_query($connection, $staff_sql);

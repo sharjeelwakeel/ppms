@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding lubricant products
+check_access('items', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['price']) && isset($_POST['category']) && isset($_POST['shelf_quantity'])) {

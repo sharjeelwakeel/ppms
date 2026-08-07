@@ -1,12 +1,22 @@
 <?php
+require 'session.php';
+if (!userloggedin()) {
+    header('Location:../login.php');
+    exit;
+}
 require 'config.php';
+require 'permissions.php';
+
+if (!has_permission('meter_readings', 'delete')) {
+    echo 'Error: Unauthorized operation.';
+    exit;
+}
+
 if (isset($_POST['id']) && !empty($_POST['id'])) {
     $id = mysqli_real_escape_string($connection, $_POST['id']);
-
-    // SOFT DELETE — just stamp deleted_at, never physically remove data
     $sql = "UPDATE tbl_meter_readings SET deleted_at = NOW() WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
-        echo 'deleted';
+        echo 'Meter reading deleted.';
     } else {
         echo 'error:' . mysqli_error($connection);
     }

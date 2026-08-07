@@ -4,6 +4,7 @@ $prefix = '';
 if (!file_exists('include/navbar.php')) {
     $prefix = '../';
 }
+require_once __DIR__ . '/permissions.php';
 ?>
 <nav class="navbar navbar-expand-lg bg-dark navbar-dark px-lg-4 shadow-sm">
     <a class="navbar-brand font-weight-bold" href="<?php echo $prefix; ?>dashboard.php">PPMS</a>
@@ -15,47 +16,88 @@ if (!file_exists('include/navbar.php')) {
             <li class="nav-item">
                 <a class="nav-link" href="<?php echo $prefix; ?>dashboard.php"><i class="fas fa-home mr-1"></i> Dashboard</a>
             </li>
+
+            <!-- Master Menu -->
+            <?php 
+            $showMaster = has_permission('shifts', 'show') || has_permission('items', 'show') || 
+                          has_permission('tanks', 'show') || has_permission('roles', 'show') || 
+                          has_permission('users', 'show') || has_permission('nozzles', 'show') || 
+                          has_permission('staff', 'show') || has_permission('card_machines', 'show') || 
+                          has_permission('banks', 'show');
+            if ($showMaster): 
+            ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-database mr-1"></i> Master
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                    <?php if (has_permission('shifts', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>shifts/shifts-list.php">Shifts</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('items', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>items/items-list.php">Items</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('tanks', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>tanks/tanks-list.php">Tanks</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>roles/roles-list.php">Roles</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('roles', 'show')): ?>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>roles/roles-list.php"><i class="fas fa-user-shield mr-1 text-warning"></i> User Roles &amp; Permissions</a>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('users', 'show')): ?>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>users/users-list.php"><i class="fas fa-users-cog mr-1 text-primary"></i> System Users</a>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('nozzles', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>nozzles/nozzles-list.php">Nozzles</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('staff', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-list.php">Staff</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('card_machines', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php">Card Machines</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('banks', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>banks/banks-list.php">Banks</a>
-                    <div class="dropdown-divider"></div>
+                    <?php endif; ?>
+
+                    <?php if (has_permission('tanks', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>dip-lookup/dip-lookup-list.php">Dip Lookup</a>
+                    <?php endif; ?>
                 </div>
             </li>
+            <?php endif; ?>
+
+            <!-- Purchases Menu -->
+            <?php if (has_permission('purchases', 'show')): ?>
             <li class="nav-item">
                 <a class="nav-link" href="<?php echo $prefix; ?>purchases/purchases-list.php"><i class="fas fa-shopping-cart mr-1"></i> Purchases</a>
             </li>
+            <?php endif; ?>
+
+            <!-- Stock & Lubricants Menu -->
+            <?php if (has_permission('items', 'show')): ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkLubricants" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="fas fa-oil-can mr-1"></i> Stock & Lubricants
+                <i class="fas fa-oil-can mr-1"></i> Stock &amp; Lubricants
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php">Products</a>
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php">Purchases (Inflow)</a>
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php">Sales (Outflow)</a>
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php">Stock Report</a>
                 </div>
             </li>
+            <?php endif; ?>
+
+            <!-- Transactions / Meter Readings -->
+            <?php if (has_permission('meter_readings', 'show')): ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-calculator mr-1"></i> Transactions
@@ -64,18 +106,22 @@ if (!file_exists('include/navbar.php')) {
                     <a class="dropdown-item" href="<?php echo $prefix; ?>meter-readings/meter-reading-list.php"><i class="fas fa-tachometer-alt mr-1"></i> Meter Reading</a>
                 </div>
             </li>
+            <?php endif; ?>
+
+            <!-- HR & Payroll -->
+            <?php if (has_permission('staff', 'show')): ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkHR" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="fas fa-users mr-1"></i> HR & Payroll
+                <i class="fas fa-users mr-1"></i> HR &amp; Payroll
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkHR">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-roles-list.php"><i class="fas fa-id-badge mr-1 text-info"></i> Staff Designations</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/attendance-list.php"><i class="fas fa-calendar-check mr-1"></i> Staff Attendance</a>
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/leave-setup.php"><i class="fas fa-calendar-minus mr-1"></i> Leave Setup</a>
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/salary-calculator.php"><i class="fas fa-money-check-alt mr-1"></i> Salary Calculator</a>
                 </div>
             </li>
+            <?php endif; ?>
         </ul>
         <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-primary mt-2 mt-lg-0 ml-lg-3">Logout</a>
     </div>

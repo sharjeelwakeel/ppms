@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing stock report
+check_access('items', 'show');
 
 // Date filters
 $fromDate = isset($_GET['from_date']) ? $_GET['from_date'] : '';

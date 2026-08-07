@@ -2,6 +2,10 @@
 require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding meter readings
+check_access('meter_readings', 'add');
 
 // Auto-migrate tbl_meter_reading_card_sales schema if columns are missing
 $check_columns = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'nozzle_id'");

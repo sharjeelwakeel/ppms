@@ -2,6 +2,10 @@
 require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing meter readings
+check_access('meter_readings', 'show');
 
 // Active records
 $sql_active = "SELECT mr.*, sh.name AS shift_name
@@ -86,9 +90,11 @@ if ($result_active === false) {
             <h4><i class="fas fa-tachometer-alt mr-2"></i>Meter Readings</h4>
             <small style="opacity:.8;">All recorded meter readings — click <i class="fas fa-eye"></i> to view details</small>
         </div>
+        <?php if (has_permission('meter_readings', 'add')): ?>
         <a href="add-meter-reading.php" class="btn-new btn">
             <i class="fas fa-plus mr-1"></i> New Meter Reading
         </a>
+        <?php endif; ?>
     </div>
 
     <!-- List Table -->

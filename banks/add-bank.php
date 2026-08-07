@@ -4,6 +4,10 @@ if (!userloggedin()) {
     header('Location:../login.php');
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for adding banks
+check_access('banks', 'add');
 
 $message = '';
 if (isset($_POST['name']) && isset($_POST['account_number'])) {

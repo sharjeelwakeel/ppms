@@ -11,9 +11,10 @@ header('Content-Type: application/json');
 
 if (isset($_REQUEST['dip_mm'])) {
     $dip_mm = mysqli_real_escape_string($connection, $_REQUEST['dip_mm']);
+    $tank_capacity = isset($_REQUEST['tank_capacity']) ? mysqli_real_escape_string($connection, $_REQUEST['tank_capacity']) : '23500';
     $exclude_id = isset($_REQUEST['exclude_id']) ? mysqli_real_escape_string($connection, $_REQUEST['exclude_id']) : null;
 
-    $sql = "SELECT id, dip_mm, dip_litre FROM tbl_dip_lookup WHERE dip_mm = '$dip_mm' AND deleted_at IS NULL";
+    $sql = "SELECT id, dip_mm, dip_litre, tank_capacity FROM tbl_dip_lookup WHERE dip_mm = '$dip_mm' AND tank_capacity = '$tank_capacity' AND deleted_at IS NULL";
     if ($exclude_id) {
         $sql .= " AND id != '$exclude_id'";
     }
@@ -27,7 +28,8 @@ if (isset($_REQUEST['dip_mm'])) {
             'exists' => true,
             'id' => $row['id'],
             'dip_mm' => $row['dip_mm'],
-            'dip_litre' => $row['dip_litre']
+            'dip_litre' => $row['dip_litre'],
+            'tank_capacity' => $row['tank_capacity']
         ]);
     } else {
         echo json_encode(['exists' => false]);

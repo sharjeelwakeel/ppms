@@ -2,8 +2,17 @@
 require '../include/session.php';
 if (!userloggedin()) {
     header('Location:../login.php');
+    exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing card machines
+check_access('card_machines', 'show');
+
+$canAdd    = has_permission('card_machines', 'add');
+$canEdit   = has_permission('card_machines', 'edit');
+$canDelete = has_permission('card_machines', 'delete');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -12,28 +21,22 @@ require '../include/config.php';
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" />
 		<link rel="stylesheet" href="../include/style.css?v=1.0.1" />
 		<style>
-		.m-top{
-			margin-top:20px;
-		}
-		.m-bot{
-			margin-bottom:20px;
-		}
+		.m-top{ margin-top:20px; }
+		.m-bot{ margin-bottom:20px; }
         .btn-primary {
-            background-color: #04204e !important; /* Fallback */
+            background-color: #04204e !important;
             background: var(--primary-gradient) !important;
             border: none !important;
             color: #fff !important;
         }
-        .btn-primary:hover {
-            opacity: 0.9;
-        }
-        #machinesListTable thead th {
-            background-color: #04204e !important; /* Fallback */
+        .btn-primary:hover { opacity: 0.9; }
+        #cardMachinesTable thead th {
+            background-color: #04204e !important;
             background: var(--primary-color) !important;
             color: #fff !important;
         }
@@ -46,25 +49,27 @@ require '../include/config.php';
 
 		<main class="main">
 			<div class="container pt-4 pb-4">
-				<div class="row mb-5 align-items-center">
+				<div class="row mb-4 align-items-center">
 					<div class="col-md-6">
-						<h4>View Card Machines</h4>
+						<h4><i class="fas fa-credit-card mr-2 text-primary"></i>View Card Machines</h4>
 					</div>
 					<div class="col-md-6 text-right">
-						<a href="add-card-machine.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Machine</a>
+                        <?php if ($canAdd): ?>
+						<a href="add-card-machine.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add Card Machine</a>
+                        <?php endif; ?>
 					</div>
 				</div>
-				<table id="machinesListTable" class="table table-striped table-bordered">
+				<table id="cardMachinesTable" class="table table-striped table-bordered">
 					<thead>
 						<tr>
 							<th>ID</th>
 							<th>Machine Name</th>
-							<th>Service Charges (%)</th>
+							<th>Charges %</th>
 							<th>Contact Person</th>
 							<th>Contact Number</th>
-							<th>Created At</th>
-							<th>Updated At</th>
-							<th>Delete</th>
+                            <?php if ($canDelete): ?>
+							<th style="text-align: center;">Delete</th>
+                            <?php endif; ?>
 						</tr>
 					</thead>
 					<tbody>
@@ -73,17 +78,20 @@ require '../include/config.php';
 						$result = mysqli_query($connection, $sql);
 						if($result && mysqli_num_rows($result) > 0){
 							while($row = mysqli_fetch_assoc($result)){
+                                $machineNameDisplay = $canEdit 
+                                    ? '<a href="edit-card-machine.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a>'
+                                    : '<strong>'.htmlspecialchars($row['name']).'</strong>';
 								echo' 
 									<tr>
 										<td>'.$row['id'].'</td>
-										<td><a href="edit-card-machine.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a></td>
+										<td>'.$machineNameDisplay.'</td>
 										<td>'.number_format($row['charges_percentage'], 2).'%</td>
 										<td>'.htmlspecialchars($row['contact_person_name']).'</td>
-										<td>'.htmlspecialchars($row['contact_person_number']).'</td>
-										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
-										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>
-										<td><a class="btn btn-large btn-link p-0 text-danger" onclick="deleteMachine('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 20px;"></i></a></td>
-									</tr>';
+										<td>'.htmlspecialchars($row['contact_person_number']).'</td>';
+                                if ($canDelete) {
+                                    echo '<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deleteMachine('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 18px;"></i></a></td>';
+                                }
+								echo '</tr>';
 							}
 						}
 						?>
@@ -94,12 +102,12 @@ require '../include/config.php';
 
     </body>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 	<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
 	<script>
 	$(document).ready(function() {
-		$('#machinesListTable').DataTable({
+		$('#cardMachinesTable').DataTable({
 			"order": [[ 0, "desc" ]]
 		});
 	});

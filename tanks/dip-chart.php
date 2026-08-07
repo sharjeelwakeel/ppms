@@ -5,6 +5,14 @@ if (!userloggedin()) {
     exit;
 }
 require '../include/config.php';
+require '../include/permissions.php';
+
+// Enforce access check for viewing dip chart
+check_access('tanks', 'show');
+
+$canAdd    = has_permission('tanks', 'add');
+$canEdit   = has_permission('tanks', 'edit');
+$canDelete = has_permission('tanks', 'delete');
 
 $tank_id = isset($_GET['tank_id']) ? intval($_GET['tank_id']) : 0;
 if ($tank_id <= 0) {
@@ -69,7 +77,7 @@ if ($stmt_latest) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" />
 		<link rel="stylesheet" href="../include/style.css?v=1.0.1" />
@@ -121,7 +129,9 @@ if ($stmt_latest) {
                         <small class="text-muted"><i class="fas fa-gas-pump mr-1"></i> Attached Nozzles: <strong><?php echo htmlspecialchars($attached_nozzles_str); ?></strong></small>
 					</div>
 					<div class="col-md-5 text-md-right">
+                        <?php if ($canAdd): ?>
 						<a href="add-dip-log.php?tank_id=<?php echo $tank_id; ?>" class="btn btn-primary mr-2 mb-1"><i class="fas fa-plus mr-1"></i> Add Dip Log</a>
+                        <?php endif; ?>
 						<a href="tanks-list.php" class="btn btn-secondary mb-1"><i class="fas fa-arrow-left mr-1"></i> Back to Tanks</a>
 					</div>
 				</div>
@@ -180,7 +190,9 @@ if ($stmt_latest) {
                                         <th>Per Dip Gain/Loss</th>
                                         <th>Overall Gain/Loss</th>
                                         <th>Accumulative PMG</th>
-                                        <th>Actions</th>
+                                        <?php if ($canEdit || $canDelete): ?>
+                                        <th style="text-align: center;">Actions</th>
+                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -211,12 +223,20 @@ if ($stmt_latest) {
                                                     <td class="font-weight-bold">'.number_format($row['book_balance'], 2).'</td>
                                                     <td><span class="badge '.$gl_class.' px-2 py-1">'.$gl_sign.number_format($row['per_dip_gain_loss'], 2).'</span></td>
                                                     <td class="'.$ov_class.' font-weight-bold">'.$ov_sign.number_format($row['overall_gain_loss'], 2).'</td>
-                                                    <td>'.number_format($row['accumulative_pmg'], 2).'</td>
-                                                    <td>
-                                                        <a href="edit-dip-log.php?id='.$row['id'].'&tank_id='.$tank_id.'" class="btn btn-sm btn-outline-primary mr-1" title="Edit"><i class="fas fa-edit"></i></a>
-                                                        <a class="btn btn-sm btn-outline-danger" onclick="deletediplog('.$row['id'].')" title="Delete"><i class="fas fa-trash-alt"></i></a>
-                                                    </td>
-                                                </tr>';
+                                                    <td>'.number_format($row['accumulative_pmg'], 2).'</td>';
+                                            
+                                            if ($canEdit || $canDelete) {
+                                                echo '<td class="text-center">';
+                                                if ($canEdit) {
+                                                    echo '<a href="edit-dip-log.php?id='.$row['id'].'&tank_id='.$tank_id.'" class="btn btn-sm btn-outline-primary mr-1" title="Edit"><i class="fas fa-edit"></i></a>';
+                                                }
+                                                if ($canDelete) {
+                                                    echo '<a class="btn btn-sm btn-outline-danger" onclick="deletediplog('.$row['id'].')" title="Delete"><i class="fas fa-trash-alt"></i></a>';
+                                                }
+                                                echo '</td>';
+                                            }
+                                            
+                                            echo '</tr>';
                                         }
                                     }
                                     ?>
@@ -229,15 +249,13 @@ if ($stmt_latest) {
 		</main>
     </body>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 	<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
 	<script>
 	$(document).ready(function() {
 		$('#dipLogsTable').DataTable({
-			"order": [[ 0, "desc" ]],
-            "pageLength": 25,
-            "scrollX": true
+			"order": [[ 0, "desc" ]]
 		});
 	});
 
