@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 27, 2026 at 02:00 PM
+-- Generation Time: Aug 07, 2026 at 11:05 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -31,20 +31,24 @@ CREATE TABLE `tbl_accounts` (
   `id` int(11) NOT NULL,
   `name` varchar(256) NOT NULL,
   `username` varchar(64) NOT NULL,
-  `password` varchar(64) NOT NULL,
+  `password` varchar(255) NOT NULL,
   `type` varchar(64) NOT NULL,
   `phonenumber` varchar(64) NOT NULL,
   `cnicnumber` varchar(64) NOT NULL,
   `address` varchar(512) NOT NULL,
-  `city` varchar(64) NOT NULL
+  `city` varchar(64) NOT NULL,
+  `role_id` int(11) DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`id`, `name`, `username`, `password`, `type`, `phonenumber`, `cnicnumber`, `address`, `city`) VALUES
-(1, 'Syed Haseeb Hashmi', 'hasyeb', '$2y$10$.U60lyPzF1YLJlBZast2Qe/yOl1meu0R5MfHvtesLtNAngZzTdYem', 'Admin', '03005090170', '31202-0000000-0', 'House # 18, Sajid Awan Colony.', 'Bahawalpur');
+INSERT INTO `tbl_accounts` (`id`, `name`, `username`, `password`, `type`, `phonenumber`, `cnicnumber`, `address`, `city`, `role_id`, `deleted_at`, `created_at`) VALUES
+(1, 'Syed Haseeb Hashmi', 'hasyeb', '$2y$10$.U60lyPzF1YLJlBZast2Qe/yOl1meu0R5MfHvtesLtNAngZzTdYem', 'Admin', '03005090170', '31202-0000000-0', 'House # 18, Sajid Awan Colony.', 'Bahawalpur', NULL, NULL, '2026-08-01 19:47:23'),
+(2, 'abc', 'abc', '$2y$10$geHb69rnJ5eCCYRUXKs34OihIcoT6CWwzNtf8AdZZt.yJEkW351VG', 'user', '123213', '', '', '', 4, NULL, '2026-08-01 20:17:23');
 
 -- --------------------------------------------------------
 
@@ -98,6 +102,33 @@ INSERT INTO `tbl_card_machines` (`id`, `name`, `charges_percentage`, `contact_pe
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_dip_lookup`
+--
+
+CREATE TABLE `tbl_dip_lookup` (
+  `id` int(11) NOT NULL,
+  `tank_capacity` decimal(12,2) NOT NULL DEFAULT 23500.00,
+  `dip_mm` decimal(10,2) NOT NULL,
+  `dip_litre` decimal(10,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_dip_lookup`
+--
+
+INSERT INTO `tbl_dip_lookup` (`id`, `tank_capacity`, `dip_mm`, `dip_litre`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 23500.00, 1231.00, 12312.00, '2026-07-29 08:36:43', '2026-07-29 08:37:24', NULL),
+(3, 23500.00, 200.00, 2500.00, '2026-07-29 09:23:16', '2026-07-29 09:23:43', '2026-07-29 14:23:43'),
+(4, 23500.00, 200.00, 2500.00, '2026-07-29 09:23:54', '2026-07-29 09:23:54', NULL),
+(5, 23500.00, 100.00, 1000.00, '2026-07-30 10:39:59', '2026-07-30 10:39:59', NULL),
+(6, 23500.00, 1.00, 1.10, '2026-08-04 18:07:26', '2026-08-04 18:07:54', NULL);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_items`
 --
 
@@ -109,17 +140,18 @@ CREATE TABLE `tbl_items` (
   `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `unit` varchar(64) NOT NULL DEFAULT '',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_items`
 --
 
-INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rate`, `unit`, `created_at`, `updated_at`) VALUES
-(2, 'Petrol', 200.00, 0.00, 0.00, '', '2026-06-03 10:47:28', '2026-06-03 10:47:28'),
-(3, 'Diesel', 375.00, 0.00, 0.00, '', '2026-06-14 14:39:18', '2026-06-14 14:39:18'),
-(4, 'Lubricant', 200.00, 400.00, 300.00, 'ltr', '2026-06-23 14:39:55', '2026-06-23 14:39:55');
+INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rate`, `unit`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 'Petrol', 200.00, 0.00, 0.00, '', '2026-06-03 10:47:28', '2026-06-03 10:47:28', NULL),
+(3, 'Diesel', 375.00, 0.00, 0.00, '', '2026-06-14 14:39:18', '2026-06-14 14:39:18', NULL),
+(4, 'Lubricant', 200.00, 400.00, 300.00, 'ltr', '2026-06-23 14:39:55', '2026-06-23 14:39:55', NULL);
 
 -- --------------------------------------------------------
 
@@ -154,18 +186,19 @@ CREATE TABLE `tbl_lubricant_products` (
   `category` varchar(64) NOT NULL DEFAULT 'Stock Item',
   `shelf_quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 --
 -- Dumping data for table `tbl_lubricant_products`
 --
 
-INSERT INTO `tbl_lubricant_products` (`id`, `name`, `price`, `category`, `shelf_quantity`, `created_at`, `updated_at`) VALUES
-(1, 'Grease (250g)', 350.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
-(2, 'Engine Oil (4L)', 3200.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
-(3, 'Break Oil (250ml)', 450.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06'),
-(4, 'Tube', 150.00, 'Stock Item', 0.05, '2026-06-23 17:10:29', '2026-06-23 17:10:29');
+INSERT INTO `tbl_lubricant_products` (`id`, `name`, `price`, `category`, `shelf_quantity`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Grease (250g)', 350.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06', NULL),
+(2, 'Engine Oil (4L)', 3200.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06', NULL),
+(3, 'Break Oil (250ml)', 450.00, 'Stock Item', 0.00, '2026-06-09 12:05:06', '2026-06-09 12:05:06', NULL),
+(4, 'Tube', 150.00, 'Stock Item', 0.05, '2026-06-23 17:10:29', '2026-06-23 17:10:29', NULL);
 
 -- --------------------------------------------------------
 
@@ -181,16 +214,17 @@ CREATE TABLE `tbl_lubricant_purchases` (
   `date` date NOT NULL,
   `payment_status` enum('paid','unpaid') NOT NULL DEFAULT 'paid',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 --
 -- Dumping data for table `tbl_lubricant_purchases`
 --
 
-INSERT INTO `tbl_lubricant_purchases` (`id`, `product_id`, `quantity`, `purchase_price`, `date`, `payment_status`, `created_at`, `updated_at`) VALUES
-(2, 3, 12.00, 2.00, '2026-06-09', 'paid', '2026-06-09 12:13:25', '2026-06-09 12:13:25'),
-(3, 4, 25.00, 130.00, '2026-06-23', 'paid', '2026-06-23 17:11:10', '2026-06-23 17:11:10');
+INSERT INTO `tbl_lubricant_purchases` (`id`, `product_id`, `quantity`, `purchase_price`, `date`, `payment_status`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 3, 12.00, 2.00, '2026-06-09', 'paid', '2026-06-09 12:13:25', '2026-06-09 12:13:25', NULL),
+(3, 4, 25.00, 130.00, '2026-06-23', 'paid', '2026-06-23 17:11:10', '2026-06-23 17:11:10', NULL);
 
 -- --------------------------------------------------------
 
@@ -208,17 +242,18 @@ CREATE TABLE `tbl_lubricant_sales` (
   `details` varchar(256) DEFAULT NULL,
   `date` date NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 --
 -- Dumping data for table `tbl_lubricant_sales`
 --
 
-INSERT INTO `tbl_lubricant_sales` (`id`, `product_id`, `quantity`, `rate`, `amount`, `payment_type`, `details`, `date`, `created_at`, `updated_at`) VALUES
-(2, 3, 2.00, 450.00, 900.00, 'Cash', '', '2026-06-09', '2026-06-09 12:13:54', '2026-06-09 12:13:54'),
-(3, 3, 8.00, 450.00, 3600.00, 'Cash', '', '2026-06-15', '2026-06-14 16:52:43', '2026-06-14 16:52:43'),
-(4, 4, 12.00, 150.00, 1800.00, 'Cash', '', '2026-06-23', '2026-06-23 17:11:34', '2026-06-23 17:11:34');
+INSERT INTO `tbl_lubricant_sales` (`id`, `product_id`, `quantity`, `rate`, `amount`, `payment_type`, `details`, `date`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 3, 2.00, 450.00, 900.00, 'Cash', '', '2026-06-09', '2026-06-09 12:13:54', '2026-06-09 12:13:54', NULL),
+(3, 3, 8.00, 450.00, 3600.00, 'Cash', '', '2026-06-15', '2026-06-14 16:52:43', '2026-06-14 16:52:43', NULL),
+(4, 4, 12.00, 150.00, 1800.00, 'Cash', '', '2026-06-23', '2026-06-23 17:11:34', '2026-06-23 17:11:34', NULL);
 
 -- --------------------------------------------------------
 
@@ -254,7 +289,15 @@ INSERT INTO `tbl_meter_readings` (`id`, `date`, `shift_id`, `payment_type`, `gra
 (13, '2026-06-09', 2, 'Cash', 80000.00, '2026-06-09 11:40:27', '2026-06-09 11:40:27', NULL, ''),
 (14, '2026-06-15', 2, 'Cash', 2400.00, '2026-06-14 16:55:57', '2026-06-14 16:55:57', NULL, 'this is test'),
 (15, '2026-06-26', 5, 'Cash', 5297600.00, '2026-06-26 04:03:43', '2026-06-26 04:03:43', NULL, ''),
-(16, '2026-06-26', 5, 'Cash', 644400.00, '2026-06-26 04:32:27', '2026-06-26 04:32:27', NULL, '');
+(16, '2026-06-26', 5, 'Cash', 644400.00, '2026-06-26 04:32:27', '2026-06-26 04:32:27', NULL, ''),
+(17, '2026-07-29', 2, 'Cash', 200000.00, '2026-07-30 15:23:28', '2026-07-30 15:23:28', NULL, ''),
+(19, '2026-07-30', 2, 'Cash', 200000.00, '2026-07-30 15:33:44', '2026-07-30 15:33:44', NULL, ''),
+(20, '2026-07-31', 2, 'Cash', 800000.00, '2026-07-30 16:28:04', '2026-07-30 16:28:04', NULL, ''),
+(21, '2026-08-01', 2, 'Cash', 0.00, '2026-07-30 16:34:26', '2026-07-30 16:34:26', NULL, ''),
+(24, '2026-08-02', 2, 'Cash', 200000.00, '2026-08-03 22:47:54', '2026-08-03 22:47:54', NULL, ''),
+(25, '2026-08-03', 2, 'Cash', 200000.00, '2026-08-03 22:48:13', '2026-08-03 22:48:13', NULL, ''),
+(26, '2026-08-03', 2, 'Cash', 200000.00, '2026-08-04 23:11:25', '2026-08-04 23:11:25', NULL, ''),
+(27, '2026-08-04', 2, 'Cash', 200000.00, '2026-08-04 23:11:47', '2026-08-04 23:11:47', NULL, '');
 
 -- --------------------------------------------------------
 
@@ -287,7 +330,10 @@ INSERT INTO `tbl_meter_reading_card_sales` (`id`, `meter_reading_id`, `staff_id`
 (1, 13, 1, 2, 2, 7.00, 200.00, 1400.00, '', 28.00, 1372.00, '2026-06-09 18:40:27', NULL, 0),
 (2, 14, 2, 3, 2, 6.00, 200.00, 1200.00, '', 0.00, 1200.00, '2026-06-14 23:55:57', NULL, 0),
 (3, 15, 0, 3, 2, 0.00, 0.00, 1200.00, '20', 0.00, 1200.00, '2026-06-25 23:03:43', 1, 30),
-(4, 16, 0, 3, 2, 0.00, 0.00, 1111.00, '1221', 0.00, 1111.00, '2026-06-25 23:32:27', 1, 122);
+(4, 16, 0, 3, 2, 0.00, 0.00, 1111.00, '1221', 0.00, 1111.00, '2026-06-25 23:32:27', 1, 122),
+(5, 20, 0, 3, 2, 0.00, 0.00, 25000.00, '', 0.00, 25000.00, '2026-07-30 11:28:04', 1, 50),
+(6, 20, 0, 2, 2, 0.00, 0.00, 400.00, '', 8.00, 392.00, '2026-07-30 11:28:04', 2, 2),
+(7, 21, 0, 3, 2, 0.00, 0.00, 2000.00, '', 0.00, 2000.00, '2026-07-30 11:34:26', 1, 200);
 
 -- --------------------------------------------------------
 
@@ -319,7 +365,9 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
 --
 
 INSERT INTO `tbl_meter_reading_credit_sales` (`id`, `meter_reading_id`, `nozzle_id`, `slip_date`, `slip_no`, `account_number`, `vehicle_number`, `quantity`, `rate`, `amount`, `cash_rate`, `issue_quantity`, `balance_1`, `balance_2`, `wasoli`, `created_at`) VALUES
-(1, 16, 1, '2026-06-25', '1212', '1212121', '12122', 20.00, 12.00, 122.00, 200.00, 1.00, 2.00, 2.00, 0.00, '2026-06-25 23:32:27');
+(1, 16, 1, '2026-06-25', '1212', '1212121', '12122', 20.00, 12.00, 122.00, 200.00, 1.00, 2.00, 2.00, 0.00, '2026-06-25 23:32:27'),
+(2, 21, 1, '2026-07-30', '', '', '', 40.00, 0.00, 400.00, 200.00, 0.00, 0.00, 0.00, 0.00, '2026-07-30 11:34:26'),
+(3, 21, 2, '2026-07-30', '', '', '', 0.00, 0.00, 200.00, 200.00, 0.00, 0.00, 0.00, 0.00, '2026-07-30 11:34:26');
 
 -- --------------------------------------------------------
 
@@ -367,7 +415,69 @@ INSERT INTO `tbl_meter_reading_details` (`id`, `meter_reading_id`, `nozzle_id`, 
 (15, 15, 3, 3, 'Lubricant', 200.00, 1200.00, 24444.00, 23244.00, 0.00, 23244.00, 4648800.00, 'Cash', '2026-06-26 04:03:43', '2026-06-26 04:03:43'),
 (16, 16, 1, 0, 'Petrol', 200.00, 124444.00, 125555.00, 1111.00, 0.00, 1111.00, 222200.00, 'Cash', '2026-06-26 04:32:27', '2026-06-26 04:32:27'),
 (17, 16, 2, 0, 'Petrol', 200.00, 23144.00, 24144.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-06-26 04:32:27', '2026-06-26 04:32:27'),
-(18, 16, 3, 0, 'Lubricant', 200.00, 24444.00, 25555.00, 1111.00, 0.00, 1111.00, 222200.00, 'Cash', '2026-06-26 04:32:27', '2026-06-26 04:32:27');
+(18, 16, 3, 0, 'Lubricant', 200.00, 24444.00, 25555.00, 1111.00, 0.00, 1111.00, 222200.00, 'Cash', '2026-06-26 04:32:27', '2026-06-26 04:32:27'),
+(19, 17, 1, 2, 'Petrol', 200.00, 125555.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:23:28', '2026-07-30 15:23:28'),
+(20, 17, 2, 2, 'Petrol', 200.00, 24144.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:23:28', '2026-07-30 15:23:28'),
+(21, 17, 3, 2, 'Lubricant', 200.00, 25555.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:23:28', '2026-07-30 15:23:28'),
+(22, 17, 4, 2, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 15:23:28', '2026-07-30 15:23:28'),
+(23, 18, 1, 0, 'Petrol', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:30:13', '2026-07-30 15:30:13'),
+(24, 18, 2, 0, 'Petrol', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:30:13', '2026-07-30 15:30:13'),
+(25, 18, 3, 0, 'Lubricant', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:30:13', '2026-07-30 15:30:13'),
+(26, 18, 4, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:30:13', '2026-07-30 15:30:13'),
+(27, 19, 1, 0, 'Petrol', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:33:44', '2026-07-30 15:33:44'),
+(28, 19, 2, 0, 'Petrol', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:33:44', '2026-07-30 15:33:44'),
+(29, 19, 3, 0, 'Lubricant', 200.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 15:33:44', '2026-07-30 15:33:44'),
+(30, 19, 4, 0, 'Petrol', 200.00, 1000.00, 2000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 15:33:44', '2026-07-30 15:33:44'),
+(31, 20, 1, 0, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 16:28:04', '2026-07-30 16:28:04'),
+(32, 20, 2, 0, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 16:28:04', '2026-07-30 16:28:04'),
+(33, 20, 3, 0, 'Lubricant', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 16:28:04', '2026-07-30 16:28:04'),
+(34, 20, 4, 0, 'Petrol', 200.00, 2000.00, 3000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-07-30 16:28:04', '2026-07-30 16:28:04'),
+(35, 21, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 16:34:26', '2026-07-30 16:34:26'),
+(36, 21, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 16:34:26', '2026-07-30 16:34:26'),
+(37, 21, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 16:34:26', '2026-07-30 16:34:26'),
+(38, 21, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-07-30 16:34:26', '2026-07-30 16:34:26'),
+(39, 22, 1, 2, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:34:25', '2026-08-03 20:34:25'),
+(40, 22, 2, 3, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:34:25', '2026-08-03 20:34:25'),
+(41, 22, 3, 1, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:34:25', '2026-08-03 20:34:25'),
+(42, 22, 4, 4, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:34:26', '2026-08-03 20:34:26'),
+(43, 22, 5, 4, 'Petrol', 200.00, 0.00, 2000.00, 2000.00, 0.00, 2000.00, 400000.00, 'Cash', '2026-08-03 20:34:26', '2026-08-03 20:34:26'),
+(44, 22, 6, 5, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-03 20:34:26', '2026-08-03 20:34:26'),
+(45, 23, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(46, 23, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(47, 23, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(48, 23, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(49, 23, 5, 0, 'Petrol', 200.00, 2000.00, 4000.00, 2000.00, 0.00, 2000.00, 400000.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(50, 23, 6, 0, 'Petrol', 200.00, 1000.00, 2000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-03 20:35:28', '2026-08-03 20:35:28'),
+(51, 24, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(52, 24, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(53, 24, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(54, 24, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(55, 24, 5, 0, 'Petrol', 200.00, 4000.00, 4000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(56, 24, 6, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(57, 24, 7, 0, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-03 22:47:54', '2026-08-03 22:47:54'),
+(58, 25, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(59, 25, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(60, 25, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(61, 25, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(62, 25, 5, 0, 'Petrol', 200.00, 4000.00, 4000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(63, 25, 6, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(64, 25, 7, 0, 'Petrol', 200.00, 1000.00, 2000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-03 22:48:13', '2026-08-03 22:48:13'),
+(65, 26, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(66, 26, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(67, 26, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(68, 26, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(69, 26, 5, 0, 'Petrol', 200.00, 4000.00, 4000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(70, 26, 6, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(71, 26, 7, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(72, 26, 8, 0, 'Petrol', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-04 23:11:25', '2026-08-04 23:11:25'),
+(73, 27, 1, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(74, 27, 2, 0, 'Petrol', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(75, 27, 3, 0, 'Lubricant', 200.00, 1000.00, 1000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(76, 27, 4, 0, 'Petrol', 200.00, 3000.00, 3000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(77, 27, 5, 0, 'Petrol', 200.00, 4000.00, 4000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(78, 27, 6, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(79, 27, 7, 0, 'Petrol', 200.00, 2000.00, 2000.00, 0.00, 0.00, 0.00, 0.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47'),
+(80, 27, 8, 0, 'Petrol', 200.00, 1000.00, 2000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-04 23:11:47', '2026-08-04 23:11:47');
 
 -- --------------------------------------------------------
 
@@ -383,17 +493,23 @@ CREATE TABLE `tbl_nozzles` (
   `start_reading` decimal(10,2) NOT NULL DEFAULT 0.00,
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_nozzles`
 --
 
-INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Nozzle 2', 2, 2, 125555.00, 'Active', '2026-06-03 12:58:12', '2026-06-26 04:32:27'),
-(2, 'Nozzle 1', 2, 2, 24144.00, 'Active', '2026-06-03 12:58:30', '2026-06-26 04:32:27'),
-(3, 'Nozzle 3', 4, 4, 25555.00, 'Active', '2026-06-23 15:04:54', '2026-06-26 04:32:27');
+INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, `status`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Nozzle 2', 2, 2, 1000.00, 'Active', '2026-06-03 12:58:12', '2026-07-30 16:28:04', NULL),
+(2, 'Nozzle 1', 2, 2, 1000.00, 'Active', '2026-06-03 12:58:30', '2026-07-30 16:28:04', NULL),
+(3, 'Nozzle 3', 4, 4, 1000.00, 'Active', '2026-06-23 15:04:54', '2026-07-30 16:28:04', NULL),
+(4, 'Nozzle 4', 5, 2, 3000.00, 'Active', '2026-07-30 15:22:45', '2026-07-30 16:28:04', NULL),
+(5, 'Nozzle E1', 6, 2, 4000.00, 'Active', '2026-08-03 20:33:11', '2026-08-03 20:35:28', NULL),
+(6, 'Nozzle E2', 6, 2, 2000.00, 'Active', '2026-08-03 20:33:26', '2026-08-03 20:35:28', NULL),
+(7, 'Nozzle F', 7, 2, 2000.00, 'Active', '2026-08-03 22:43:08', '2026-08-03 22:48:13', NULL),
+(8, 'Nozzle G', 8, 2, 2000.00, 'Active', '2026-08-04 23:10:23', '2026-08-04 23:11:47', NULL);
 
 -- --------------------------------------------------------
 
@@ -421,7 +537,9 @@ CREATE TABLE `tbl_purchases` (
 --
 
 INSERT INTO `tbl_purchases` (`id`, `item_id`, `quantity`, `price`, `date`, `route`, `invoice_number`, `carriage_invoice_number`, `payment_status`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 3, 400.00, 200.00, '2026-06-23', 'apk', '121', '122', 'paid', '2026-06-23 11:24:17', '2026-06-23 11:27:47', NULL);
+(1, 3, 400.00, 200.00, '2026-06-23', 'apk', '121', '122', 'paid', '2026-06-23 11:24:17', '2026-06-23 11:27:47', NULL),
+(2, 3, 400.00, 200.00, '2026-07-30', 'abc', 'abcas', 'asd', 'paid', '2026-07-30 11:43:09', '2026-07-30 11:48:02', NULL),
+(3, 2, 500.00, 100.00, '2026-08-04', 'abc', 'abc', 'abc', 'unpaid', '2026-08-04 18:15:37', '2026-08-04 18:15:37', NULL);
 
 -- --------------------------------------------------------
 
@@ -435,7 +553,7 @@ CREATE TABLE `tbl_purchase_payments` (
   `date` date NOT NULL,
   `amount` decimal(12,2) NOT NULL,
   `bank_id` int(11) NOT NULL,
-  `tank_id` int(11) NOT NULL,
+  `tank_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -448,7 +566,34 @@ INSERT INTO `tbl_purchase_payments` (`id`, `purchase_id`, `date`, `amount`, `ban
 (1, 1, '2026-06-23', 20000.00, 2, 2, '2026-06-23 11:25:33', '2026-06-23 16:26:30'),
 (2, 1, '2026-06-23', 2000.00, 2, 2, '2026-06-23 11:26:44', NULL),
 (3, 1, '2026-06-23', 6000.00, 2, 2, '2026-06-23 11:27:16', NULL),
-(4, 1, '2026-06-23', 72000.00, 2, 2, '2026-06-23 11:27:47', NULL);
+(4, 1, '2026-06-23', 72000.00, 2, 2, '2026-06-23 11:27:47', NULL),
+(7, 2, '2026-07-30', 4000.00, 2, NULL, '2026-07-30 11:47:49', NULL),
+(8, 2, '2026-07-30', 76000.00, 2, NULL, '2026-07-30 11:48:02', NULL),
+(9, 2, '2026-07-30', 2000.00, 2, NULL, '2026-07-30 11:48:12', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_purchase_tank_links`
+--
+
+CREATE TABLE `tbl_purchase_tank_links` (
+  `id` int(11) NOT NULL,
+  `purchase_id` int(11) NOT NULL,
+  `tank_id` int(11) NOT NULL,
+  `quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_purchase_tank_links`
+--
+
+INSERT INTO `tbl_purchase_tank_links` (`id`, `purchase_id`, `tank_id`, `quantity`, `created_at`) VALUES
+(1, 2, 2, 200.00, '2026-07-30 11:55:59'),
+(2, 2, 3, 200.00, '2026-07-30 11:56:08'),
+(3, 1, 8, 200.00, '2026-08-04 18:15:58'),
+(4, 1, 2, 200.00, '2026-08-04 18:16:09');
 
 -- --------------------------------------------------------
 
@@ -460,16 +605,62 @@ CREATE TABLE `tbl_roles` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_roles`
 --
 
-INSERT INTO `tbl_roles` (`id`, `name`, `created_at`, `updated_at`) VALUES
-(1, 'Manager', '2026-06-03 12:58:45', '2026-06-03 12:58:45'),
-(2, 'Admin', '2026-06-14 16:49:35', '2026-06-14 16:49:35');
+INSERT INTO `tbl_roles` (`id`, `name`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 'Admin', '2026-06-14 16:49:35', '2026-06-14 16:49:35', NULL),
+(4, 'abc', '2026-08-02 01:17:53', '2026-08-02 01:17:53', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_role_permissions`
+--
+
+CREATE TABLE `tbl_role_permissions` (
+  `id` int(11) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `module_slug` varchar(64) NOT NULL,
+  `can_show` tinyint(1) NOT NULL DEFAULT 0,
+  `can_add` tinyint(1) NOT NULL DEFAULT 0,
+  `can_edit` tinyint(1) NOT NULL DEFAULT 0,
+  `can_delete` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_role_permissions`
+--
+
+INSERT INTO `tbl_role_permissions` (`id`, `role_id`, `module_slug`, `can_show`, `can_add`, `can_edit`, `can_delete`, `created_at`) VALUES
+(1, 2, 'purchases', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(2, 2, 'meter_readings', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(3, 2, 'tanks', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(4, 2, 'nozzles', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(5, 2, 'staff', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(6, 2, 'shifts', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(7, 2, 'card_machines', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(8, 2, 'items', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(9, 2, 'banks', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(10, 2, 'roles', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(11, 2, 'users', 1, 1, 1, 1, '2026-07-30 15:17:22'),
+(56, 4, 'purchases', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(57, 4, 'meter_readings', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(58, 4, 'tanks', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(59, 4, 'nozzles', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(60, 4, 'staff', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(61, 4, 'shifts', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(62, 4, 'card_machines', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(63, 4, 'items', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(64, 4, 'banks', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(65, 4, 'roles', 1, 0, 0, 0, '2026-08-02 20:49:30'),
+(66, 4, 'users', 1, 0, 0, 0, '2026-08-02 20:49:30');
 
 -- --------------------------------------------------------
 
@@ -482,17 +673,19 @@ CREATE TABLE `tbl_shifts` (
   `name` varchar(128) NOT NULL,
   `start_time` time NOT NULL,
   `end_time` time NOT NULL,
-  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active'
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_shifts`
 --
 
-INSERT INTO `tbl_shifts` (`id`, `name`, `start_time`, `end_time`, `status`) VALUES
-(2, 'Morning Shift', '12:01:00', '00:00:00', 'Active'),
-(4, 'Night Shift', '00:01:00', '12:00:00', 'Active'),
-(5, 'ABC Shift', '06:00:00', '18:00:00', 'Active');
+INSERT INTO `tbl_shifts` (`id`, `name`, `start_time`, `end_time`, `status`, `deleted_at`) VALUES
+(2, 'Morning Shift', '12:01:00', '00:00:00', 'Active', NULL),
+(4, 'Night Shift', '00:01:00', '12:00:00', 'Active', NULL),
+(5, 'ABC Shift', '06:00:00', '18:00:00', 'Active', NULL),
+(6, 'ok', '01:21:00', '01:25:00', 'Active', NULL);
 
 -- --------------------------------------------------------
 
@@ -511,18 +704,20 @@ CREATE TABLE `tbl_staff` (
   `address` varchar(512) DEFAULT NULL,
   `phone` varchar(32) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_staff`
 --
 
-INSERT INTO `tbl_staff` (`id`, `first_name`, `last_name`, `role_id`, `joining_date`, `shift_id`, `salary`, `address`, `phone`, `created_at`, `updated_at`) VALUES
-(1, 'Sharjeel', 'Wakeel', 1, '2026-06-05', 2, 12500.00, NULL, '03141236401', '2026-06-03 12:59:28', '2026-06-03 12:59:28'),
-(2, 'ABC', 'User', 2, '2026-06-16', 2, 1200.00, NULL, '031512364444', '2026-06-14 16:50:14', '2026-06-14 16:50:14'),
-(3, 'Programmatic', 'User', 1, '2026-06-23', 2, 1500.00, 'Test Address', '03211234567', '2026-06-23 15:29:44', '2026-06-23 15:29:44'),
-(4, 'test', 'name', 1, '2026-06-25', 5, 1222.00, 'okkk', '+92 (315) 123-6401', '2026-06-23 15:32:11', '2026-06-23 15:32:39');
+INSERT INTO `tbl_staff` (`id`, `first_name`, `last_name`, `role_id`, `joining_date`, `shift_id`, `salary`, `address`, `phone`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Sharjeel', 'Wakeel', 1, '2026-06-05', 2, 12500.00, NULL, '03141236401', '2026-06-03 12:59:28', '2026-06-03 12:59:28', NULL),
+(2, 'ABC', 'User', 2, '2026-06-16', 2, 1200.00, NULL, '031512364444', '2026-06-14 16:50:14', '2026-06-14 16:50:14', NULL),
+(3, 'Programmatic', 'User', 1, '2026-06-23', 2, 1500.00, 'Test Address', '03211234567', '2026-06-23 15:29:44', '2026-06-23 15:29:44', NULL),
+(4, 'test', 'name', 1, '2026-06-25', 5, 1222.00, 'okkk', '+92 (315) 123-6401', '2026-06-23 15:32:11', '2026-06-23 15:32:39', NULL),
+(5, 'test', 'user', 2, '2026-08-05', 2, 1200.00, NULL, '232213232323', '2026-08-02 00:37:54', '2026-08-02 00:37:54', NULL);
 
 -- --------------------------------------------------------
 
@@ -573,7 +768,35 @@ CREATE TABLE `tbl_staff_guarantors` (
 
 INSERT INTO `tbl_staff_guarantors` (`id`, `staff_id`, `name`, `phone`, `address`) VALUES
 (1, 3, 'Prog Guarantor', '03007654321', 'Guarantor Address'),
-(2, 4, 'filter ok', '221232132', NULL);
+(2, 4, 'filter ok', '221232132', NULL),
+(3, 5, 'abc', '3131', '123');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_staff_roles`
+--
+
+CREATE TABLE `tbl_staff_roles` (
+  `id` int(11) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_staff_roles`
+--
+
+INSERT INTO `tbl_staff_roles` (`id`, `name`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Sales Executive', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(2, 'Fuel Attendant', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(3, 'Helper', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(4, 'Accountant', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(5, 'Manager', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(6, 'Cleaner', '2026-08-01 19:32:11', '2026-08-01 19:32:11', NULL),
+(7, 'test', '2026-08-01 19:38:47', '2026-08-01 19:38:47', NULL);
 
 -- --------------------------------------------------------
 
@@ -587,17 +810,22 @@ CREATE TABLE `tbl_tanks` (
   `item_id` int(11) NOT NULL,
   `storage_capacity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_tanks`
 --
 
-INSERT INTO `tbl_tanks` (`id`, `tank_name`, `item_id`, `storage_capacity`, `created_at`, `updated_at`) VALUES
-(2, 'tank A', 2, 0.00, '2026-06-03 12:57:50', '2026-06-23 15:05:54'),
-(3, 'Tank B', 3, 0.00, '2026-06-14 14:40:56', '2026-06-14 14:40:56'),
-(4, 'Tank C', 4, 12000.00, '2026-06-23 14:55:29', '2026-06-23 14:55:29');
+INSERT INTO `tbl_tanks` (`id`, `tank_name`, `item_id`, `storage_capacity`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(2, 'tank A', 2, 0.00, '2026-06-03 12:57:50', '2026-06-23 15:05:54', NULL),
+(3, 'Tank B', 3, 0.00, '2026-06-14 14:40:56', '2026-06-14 14:40:56', NULL),
+(4, 'Tank C', 4, 12000.00, '2026-06-23 14:55:29', '2026-06-23 14:55:29', NULL),
+(5, 'Tank D', 2, 5000.00, '2026-07-30 15:19:51', '2026-07-30 15:19:51', NULL),
+(6, 'Tank E', 2, 50000.00, '2026-08-03 20:32:48', '2026-08-03 20:32:48', NULL),
+(7, 'Tank F', 2, 23500.00, '2026-08-03 22:32:35', '2026-08-03 22:32:35', NULL),
+(8, 'Tank G', 2, 23500.00, '2026-08-04 23:09:59', '2026-08-04 23:09:59', NULL);
 
 -- --------------------------------------------------------
 
@@ -618,6 +846,66 @@ CREATE TABLE `tbl_tank_dip_charts` (
 
 INSERT INTO `tbl_tank_dip_charts` (`id`, `tank_id`, `dip_label`, `dip_value`) VALUES
 (1, 4, 'Key', 232.00);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_tank_dip_logs`
+--
+
+CREATE TABLE `tbl_tank_dip_logs` (
+  `id` int(11) NOT NULL,
+  `tank_id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `shift_id` int(11) NOT NULL,
+  `dip_mm` decimal(10,2) NOT NULL,
+  `balance` decimal(12,2) NOT NULL,
+  `addition` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `usage_litre` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `book_balance` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `per_dip_gain_loss` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `overall_gain_loss` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `accumulative_pmg` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `remarks` varchar(512) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_tank_dip_logs`
+--
+
+INSERT INTO `tbl_tank_dip_logs` (`id`, `tank_id`, `date`, `shift_id`, `dip_mm`, `balance`, `addition`, `usage_litre`, `book_balance`, `per_dip_gain_loss`, `overall_gain_loss`, `accumulative_pmg`, `remarks`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 4, '2026-07-30', 2, 2000.00, 0.00, 0.00, 0.00, 12000.00, -12000.00, -12000.00, 0.00, '', '2026-07-30 09:54:00', '2026-07-30 09:54:08', '2026-07-30 14:54:08'),
+(2, 4, '2026-07-30', 2, 200.00, 2500.00, 400.00, 12000.00, 400.00, 2100.00, 2100.00, 12000.00, '', '2026-07-30 10:17:26', '2026-07-30 10:17:26', NULL),
+(3, 5, '2026-07-30', 2, 200.00, 0.00, 0.00, 0.00, 5000.00, -5000.00, -5000.00, 0.00, '', '2026-07-30 10:20:30', '2026-07-30 10:20:45', '2026-07-30 15:20:45'),
+(4, 5, '2026-07-29', 2, 200.00, 2500.00, 0.00, 1000.00, 2500.00, 0.00, 0.00, 1000.00, '', '2026-07-30 10:29:36', '2026-07-30 10:29:36', NULL),
+(5, 5, '2026-07-30', 2, 100.00, 1000.00, 0.00, 1000.00, 1500.00, -500.00, -500.00, 2000.00, '', '2026-07-30 10:45:23', '2026-07-30 10:45:23', NULL),
+(6, 8, '2026-08-04', 2, 200.00, 2500.00, 0.00, 1000.00, 2500.00, 0.00, 0.00, 1000.00, '', '2026-08-04 18:13:24', '2026-08-04 18:13:24', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_tank_dip_meter_logs`
+--
+
+CREATE TABLE `tbl_tank_dip_meter_logs` (
+  `id` int(11) NOT NULL,
+  `dip_log_id` int(11) NOT NULL,
+  `nozzle_id` int(11) NOT NULL,
+  `reading` decimal(12,2) NOT NULL DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_tank_dip_meter_logs`
+--
+
+INSERT INTO `tbl_tank_dip_meter_logs` (`id`, `dip_log_id`, `nozzle_id`, `reading`) VALUES
+(1, 2, 3, 12000.00),
+(2, 4, 4, 1000.00),
+(3, 5, 4, 2000.00),
+(4, 6, 8, 2000.00);
 
 --
 -- Indexes for dumped tables
@@ -640,6 +928,15 @@ ALTER TABLE `tbl_banks`
 --
 ALTER TABLE `tbl_card_machines`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_dip_lookup`
+--
+ALTER TABLE `tbl_dip_lookup`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dip_mm` (`dip_mm`),
+  ADD KEY `idx_deleted_at` (`deleted_at`),
+  ADD KEY `idx_deleted_mm` (`deleted_at`,`dip_mm`);
 
 --
 -- Indexes for table `tbl_items`
@@ -729,10 +1026,26 @@ ALTER TABLE `tbl_purchase_payments`
   ADD KEY `tank_id` (`tank_id`);
 
 --
+-- Indexes for table `tbl_purchase_tank_links`
+--
+ALTER TABLE `tbl_purchase_tank_links`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_purchase_id` (`purchase_id`),
+  ADD KEY `idx_tank_id` (`tank_id`);
+
+--
 -- Indexes for table `tbl_roles`
 --
 ALTER TABLE `tbl_roles`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_role_permissions`
+--
+ALTER TABLE `tbl_role_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `idx_role_module` (`role_id`,`module_slug`),
+  ADD KEY `idx_role_id` (`role_id`);
 
 --
 -- Indexes for table `tbl_shifts`
@@ -765,6 +1078,12 @@ ALTER TABLE `tbl_staff_guarantors`
   ADD KEY `staff_id` (`staff_id`);
 
 --
+-- Indexes for table `tbl_staff_roles`
+--
+ALTER TABLE `tbl_staff_roles`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `tbl_tanks`
 --
 ALTER TABLE `tbl_tanks`
@@ -779,6 +1098,23 @@ ALTER TABLE `tbl_tank_dip_charts`
   ADD KEY `tank_id` (`tank_id`);
 
 --
+-- Indexes for table `tbl_tank_dip_logs`
+--
+ALTER TABLE `tbl_tank_dip_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_tank_id` (`tank_id`),
+  ADD KEY `idx_date_shift` (`date`,`shift_id`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
+
+--
+-- Indexes for table `tbl_tank_dip_meter_logs`
+--
+ALTER TABLE `tbl_tank_dip_meter_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dip_log_id` (`dip_log_id`),
+  ADD KEY `idx_nozzle_id` (`nozzle_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -786,7 +1122,7 @@ ALTER TABLE `tbl_tank_dip_charts`
 -- AUTO_INCREMENT for table `tbl_accounts`
 --
 ALTER TABLE `tbl_accounts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `tbl_banks`
@@ -799,6 +1135,12 @@ ALTER TABLE `tbl_banks`
 --
 ALTER TABLE `tbl_card_machines`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `tbl_dip_lookup`
+--
+ALTER TABLE `tbl_dip_lookup`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `tbl_items`
@@ -834,61 +1176,73 @@ ALTER TABLE `tbl_lubricant_sales`
 -- AUTO_INCREMENT for table `tbl_meter_readings`
 --
 ALTER TABLE `tbl_meter_readings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `tbl_meter_reading_card_sales`
 --
 ALTER TABLE `tbl_meter_reading_card_sales`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tbl_meter_reading_credit_sales`
 --
 ALTER TABLE `tbl_meter_reading_credit_sales`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_meter_reading_details`
 --
 ALTER TABLE `tbl_meter_reading_details`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
 
 --
 -- AUTO_INCREMENT for table `tbl_nozzles`
 --
 ALTER TABLE `tbl_nozzles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `tbl_purchases`
 --
 ALTER TABLE `tbl_purchases`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tbl_purchase_payments`
 --
 ALTER TABLE `tbl_purchase_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- AUTO_INCREMENT for table `tbl_purchase_tank_links`
+--
+ALTER TABLE `tbl_purchase_tank_links`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `tbl_roles`
 --
 ALTER TABLE `tbl_roles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `tbl_role_permissions`
+--
+ALTER TABLE `tbl_role_permissions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
 
 --
 -- AUTO_INCREMENT for table `tbl_shifts`
 --
 ALTER TABLE `tbl_shifts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `tbl_staff`
 --
 ALTER TABLE `tbl_staff`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `tbl_staff_attendance`
@@ -900,19 +1254,37 @@ ALTER TABLE `tbl_staff_attendance`
 -- AUTO_INCREMENT for table `tbl_staff_guarantors`
 --
 ALTER TABLE `tbl_staff_guarantors`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `tbl_staff_roles`
+--
+ALTER TABLE `tbl_staff_roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tbl_tanks`
 --
 ALTER TABLE `tbl_tanks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `tbl_tank_dip_charts`
 --
 ALTER TABLE `tbl_tank_dip_charts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_tank_dip_logs`
+--
+ALTER TABLE `tbl_tank_dip_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `tbl_tank_dip_meter_logs`
+--
+ALTER TABLE `tbl_tank_dip_meter_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables
@@ -943,25 +1315,6 @@ ALTER TABLE `tbl_staff_guarantors`
 --
 ALTER TABLE `tbl_tank_dip_charts`
   ADD CONSTRAINT `tbl_tank_dip_charts_ibfk_1` FOREIGN KEY (`tank_id`) REFERENCES `tbl_tanks` (`id`) ON DELETE CASCADE;
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_dip_lookup`
---
-
-CREATE TABLE IF NOT EXISTS `tbl_dip_lookup` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `dip_mm` decimal(10,2) NOT NULL,
-  `dip_litre` decimal(10,2) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_dip_mm` (`dip_mm`),
-  KEY `idx_deleted_at` (`deleted_at`),
-  KEY `idx_deleted_mm` (`deleted_at`, `dip_mm`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
