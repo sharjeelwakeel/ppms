@@ -16,6 +16,8 @@ if (isset($_GET['msg'])) {
         $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Dip Lookup entry added successfully!<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>';
     } elseif ($_GET['msg'] === 'updated') {
         $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Dip Lookup entry updated successfully!<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>';
+    } elseif ($_GET['msg'] === 'imported') {
+        $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Dip Lookup Master chart imported successfully!<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>';
     }
 }
 ?>
@@ -65,6 +67,7 @@ if (isset($_GET['msg'])) {
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if (has_permission('tanks', 'add')): ?>
+						<a href="import-dip-lookup.php" class="btn btn-outline-primary mr-2"><i class="fas fa-file-import mr-1"></i> Import Dip Chart</a>
 						<a href="add-dip-lookup.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Dip Lookup</a>
                         <?php endif; ?>
 					</div>

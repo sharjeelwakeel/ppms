@@ -13,6 +13,7 @@ if ($check_acc_role && mysqli_num_rows($check_acc_role) == 0) {
 // Module catalog
 function get_system_modules() {
     return [
+        'expenses'       => 'Expenses Management',
         'purchases'      => 'Purchases & Tank Links',
         'meter_readings' => 'Meter Readings',
         'tanks'          => 'Tanks & Dip Chart Log',

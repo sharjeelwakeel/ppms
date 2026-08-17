@@ -74,6 +74,21 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
 
+            <!-- Expenses Menu -->
+            <?php if (has_permission('expenses', 'show')): ?>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkExpenses" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-receipt mr-1"></i> Expenses
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkExpenses">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>expenses/expenses-list.php"><i class="fas fa-list-alt mr-1"></i> View Expenses</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>expenses/add-expense.php"><i class="fas fa-plus-circle mr-1"></i> Record New Expense</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>expenses/expense-types-list.php"><i class="fas fa-tags mr-1"></i> Expense Categories</a>
+                </div>
+            </li>
+            <?php endif; ?>
+
             <!-- Purchases Menu -->
             <?php if (has_permission('purchases', 'show')): ?>
             <li class="nav-item">
