@@ -1,26 +1,34 @@
--- ========================================================
--- PPMS Clean Database Dump
--- 100% Guaranteed AUTO_INCREMENT PRIMARY KEY on all 30 tables
--- Preserved Core Data: tbl_accounts, tbl_roles, tbl_role_permissions, tbl_dip_lookup
--- All 26 other tables are cleanly structured and EMPTY
--- ========================================================
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Aug 25, 2026 at 03:06 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-SET FOREIGN_KEY_CHECKS = 0;
 START TRANSACTION;
 SET time_zone = "+00:00";
+
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
+--
+-- Database: `ppms`
+--
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_accounts`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_accounts`;
+--
+
 CREATE TABLE `tbl_accounts` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(256) NOT NULL,
   `username` varchar(64) NOT NULL,
   `password` varchar(255) NOT NULL,
@@ -31,64 +39,69 @@ CREATE TABLE `tbl_accounts` (
   `city` varchar(64) NOT NULL DEFAULT '',
   `role_id` int(11) DEFAULT NULL,
   `deleted_at` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
 -- Dumping data for table `tbl_accounts`
+--
+
 INSERT INTO `tbl_accounts` (`id`, `name`, `username`, `password`, `type`, `phonenumber`, `cnicnumber`, `address`, `city`, `role_id`, `deleted_at`, `created_at`) VALUES
 (1, 'Syed Haseeb Hashmi', 'hasyeb', '$2y$10$.U60lyPzF1YLJlBZast2Qe/yOl1meu0R5MfHvtesLtNAngZzTdYem', 'Admin', '03005090170', '31202-0000000-0', 'House # 18, Sajid Awan Colony.', 'Bahawalpur', NULL, NULL, '2026-08-01 19:47:23'),
 (2, 'abc', 'abc', '$2y$10$geHb69rnJ5eCCYRUXKs34OihIcoT6CWwzNtf8AdZZt.yJEkW351VG', 'user', '123213', '', '', '', 4, NULL, '2026-08-01 20:17:23');
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_banks`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_banks`;
+--
+
 CREATE TABLE `tbl_banks` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `account_number` varchar(128) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_card_machines`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_card_machines`;
+--
+
 CREATE TABLE `tbl_card_machines` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `charges_percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
   `contact_person_name` varchar(128) NOT NULL,
   `contact_person_number` varchar(32) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_dip_lookup`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_dip_lookup`;
+--
+
 CREATE TABLE `tbl_dip_lookup` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `tank_capacity` decimal(12,2) NOT NULL DEFAULT 23500.00,
   `dip_mm` decimal(10,2) NOT NULL,
   `dip_litre` decimal(10,2) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_dip_mm` (`dip_mm`),
-  KEY `idx_deleted_at` (`deleted_at`),
-  KEY `idx_deleted_mm` (`deleted_at`,`dip_mm`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
 -- Dumping data for table `tbl_dip_lookup`
+--
+
 INSERT INTO `tbl_dip_lookup` (`id`, `tank_capacity`, `dip_mm`, `dip_litre`, `created_at`, `updated_at`, `deleted_at`) VALUES
 (2, 23500.00, 1231.00, 12212.60, '2026-07-29 08:36:43', '2026-08-11 09:31:58', NULL),
 (3, 23500.00, 200.00, 2500.00, '2026-07-29 09:23:16', '2026-07-29 09:23:43', '2026-07-29 14:23:43'),
@@ -5005,11 +5018,13 @@ INSERT INTO `tbl_dip_lookup` (`id`, `tank_capacity`, `dip_mm`, `dip_litre`, `cre
 (4906, 50000.00, 3340.00, 50214.00, '2026-08-11 09:32:04', '2026-08-11 09:32:04', NULL);
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_expenses`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_expenses`;
+--
+
 CREATE TABLE `tbl_expenses` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `expense_date` date NOT NULL,
   `expense_type_id` int(11) NOT NULL,
   `amount` decimal(12,2) NOT NULL,
@@ -5020,34 +5035,33 @@ CREATE TABLE `tbl_expenses` (
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_expense_date` (`expense_date`),
-  KEY `idx_expense_type` (`expense_type_id`),
-  KEY `idx_deleted_at` (`deleted_at`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_expense_types`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_expense_types`;
+--
+
 CREATE TABLE `tbl_expense_types` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_items`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_items`;
+--
+
 CREATE TABLE `tbl_items` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -5055,45 +5069,54 @@ CREATE TABLE `tbl_items` (
   `unit` varchar(32) NOT NULL DEFAULT 'Litre',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_items`
+--
+
+INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rate`, `unit`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Fuel', 200.00, 205.00, 195.00, 'Litre', '2026-08-25 12:00:09', '2026-08-25 12:00:09', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_leave_setup`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_leave_setup`;
+--
+
 CREATE TABLE `tbl_leave_setup` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `staff_id` int(11) NOT NULL,
   `allowed_leaves` int(11) NOT NULL DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `staff_leave` (`staff_id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_lubricant_products`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_lubricant_products`;
+--
+
 CREATE TABLE `tbl_lubricant_products` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `category` varchar(64) NOT NULL DEFAULT '',
   `shelf_quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_lubricant_purchases`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_lubricant_purchases`;
+--
+
 CREATE TABLE `tbl_lubricant_purchases` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
   `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
   `purchase_price` decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -5101,16 +5124,17 @@ CREATE TABLE `tbl_lubricant_purchases` (
   `payment_status` varchar(32) NOT NULL DEFAULT 'Paid',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_lubricant_sales`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_lubricant_sales`;
+--
+
 CREATE TABLE `tbl_lubricant_sales` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
   `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -5120,16 +5144,17 @@ CREATE TABLE `tbl_lubricant_sales` (
   `date` date NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_meter_readings`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_meter_readings`;
+--
+
 CREATE TABLE `tbl_meter_readings` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `date` date NOT NULL,
   `shift_id` int(11) NOT NULL DEFAULT 0,
   `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',
@@ -5137,17 +5162,24 @@ CREATE TABLE `tbl_meter_readings` (
   `remarks` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `shift_id` (`shift_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_meter_readings`
+--
+
+INSERT INTO `tbl_meter_readings` (`id`, `date`, `shift_id`, `payment_type`, `grand_total`, `remarks`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, '2026-08-25', 1, 'Cash', 200000.00, '', '2026-08-25 12:02:29', '2026-08-25 12:02:29', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_meter_reading_card_sales`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_meter_reading_card_sales`;
+--
+
 CREATE TABLE `tbl_meter_reading_card_sales` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `meter_reading_id` int(11) NOT NULL,
   `staff_id` int(11) NOT NULL DEFAULT 0,
   `card_machine_id` int(11) NOT NULL,
@@ -5160,20 +5192,17 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
   `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `nozzle_id` int(11) DEFAULT NULL,
   `no_of_cards` int(11) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `meter_reading_id` (`meter_reading_id`),
-  KEY `staff_id` (`staff_id`),
-  KEY `card_machine_id` (`card_machine_id`),
-  KEY `item_id` (`item_id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_meter_reading_credit_sales`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_meter_reading_credit_sales`;
+--
+
 CREATE TABLE `tbl_meter_reading_credit_sales` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `meter_reading_id` int(11) NOT NULL,
   `nozzle_id` int(11) NOT NULL,
   `slip_date` date NOT NULL,
@@ -5188,17 +5217,17 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
   `balance_1` decimal(12,2) NOT NULL DEFAULT 0.00,
   `balance_2` decimal(12,2) NOT NULL DEFAULT 0.00,
   `wasoli` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_meter_reading_id` (`meter_reading_id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_meter_reading_details`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_meter_reading_details`;
+--
+
 CREATE TABLE `tbl_meter_reading_details` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `meter_reading_id` int(11) NOT NULL,
   `nozzle_id` int(11) NOT NULL,
   `staff_id` int(11) NOT NULL DEFAULT 0,
@@ -5212,19 +5241,24 @@ CREATE TABLE `tbl_meter_reading_details` (
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `meter_reading_id` (`meter_reading_id`),
-  KEY `nozzle_id` (`nozzle_id`),
-  KEY `staff_id` (`staff_id`)
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_meter_reading_details`
+--
+
+INSERT INTO `tbl_meter_reading_details` (`id`, `meter_reading_id`, `nozzle_id`, `staff_id`, `item_type`, `price`, `last_reading`, `current_reading`, `sale_reading`, `test_reading`, `net_sale`, `amount`, `payment_type`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 1, 'Fuel', 200.00, 0.00, 1000.00, 1000.00, 0.00, 1000.00, 200000.00, 'Cash', '2026-08-25 12:02:29', '2026-08-25 12:02:29');
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_nozzles`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_nozzles`;
+--
+
 CREATE TABLE `tbl_nozzles` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `tank_id` int(11) NOT NULL,
   `item_id` int(11) NOT NULL,
@@ -5232,18 +5266,24 @@ CREATE TABLE `tbl_nozzles` (
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `tank_id` (`tank_id`),
-  KEY `item_id` (`item_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_nozzles`
+--
+
+INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, `status`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'nozzle A', 1, 1, 1000.00, 'Active', '2026-08-25 12:00:39', '2026-08-25 12:02:29', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchases`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_purchases`;
+--
+
 CREATE TABLE `tbl_purchases` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `item_id` int(11) NOT NULL,
   `quantity` decimal(12,2) NOT NULL,
   `price` decimal(10,2) NOT NULL,
@@ -5254,82 +5294,83 @@ CREATE TABLE `tbl_purchases` (
   `payment_status` varchar(32) NOT NULL DEFAULT 'Unpaid',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `item_id` (`item_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchase_payments`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_purchase_payments`;
+--
+
 CREATE TABLE `tbl_purchase_payments` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `purchase_id` int(11) NOT NULL,
   `date` date NOT NULL,
   `amount` decimal(12,2) NOT NULL,
   `bank_id` int(11) NOT NULL,
   `tank_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `purchase_id` (`purchase_id`),
-  KEY `bank_id` (`bank_id`),
-  KEY `tank_id` (`tank_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchase_tank_links`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_purchase_tank_links`;
+--
+
 CREATE TABLE `tbl_purchase_tank_links` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `purchase_id` int(11) NOT NULL,
   `tank_id` int(11) NOT NULL,
   `quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_purchase_id` (`purchase_id`),
-  KEY `idx_tank_id` (`tank_id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_roles`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_roles`;
+--
+
 CREATE TABLE `tbl_roles` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
 -- Dumping data for table `tbl_roles`
+--
+
 INSERT INTO `tbl_roles` (`id`, `name`, `created_at`, `updated_at`, `deleted_at`) VALUES
 (2, 'Admin', '2026-06-14 16:49:35', '2026-06-14 16:49:35', NULL),
 (4, 'abc', '2026-08-02 01:17:53', '2026-08-02 01:17:53', NULL);
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_role_permissions`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_role_permissions`;
+--
+
 CREATE TABLE `tbl_role_permissions` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `role_id` int(11) NOT NULL,
   `module_slug` varchar(64) NOT NULL,
   `can_show` tinyint(1) NOT NULL DEFAULT 0,
   `can_add` tinyint(1) NOT NULL DEFAULT 0,
   `can_edit` tinyint(1) NOT NULL DEFAULT 0,
   `can_delete` tinyint(1) NOT NULL DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_role_module` (`role_id`,`module_slug`),
-  KEY `idx_role_id` (`role_id`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
 -- Dumping data for table `tbl_role_permissions`
+--
+
 INSERT INTO `tbl_role_permissions` (`id`, `role_id`, `module_slug`, `can_show`, `can_add`, `can_edit`, `can_delete`, `created_at`) VALUES
 (1, 2, 'purchases', 1, 1, 1, 1, '2026-07-30 15:17:22'),
 (2, 2, 'meter_readings', 1, 1, 1, 1, '2026-07-30 15:17:22'),
@@ -5356,25 +5397,35 @@ INSERT INTO `tbl_role_permissions` (`id`, `role_id`, `module_slug`, `can_show`, 
 (66, 4, 'users', 1, 0, 0, 0, '2026-08-02 20:49:30');
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_shifts`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_shifts`;
+--
+
 CREATE TABLE `tbl_shifts` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `start_time` time NOT NULL,
   `end_time` time NOT NULL,
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_shifts`
+--
+
+INSERT INTO `tbl_shifts` (`id`, `name`, `start_time`, `end_time`, `status`, `deleted_at`) VALUES
+(1, 'Morninig', '05:59:00', '09:59:00', 'Active', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_staff`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_staff`;
+--
+
 CREATE TABLE `tbl_staff` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `first_name` varchar(128) NOT NULL,
   `last_name` varchar(128) NOT NULL,
   `role_id` int(11) NOT NULL,
@@ -5385,90 +5436,116 @@ CREATE TABLE `tbl_staff` (
   `phone` varchar(32) NOT NULL DEFAULT '',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `role_id` (`role_id`),
-  KEY `shift_id` (`shift_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_staff`
+--
+
+INSERT INTO `tbl_staff` (`id`, `first_name`, `last_name`, `role_id`, `joining_date`, `shift_id`, `salary`, `address`, `phone`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Staff', 'Morning', 1, '2026-08-19', 1, 800.00, NULL, '03131232132', '2026-08-25 05:01:27', '2026-08-25 05:01:27', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_staff_attendance`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_staff_attendance`;
+--
+
 CREATE TABLE `tbl_staff_attendance` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `staff_id` int(11) NOT NULL,
   `date` date NOT NULL,
   `status` enum('Present','Absent','Leave') NOT NULL DEFAULT 'Present',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `staff_date` (`staff_id`,`date`),
-  KEY `staff_id_idx` (`staff_id`),
-  KEY `date_idx` (`date`)
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_staff_guarantors`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_staff_guarantors`;
+--
+
 CREATE TABLE `tbl_staff_guarantors` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `staff_id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `phone` varchar(32) NOT NULL DEFAULT '',
-  `address` varchar(512) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `staff_id` (`staff_id`)
+  `address` varchar(512) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_staff_guarantors`
+--
+
+INSERT INTO `tbl_staff_guarantors` (`id`, `staff_id`, `name`, `phone`, `address`) VALUES
+(1, 1, 'Staff', '03151323', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_staff_roles`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_staff_roles`;
+--
+
 CREATE TABLE `tbl_staff_roles` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_staff_roles`
+--
+
+INSERT INTO `tbl_staff_roles` (`id`, `name`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Staff', '2026-08-25 11:58:46', '2026-08-25 11:58:46', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_tanks`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_tanks`;
+--
+
 CREATE TABLE `tbl_tanks` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `tank_name` varchar(128) NOT NULL,
   `item_id` int(11) NOT NULL,
   `storage_capacity` decimal(12,2) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `item_id` (`item_id`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tbl_tanks`
+--
+
+INSERT INTO `tbl_tanks` (`id`, `tank_name`, `item_id`, `storage_capacity`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Tank A', 1, 23500.00, '2026-08-25 12:00:21', '2026-08-25 12:00:21', NULL);
+
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_tank_dip_charts`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_tank_dip_charts`;
+--
+
 CREATE TABLE `tbl_tank_dip_charts` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `tank_id` int(11) NOT NULL,
   `dip_label` varchar(64) NOT NULL,
-  `volume_litres` decimal(12,2) NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `tank_id` (`tank_id`)
+  `volume_litres` decimal(12,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_tank_dip_logs`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_tank_dip_logs`;
+--
+
 CREATE TABLE `tbl_tank_dip_logs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `tank_id` int(11) NOT NULL,
   `date` date NOT NULL,
   `shift_id` int(11) NOT NULL,
@@ -5477,50 +5554,458 @@ CREATE TABLE `tbl_tank_dip_logs` (
   `cumulative_meter_reading` decimal(12,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_tank_id` (`tank_id`),
-  KEY `idx_date_shift` (`date`,`shift_id`),
-  KEY `idx_deleted_at` (`deleted_at`)
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_tank_dip_meter_logs`
--- --------------------------------------------------------
-DROP TABLE IF EXISTS `tbl_tank_dip_meter_logs`;
+--
+
 CREATE TABLE `tbl_tank_dip_meter_logs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) NOT NULL,
   `dip_log_id` int(11) NOT NULL,
   `nozzle_id` int(11) NOT NULL,
-  `reading` decimal(12,2) NOT NULL DEFAULT 0.00,
-  PRIMARY KEY (`id`),
-  KEY `idx_dip_log_id` (`dip_log_id`),
-  KEY `idx_nozzle_id` (`nozzle_id`)
+  `reading` decimal(12,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `tbl_accounts`
+--
+ALTER TABLE `tbl_accounts`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_banks`
+--
+ALTER TABLE `tbl_banks`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_card_machines`
+--
+ALTER TABLE `tbl_card_machines`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_dip_lookup`
+--
+ALTER TABLE `tbl_dip_lookup`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dip_mm` (`dip_mm`),
+  ADD KEY `idx_deleted_at` (`deleted_at`),
+  ADD KEY `idx_deleted_mm` (`deleted_at`,`dip_mm`);
+
+--
+-- Indexes for table `tbl_expenses`
+--
+ALTER TABLE `tbl_expenses`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_expense_date` (`expense_date`),
+  ADD KEY `idx_expense_type` (`expense_type_id`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
+
+--
+-- Indexes for table `tbl_expense_types`
+--
+ALTER TABLE `tbl_expense_types`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_items`
+--
+ALTER TABLE `tbl_items`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_leave_setup`
+--
+ALTER TABLE `tbl_leave_setup`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `staff_leave` (`staff_id`);
+
+--
+-- Indexes for table `tbl_lubricant_products`
+--
+ALTER TABLE `tbl_lubricant_products`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_lubricant_purchases`
+--
+ALTER TABLE `tbl_lubricant_purchases`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_lubricant_sales`
+--
+ALTER TABLE `tbl_lubricant_sales`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_meter_readings`
+--
+ALTER TABLE `tbl_meter_readings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `shift_id` (`shift_id`);
+
+--
+-- Indexes for table `tbl_meter_reading_card_sales`
+--
+ALTER TABLE `tbl_meter_reading_card_sales`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `meter_reading_id` (`meter_reading_id`),
+  ADD KEY `staff_id` (`staff_id`),
+  ADD KEY `card_machine_id` (`card_machine_id`),
+  ADD KEY `item_id` (`item_id`);
+
+--
+-- Indexes for table `tbl_meter_reading_credit_sales`
+--
+ALTER TABLE `tbl_meter_reading_credit_sales`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_meter_reading_id` (`meter_reading_id`);
+
+--
+-- Indexes for table `tbl_meter_reading_details`
+--
+ALTER TABLE `tbl_meter_reading_details`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `meter_reading_id` (`meter_reading_id`),
+  ADD KEY `nozzle_id` (`nozzle_id`),
+  ADD KEY `staff_id` (`staff_id`);
+
+--
+-- Indexes for table `tbl_nozzles`
+--
+ALTER TABLE `tbl_nozzles`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `tank_id` (`tank_id`),
+  ADD KEY `item_id` (`item_id`);
+
+--
+-- Indexes for table `tbl_purchases`
+--
+ALTER TABLE `tbl_purchases`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `item_id` (`item_id`);
+
+--
+-- Indexes for table `tbl_purchase_payments`
+--
+ALTER TABLE `tbl_purchase_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `purchase_id` (`purchase_id`),
+  ADD KEY `bank_id` (`bank_id`),
+  ADD KEY `tank_id` (`tank_id`);
+
+--
+-- Indexes for table `tbl_purchase_tank_links`
+--
+ALTER TABLE `tbl_purchase_tank_links`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_purchase_id` (`purchase_id`),
+  ADD KEY `idx_tank_id` (`tank_id`);
+
+--
+-- Indexes for table `tbl_roles`
+--
+ALTER TABLE `tbl_roles`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_role_permissions`
+--
+ALTER TABLE `tbl_role_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `idx_role_module` (`role_id`,`module_slug`),
+  ADD KEY `idx_role_id` (`role_id`);
+
+--
+-- Indexes for table `tbl_shifts`
+--
+ALTER TABLE `tbl_shifts`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_staff`
+--
+ALTER TABLE `tbl_staff`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `role_id` (`role_id`),
+  ADD KEY `shift_id` (`shift_id`);
+
+--
+-- Indexes for table `tbl_staff_attendance`
+--
+ALTER TABLE `tbl_staff_attendance`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `staff_date` (`staff_id`,`date`),
+  ADD KEY `staff_id_idx` (`staff_id`),
+  ADD KEY `date_idx` (`date`);
+
+--
+-- Indexes for table `tbl_staff_guarantors`
+--
+ALTER TABLE `tbl_staff_guarantors`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `staff_id` (`staff_id`);
+
+--
+-- Indexes for table `tbl_staff_roles`
+--
+ALTER TABLE `tbl_staff_roles`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_tanks`
+--
+ALTER TABLE `tbl_tanks`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `item_id` (`item_id`);
+
+--
+-- Indexes for table `tbl_tank_dip_charts`
+--
+ALTER TABLE `tbl_tank_dip_charts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `tank_id` (`tank_id`);
+
+--
+-- Indexes for table `tbl_tank_dip_logs`
+--
+ALTER TABLE `tbl_tank_dip_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_tank_id` (`tank_id`),
+  ADD KEY `idx_date_shift` (`date`,`shift_id`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
+
+--
+-- Indexes for table `tbl_tank_dip_meter_logs`
+--
+ALTER TABLE `tbl_tank_dip_meter_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dip_log_id` (`dip_log_id`),
+  ADD KEY `idx_nozzle_id` (`nozzle_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `tbl_accounts`
+--
+ALTER TABLE `tbl_accounts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `tbl_banks`
+--
+ALTER TABLE `tbl_banks`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_card_machines`
+--
+ALTER TABLE `tbl_card_machines`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_dip_lookup`
+--
+ALTER TABLE `tbl_dip_lookup`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4907;
+
+--
+-- AUTO_INCREMENT for table `tbl_expenses`
+--
+ALTER TABLE `tbl_expenses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_expense_types`
+--
+ALTER TABLE `tbl_expense_types`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_items`
+--
+ALTER TABLE `tbl_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_leave_setup`
+--
+ALTER TABLE `tbl_leave_setup`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_lubricant_products`
+--
+ALTER TABLE `tbl_lubricant_products`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_lubricant_purchases`
+--
+ALTER TABLE `tbl_lubricant_purchases`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_lubricant_sales`
+--
+ALTER TABLE `tbl_lubricant_sales`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_meter_readings`
+--
+ALTER TABLE `tbl_meter_readings`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_meter_reading_card_sales`
+--
+ALTER TABLE `tbl_meter_reading_card_sales`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_meter_reading_credit_sales`
+--
+ALTER TABLE `tbl_meter_reading_credit_sales`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_meter_reading_details`
+--
+ALTER TABLE `tbl_meter_reading_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_nozzles`
+--
+ALTER TABLE `tbl_nozzles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_purchases`
+--
+ALTER TABLE `tbl_purchases`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_purchase_payments`
+--
+ALTER TABLE `tbl_purchase_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_purchase_tank_links`
+--
+ALTER TABLE `tbl_purchase_tank_links`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_roles`
+--
+ALTER TABLE `tbl_roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `tbl_role_permissions`
+--
+ALTER TABLE `tbl_role_permissions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
+
+--
+-- AUTO_INCREMENT for table `tbl_shifts`
+--
+ALTER TABLE `tbl_shifts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_staff`
+--
+ALTER TABLE `tbl_staff`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_staff_attendance`
+--
+ALTER TABLE `tbl_staff_attendance`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_staff_guarantors`
+--
+ALTER TABLE `tbl_staff_guarantors`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_staff_roles`
+--
+ALTER TABLE `tbl_staff_roles`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_tanks`
+--
+ALTER TABLE `tbl_tanks`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_tank_dip_charts`
+--
+ALTER TABLE `tbl_tank_dip_charts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_tank_dip_logs`
+--
+ALTER TABLE `tbl_tank_dip_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_tank_dip_meter_logs`
+--
+ALTER TABLE `tbl_tank_dip_meter_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- Constraints for dumped tables
--- --------------------------------------------------------
+--
+
+--
+-- Constraints for table `tbl_purchases`
+--
 ALTER TABLE `tbl_purchases`
   ADD CONSTRAINT `tbl_purchases_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `tbl_items` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `tbl_purchase_payments`
+--
 ALTER TABLE `tbl_purchase_payments`
   ADD CONSTRAINT `tbl_purchase_payments_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `tbl_purchases` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `tbl_purchase_payments_ibfk_2` FOREIGN KEY (`bank_id`) REFERENCES `tbl_banks` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `tbl_purchase_payments_ibfk_3` FOREIGN KEY (`tank_id`) REFERENCES `tbl_tanks` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `tbl_staff_guarantors`
+--
 ALTER TABLE `tbl_staff_guarantors`
   ADD CONSTRAINT `tbl_staff_guarantors_ibfk_1` FOREIGN KEY (`staff_id`) REFERENCES `tbl_staff` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `tbl_tank_dip_charts`
+--
 ALTER TABLE `tbl_tank_dip_charts`
   ADD CONSTRAINT `tbl_tank_dip_charts_ibfk_1` FOREIGN KEY (`tank_id`) REFERENCES `tbl_tanks` (`id`) ON DELETE CASCADE;
-
-ALTER TABLE `tbl_accounts` AUTO_INCREMENT = 3;
-ALTER TABLE `tbl_roles` AUTO_INCREMENT = 5;
-ALTER TABLE `tbl_role_permissions` AUTO_INCREMENT = 68;
-ALTER TABLE `tbl_dip_lookup` AUTO_INCREMENT = 4907;
-
-SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
