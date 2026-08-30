@@ -6,8 +6,10 @@ if (!file_exists('include/navbar.php')) {
 }
 require_once __DIR__ . '/permissions.php';
 ?>
-<nav class="navbar navbar-expand-lg bg-dark navbar-dark px-lg-4 shadow-sm">
-    <a class="navbar-brand font-weight-bold" href="<?php echo $prefix; ?>dashboard.php">PPMS</a>
+<nav class="navbar navbar-expand-custom bg-dark navbar-dark px-3 px-lg-4 shadow-sm main-navbar">
+    <a class="navbar-brand font-weight-bold d-flex align-items-center" href="<?php echo $prefix; ?>dashboard.php">
+        <i class="fas fa-gas-pump mr-2 text-warning"></i> PPMS
+    </a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
     </button>
@@ -32,15 +34,15 @@ require_once __DIR__ . '/permissions.php';
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
                     <?php if (has_permission('shifts', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>shifts/shifts-list.php">Shifts</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>shifts/shifts-list.php"><i class="fas fa-clock mr-1 text-muted"></i> Shifts</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('items', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>items/items-list.php">Items</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>items/items-list.php"><i class="fas fa-cubes mr-1 text-muted"></i> Items</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('tanks', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>tanks/tanks-list.php">Tanks</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>tanks/tanks-list.php"><i class="fas fa-oil-can mr-1 text-muted"></i> Tanks</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('roles', 'show')): ?>
@@ -52,23 +54,23 @@ require_once __DIR__ . '/permissions.php';
                     <?php endif; ?>
 
                     <?php if (has_permission('nozzles', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>nozzles/nozzles-list.php">Nozzles</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>nozzles/nozzles-list.php"><i class="fas fa-gas-pump mr-1 text-muted"></i> Nozzles</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('staff', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-list.php">Staff</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-list.php"><i class="fas fa-user-tie mr-1 text-muted"></i> Staff</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('card_machines', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php">Card Machines</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>card-machines/card-machines-list.php"><i class="fas fa-credit-card mr-1 text-muted"></i> Card Machines</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('banks', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>banks/banks-list.php">Banks</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>banks/banks-list.php"><i class="fas fa-university mr-1 text-muted"></i> Banks</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('tanks', 'show')): ?>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>dip-lookup/dip-lookup-list.php">Dip Lookup</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>dip-lookup/dip-lookup-list.php"><i class="fas fa-ruler-vertical mr-1 text-muted"></i> Dip Lookup</a>
                     <?php endif; ?>
                 </div>
             </li>
@@ -103,10 +105,10 @@ require_once __DIR__ . '/permissions.php';
                 <i class="fas fa-oil-can mr-1"></i> Stock &amp; Lubricants
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php">Products</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php">Purchases (Inflow)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php">Sales (Outflow)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php">Stock Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php"><i class="fas fa-boxes mr-1 text-muted"></i> Products</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Purchases (Inflow)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Sales (Outflow)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php"><i class="fas fa-file-invoice mr-1 text-info"></i> Stock Report</a>
                 </div>
             </li>
             <?php endif; ?>
@@ -138,6 +140,10 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
         </ul>
-        <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-primary mt-2 mt-lg-0 ml-lg-3">Logout</a>
+        <div class="nav-action-wrapper mt-3 mt-lg-0 ml-lg-3">
+            <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-light btn-sm btn-logout d-block d-lg-inline-block font-weight-bold">
+                <i class="fas fa-sign-out-alt mr-1"></i> Logout
+            </a>
+        </div>
     </div>
 </nav>

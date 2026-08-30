@@ -67,9 +67,29 @@ All primary color definitions are centralized in `include/style.css`.
 
 ---
 
-## 4. Enforcement & Mandatory Guidelines for Developers
+---
+
+## 4. Tablet & Laptop Responsive Design Standards (`<= 1240px` Breakpoint)
+
+### A. Navigation Bar in Tablet & Laptop Mode (`@media (max-width: 1240px)`)
+- **Responsive Drawer Trigger**: On screen widths `<= 1240px`, the navbar automatically collapses into the responsive drawer to prevent multi-menu horizontal wrapping.
+- **Drawer Background**: `#031a40` with `1px solid rgba(255, 255, 255, 0.1)` and smooth vertical scrolling (`max-height: calc(100vh - 80px)`).
+- **Nav Links**: Touch-friendly padding (`10px 14px`), flex alignment with icons, light text (`rgba(255, 255, 255, 0.9)`), hover background `rgba(255, 255, 255, 0.12)`.
+- **Indented Submenu Drawer**: Nested dropdowns use subtle translucent panel `rgba(255, 255, 255, 0.07)` with `1px solid rgba(255, 255, 255, 0.12)`, `8px` border radius, and indented items.
+- **Dropdown Items**: Light text (`rgba(255, 255, 255, 0.85)`), icon alignment, hover highlight `rgba(255, 255, 255, 0.18)`.
+- **Hamburger Toggler (`.navbar-toggler`)**: Rounded `6px`, `1.5px solid rgba(255, 255, 255, 0.35)` with custom glow focus ring.
+- **Logout Action**: Spans full width as block button (`width: 100%`) with clear white border and icon.
+
+### B. Layout & DataTables on Tablets & Small Laptops (`<= 1240px`)
+- **Page Header Banner (`.page-header`)**: Stacks vertically (`flex-direction: column; align-items: flex-start; gap: 12px`) with full-width action buttons.
+- **DataTables Controls**: Length and Search filter controls stack cleanly (`float: none; width: 100%`) without horizontal overlap.
+- **Table Touch Scrolling**: All table containers use `.table-responsive` with `-webkit-overflow-scrolling: touch`.
+
+---
+
+## 5. Enforcement & Mandatory Guidelines for Developers
 
 1. **Always Include `include/style.css`**: Every HTML/PHP file **MUST** include `<link rel="stylesheet" href=".../include/style.css?v=1.0.1">` AFTER the Bootstrap CSS link.
 2. **Never Use Generic Blue (`#007bff`)**: Do not use standard Bootstrap default blue (`#007bff`) for branding or primary buttons. Always use `var(--primary-color)` or `var(--primary-gradient)`.
 3. **Consistent Icons**: Use FontAwesome 5 (`fas fa-*`) icons for all actions (e.g. `<i class="fas fa-plus mr-1"></i> Add New`, `<i class="fas fa-edit"></i> Edit`, `<i class="fas fa-trash-alt"></i> Delete`, `<i class="fas fa-save mr-1"></i> Save`).
-4. **Theme Consistency Across All Modules**: All new modules (Dip Lookup, Banks, Tanks, Staff, Items, etc.) must follow these exact color and component definitions without deviation.
+4. **Theme Consistency Across All Modules**: All modules must follow these exact color, component, and responsive definitions without deviation.
