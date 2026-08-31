@@ -67,15 +67,29 @@ $result = mysqli_query($connection, $query);
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" />
-    <link rel="stylesheet" href="../include/style.css?v=1.0.1" />
+    <link rel="stylesheet" href="../include/style.css?v=1.0.2" />
     <style>
         .btn-primary {
             background-color: #04204e !important;
             background: var(--primary-gradient) !important;
             border: none !important;
             color: #fff !important;
+            font-weight: 500;
         }
         .btn-primary:hover { opacity: 0.9; }
+        .btn-outline-primary {
+            color: #04204e !important;
+            border: 1.5px solid #04204e !important;
+            background-color: transparent !important;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-outline-primary:hover {
+            background-color: #04204e !important;
+            background: var(--primary-gradient) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
+        }
         #typeTable thead th {
             background-color: #04204e !important;
             background: var(--primary-color) !important;
@@ -101,9 +115,9 @@ $result = mysqli_query($connection, $query);
                     <h4><i class="fas fa-tags mr-2" style="color: var(--primary-color);"></i>Expense Categories / Types</h4>
                 </div>
                 <div class="col-md-6 text-right">
-                    <a href="expenses-list.php" class="btn btn-outline-secondary mr-2"><i class="fas fa-list-alt mr-1"></i> View Expenses</a>
+                    <a href="expenses-list.php" class="btn btn-outline-primary mr-2 font-weight-bold shadow-sm"><i class="fas fa-list-alt mr-1"></i> View Expenses</a>
                     <?php if ($canAdd): ?>
-                    <button type="button" class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus mr-1"></i> Add New Category</button>
+                    <button type="button" class="btn btn-primary font-weight-bold shadow-sm" onclick="openAddModal()"><i class="fas fa-plus mr-1"></i> Add New Category</button>
                     <?php endif; ?>
                 </div>
             </div>

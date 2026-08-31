@@ -40,15 +40,29 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" />
-    <link rel="stylesheet" href="../include/style.css?v=1.0.1" />
+    <link rel="stylesheet" href="../include/style.css?v=1.0.2" />
     <style>
         .btn-primary {
             background-color: #04204e !important;
             background: var(--primary-gradient) !important;
             border: none !important;
             color: #fff !important;
+            font-weight: 500;
         }
         .btn-primary:hover { opacity: 0.9; }
+        .btn-outline-primary {
+            color: #04204e !important;
+            border: 1.5px solid #04204e !important;
+            background-color: transparent !important;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-outline-primary:hover {
+            background-color: #04204e !important;
+            background: var(--primary-gradient) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
+        }
         #expenseTable thead th {
             background-color: #04204e !important;
             background: var(--primary-color) !important;
@@ -73,9 +87,9 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
                     <h4><i class="fas fa-receipt mr-2" style="color: var(--primary-color);"></i>Expenses Management</h4>
                 </div>
                 <div class="col-md-6 text-right">
-                    <a href="expense-types-list.php" class="btn btn-outline-primary mr-2"><i class="fas fa-tags mr-1"></i> Expense Categories</a>
+                    <a href="expense-types-list.php" class="btn btn-outline-primary mr-2 font-weight-bold shadow-sm"><i class="fas fa-tags mr-1"></i> Expense Categories</a>
                     <?php if ($canAdd): ?>
-                    <a href="add-expense.php" class="btn btn-primary"><i class="fas fa-plus-circle mr-1"></i> Record New Expense</a>
+                    <a href="add-expense.php" class="btn btn-primary font-weight-bold shadow-sm"><i class="fas fa-plus-circle mr-1"></i> Record New Expense</a>
                     <?php endif; ?>
                 </div>
             </div>
