@@ -114,21 +114,16 @@ $banks_res = mysqli_query($connection, "SELECT id, name, account_no FROM tbl_ban
                             
                             <div class="col-md-4 form-group">
                                 <label class="font-weight-bold">Expense Category / Type <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <select name="expense_type_id" class="form-control" required>
-                                        <option value="">-- Select Category --</option>
-                                        <?php if ($types_res && mysqli_num_rows($types_res) > 0): ?>
-                                            <?php while ($t = mysqli_fetch_assoc($types_res)): ?>
-                                                <option value="<?php echo $t['id']; ?>" <?php echo ($expense_type_val == $t['id']) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($t['name']); ?>
-                                                </option>
-                                            <?php endwhile; ?>
-                                        <?php endif; ?>
-                                    </select>
-                                    <div class="input-group-append">
-                                        <a href="expense-types-list.php" class="btn btn-outline-secondary" title="Manage Categories"><i class="fas fa-plus"></i></a>
-                                    </div>
-                                </div>
+                                <select name="expense_type_id" class="form-control" required>
+                                    <option value="">-- Select Category --</option>
+                                    <?php if ($types_res && mysqli_num_rows($types_res) > 0): ?>
+                                        <?php while ($t = mysqli_fetch_assoc($types_res)): ?>
+                                            <option value="<?php echo $t['id']; ?>" <?php echo ($expense_type_val == $t['id']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($t['name']); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    <?php endif; ?>
+                                </select>
                             </div>
 
                             <div class="col-md-4 form-group">
