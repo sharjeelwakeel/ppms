@@ -33,14 +33,14 @@ if (isset($_POST['submit'])) {
     $start_reading = mysqli_real_escape_string($connection, $_POST['start_reading']);
     $status = mysqli_real_escape_string($connection, $_POST['status']);
 
-    // Validate that the updated reading is greater than the previous stored reading
+    // Validate that the updated reading is greater than or equal to the previous stored reading
     $nozzle_query = mysqli_query($connection, "SELECT start_reading FROM tbl_nozzles WHERE id = '$id'");
     $nozzle_data = mysqli_fetch_assoc($nozzle_query);
     $previous_reading = floatval($nozzle_data['start_reading'] ?? 0);
     $new_reading = floatval($start_reading);
 
-    if ($new_reading <= $previous_reading) {
-        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: The new reading must be greater than the previous reading (' . number_format($previous_reading, 2) . ').</div>';
+    if ($new_reading < $previous_reading) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: The new reading must be greater than or equal to the previous reading (' . number_format($previous_reading, 2) . ').</div>';
     } else {
         $query = "UPDATE tbl_nozzles SET 
                     name='$name', 
@@ -110,7 +110,7 @@ $items_result = mysqli_query($connection, $items_sql);
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="edit-nozzle.php?id=<?php echo $id; ?>" method="POST">
-					<h4 class="mb-5">Edit Nozzle</h4>
+					<h4 class="mb-5"><i class="fas fa-burn mr-2 text-primary"></i>Edit Nozzle</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -174,8 +174,8 @@ $items_result = mysqli_query($connection, $items_sql);
 						</div>	
 					</div>
 					<div class="txt-center">
-						<input type="submit" name="submit" value="Save Nozzle" class="btn btn-primary m-top">
-                        <a href="nozzles-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" name="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Nozzle</button>
+                        <a href="nozzles-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

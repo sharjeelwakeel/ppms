@@ -26,14 +26,18 @@ if (isset($_POST['name']) && isset($_POST['tank_id']) && isset($_POST['item_id']
     $start_reading = mysqli_real_escape_string($connection, $_POST['start_reading']);
     $status = mysqli_real_escape_string($connection, $_POST['status']);
 
-    $query = "INSERT INTO tbl_nozzles (name, tank_id, item_id, start_reading, status) 
-              VALUES ('$name', '$tank_id', '$item_id', '$start_reading', '$status')";
-    
-    if (mysqli_query($connection, $query)) {
-        header('Location: nozzles-list.php');
-        exit;
+    if (floatval($start_reading) < 0) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-2"></i>Error: Current reading must be greater than or equal to 0.</div>';
     } else {
-        $message = '<div class="alert alert-danger">Error saving nozzle: ' . mysqli_error($connection) . '</div>';
+        $query = "INSERT INTO tbl_nozzles (name, tank_id, item_id, start_reading, status) 
+                  VALUES ('$name', '$tank_id', '$item_id', '$start_reading', '$status')";
+        
+        if (mysqli_query($connection, $query)) {
+            header('Location: nozzles-list.php');
+            exit;
+        } else {
+            $message = '<div class="alert alert-danger">Error saving nozzle: ' . mysqli_error($connection) . '</div>';
+        }
     }
 }
 
@@ -78,7 +82,7 @@ $items_result = mysqli_query($connection, $items_sql);
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-nozzle.php" method="POST">
-					<h4 class="mb-5">Add Nozzle</h4>
+					<h4 class="mb-5"><i class="fas fa-burn mr-2 text-primary"></i>Add Nozzle</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -123,7 +127,7 @@ $items_result = mysqli_query($connection, $items_sql);
 									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Current Reading</label>
 										<div class="col-lg-8 col-md-7 col-sm-7">
-											<input type="number" step="0.01" name="start_reading" class="form-control" placeholder="0.00" required>
+											<input type="number" step="0.01" min="0" name="start_reading" class="form-control" value="0.00" placeholder="0.00" required>
 										</div>
 									</div>
 									<div class="form-group row">
@@ -140,8 +144,8 @@ $items_result = mysqli_query($connection, $items_sql);
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Nozzle</button>
-                        <a href="nozzles-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Nozzle</button>
+                        <a href="nozzles-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>
