@@ -61,7 +61,7 @@ if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-item.php" method="POST">
-					<h4 class="mb-5">Add Item</h4>
+					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Add Item</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -76,7 +76,9 @@ if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_
 									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-form-label">Unit</label>
 										<div class="col-lg-8 col-md-7">
-											<input type="text" name="unit" class="form-control" placeholder="e.g. Litre" required>
+											<select name="unit" class="form-control" required>
+												<option value="Ltr" selected>Ltr</option>
+											</select>
 										</div>
 									</div>
 								</div>
@@ -104,8 +106,8 @@ if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Item</button>
-                        <a href="items-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Item</button>
+                        <a href="items-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

@@ -83,7 +83,7 @@ if (!$item) {
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="edit-item.php?id=<?php echo $id; ?>" method="POST">
-					<h4 class="mb-5">Edit Item</h4>
+					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Edit Item</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -98,7 +98,9 @@ if (!$item) {
 									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-form-label">Unit</label>
 										<div class="col-lg-8 col-md-7">
-											<input type="text" name="unit" class="form-control" value="<?php echo htmlspecialchars($item['unit']); ?>" required>
+											<select name="unit" class="form-control" required>
+												<option value="Ltr" selected>Ltr</option>
+											</select>
 										</div>
 									</div>
 								</div>
@@ -126,8 +128,8 @@ if (!$item) {
 						</div>	
 					</div>
 					<div class="txt-center">
-						<input type="submit" name="submit" value="Save Item" class="btn btn-primary m-top">
-                        <a href="items-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" name="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Item</button>
+                        <a href="items-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

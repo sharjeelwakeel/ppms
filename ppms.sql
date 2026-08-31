@@ -5066,7 +5066,7 @@ CREATE TABLE `tbl_items` (
   `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `unit` varchar(32) NOT NULL DEFAULT 'Litre',
+  `unit` varchar(32) NOT NULL DEFAULT 'Ltr',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
