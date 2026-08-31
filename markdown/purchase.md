@@ -95,3 +95,23 @@ $$\text{Total Cost} = \text{Quantity} \times \text{Unit Price}$$
   - Delete Purchase / Payment: `<i class="fas fa-trash-alt text-danger"></i>`
   - Record Payment: `<i class="fas fa-check-circle mr-1"></i>`
   - Back: `<i class="fas fa-arrow-left"></i>`
+
+---
+
+## 6. Payment Deletion & Form Resubmission Architecture (Troubleshooting)
+
+### Root Cause Analysis:
+1. **Form Resubmission via `location.reload()`**:
+   - When a user submitted the payment form (`POST`), the page was rendered under an active POST request.
+   - If the user immediately deleted the payment, the AJAX success callback triggered `location.reload()`.
+   - The browser reloaded by re-submitting the previous POST payload (`add_payment`), unintentionally re-inserting the exact payment that was just deleted.
+2. **Missing Post-Redirect-Get (PRG) Handling**:
+   - The form submission handled the database insert and rendered the page in the same lifecycle without redirecting to a clean GET request.
+
+### Solution Applied:
+1. **Post-Redirect-Get (PRG) Pattern**:
+   - Both `purchases/edit-purchase.php` and `lubricants/edit-purchase.php` now redirect after processing `add_payment` and `update_purchase` (`header("Location: edit-purchase.php?id=$id&msg=payment_added"); exit;`).
+2. **Clean GET Redirection on Deletion**:
+   - In `deletePayment()`, upon receiving `'deleted'` from the server, the browser performs a clean GET navigation (`window.location.href = 'edit-purchase.php?id=' + id + '&msg=payment_deleted'`).
+3. **Robust Soft-Delete Queries**:
+   - Updated queries to treat both `NULL` and `'0000-00-00 00:00:00'` as non-deleted records (`deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'`).

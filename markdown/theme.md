@@ -49,13 +49,19 @@ All primary color definitions are centralized in `include/style.css`.
 - **Shadow**: `0 4px 12px rgba(4, 32, 78, 0.2)`
 - **Hover State**: `background: var(--primary-hover) !important; opacity: 0.9;`
 
-### C. DataTables & Tables
+### C. Outline Primary Buttons (`.btn-outline-primary`)
+- **Text Color**: `#04204e !important` (`var(--primary-color)`)
+- **Border**: `1.5px solid #04204e !important`
+- **Background**: `transparent !important`
+- **Hover & Active State**: `background: var(--primary-gradient) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);`
+
+### D. DataTables & Tables
 - **Header (`table thead th`, `.table thead th`)**:
   - `background-color: #04204e !important;`
   - `color: #ffffff !important;`
 - **Table Links**: Use `color: var(--primary-color); font-weight: bold;`
 
-### D. Typography & Fonts
+### E. Typography & Fonts
 - **Font Family**: `'Roboto', sans-serif` (Google Font: weights 300, 400, 500, 700, 900)
 - **Stylesheets Required on Every Page**:
   ```html

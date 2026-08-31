@@ -1,7 +1,7 @@
 # Lubricant Products & Inventory Module Documentation (`markdown/products.md`)
 
 ## 1. Overview
-The **Lubricant Products & Inventory** module manages engine oils, lubricants, greases, and auxiliary stock items (`tbl_lubricant_products`). It tracks item pricing, dynamic stock inflows/outflows in **whole integer quantities**, and automated integer **Reordering Level Thresholds** with proactive low stock alert notifications on the Dashboard.
+The **Lubricant Products & Inventory** module manages engine oils, lubricants, greases, and auxiliary stock items (`tbl_lubricant_products`). It tracks item pricing, dynamic stock inflows/outflows in **whole integer quantities**, automated integer **Reordering Level Thresholds** with proactive Dashboard alerts, **Partial Payment Disbursements** (`tbl_lubricant_purchase_payments`) from bank accounts, and **Comprehensive Sales Revenue Analysis** across date ranges.
 
 ---
 
@@ -30,15 +30,36 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchases` (
   `quantity` INT(11) NOT NULL DEFAULT 0,              -- Integer whole unit quantity
   `purchase_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `date` DATE NOT NULL,
-  `payment_status` VARCHAR(32) NOT NULL DEFAULT 'Paid',
+  `payment_status` VARCHAR(32) NOT NULL DEFAULT 'unpaid', -- unpaid | in process | paid
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_payment_status` (`payment_status`),
+  KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ```
 
-### 3. Sales Table (`tbl_lubricant_sales`)
+### 3. Purchase Payments Table (`tbl_lubricant_purchase_payments`)
+```sql
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchase_payments` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `purchase_id` INT(11) NOT NULL,
+  `date` DATE NOT NULL,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `bank_id` INT(11) NOT NULL,                         -- Source bank account master (tbl_banks)
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_lubricant_purchase_id` (`purchase_id`),
+  KEY `idx_bank_id` (`bank_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+### 4. Sales Table (`tbl_lubricant_sales`)
 ```sql
 CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -52,29 +73,35 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ```
 
 ---
 
-## 3. Integer Quantity & Reordering Logic
+## 3. Financial & Revenue Formulas
 
-### 1. Integer Unit Quantities
-- **Rule**: All product transactions (Stock Inflow / Purchases, Stock Outflow / Sales, Reorder Levels, and Current Stock) operate on **whole integer units** (e.g., `1`, `10`, `50`, `100`), without decimal fractions.
-- **Form Inputs**:
-  - `add-product.php` & `edit-product.php`: `<input type="number" step="1" min="0" name="reorder_level" placeholder="e.g. 10" required>`
-  - `add-purchase.php` & `edit-purchase.php`: `<input type="number" step="1" min="1" name="quantity" placeholder="e.g. 10" required>`
-  - `add-sale.php` & `edit-sale.php`: `<input type="number" step="1" min="1" name="quantity" placeholder="e.g. 1" required>`
+### 1. Product Sales Revenue (Period)
+$$\text{Product Revenue} = \sum_{\text{Period}}(\text{tbl\_lubricant\_sales.amount where product\_id} = p.id)$$
+$$\text{Overall Sales Revenue} = \sum_{\text{Period}}(\text{tbl\_lubricant\_sales.amount})$$
+$$\text{Overall Cash Sales Revenue} = \sum_{\text{Period}}(\text{tbl\_lubricant\_sales.amount where payment\_type} = \text{'Cash'})$$
+$$\text{Overall Credit Sales Revenue} = \sum_{\text{Period}}(\text{tbl\_lubricant\_sales.amount where payment\_type} = \text{'Credit'})$$
 
-### 2. Real-Time Stock & Low Stock Evaluation Formula
-For each product:
-$$\text{Total Inflow (Units)} = \sum(\text{tbl\_lubricant\_purchases.quantity})$$
-$$\text{Total Outflow (Units)} = \sum(\text{tbl\_lubricant\_sales.quantity})$$
-$$\text{Current Stock} = \text{Total Inflow} - \text{Total Outflow}$$
+### 2. Purchase Cost & Partial Payments
+$$\text{Total Cost} = \text{Quantity} \times \text{Purchase Price}$$
+$$\text{Total Paid} = \sum(\text{tbl\_lubricant\_purchase\_payments.amount})$$
+$$\text{Remaining Balance} = \text{Total Cost} - \text{Total Paid}$$
 
-**Low Stock Alert Condition**:
-$$\text{Is Low Stock} = (\text{Current Stock} \le \text{reorder\_level} \text{ and } \text{reorder\_level} > 0) \lor (\text{Current Stock} \le 0)$$
+**Payment Status Automation**:
+- **`unpaid`**: Total Paid $= 0.00$
+- **`in process`**: $0.00 < \text{Total Paid} < \text{Total Cost}$
+- **`paid`**: Total Paid $\ge$ Total Cost
+
+### 3. Inventory Stock Balances & Valuation
+$$\text{Current Stock (Units)} = \sum(\text{Purchased}) - \sum(\text{Sold})$$
+$$\text{Stock Valuation (Rs.)} = \text{Current Stock} \times \text{Selling Price}$$
 
 ---
 
@@ -85,28 +112,21 @@ $$\text{Is Low Stock} = (\text{Current Stock} \le \text{reorder\_level} \text{ a
 | `lubricants/products-list.php` | Catalog of all lubricant products with integer reorder levels and selling prices |
 | `lubricants/add-product.php` | Form to create a new product with selling price and integer reorder level |
 | `lubricants/edit-product.php` | Form to update product details, pricing, and integer reorder level |
-| `lubricants/purchases-list.php` | Stock intake / purchases log formatted with integer quantities |
-| `lubricants/add-purchase.php` | Form to record stock inflows with integer unit quantity |
-| `lubricants/edit-purchase.php` | Form to edit recorded stock purchases |
+| `lubricants/purchases-list.php` | Inflow purchase list with Total Amount, Paid Amount, Remaining Balance, and Status |
+| `lubricants/add-purchase.php` | Form to record stock inflows with optional initial bank payment disbursement |
+| `lubricants/edit-purchase.php` | Manage purchase details, view financial KPIs, disburse partial bank payments, and view payment history |
+| `include/deletelubricantpurchasepayment.php` | Soft-delete handler for partial payments with automatic status recalculation |
 | `lubricants/sales-list.php` | Stock sales log formatted with integer quantities |
 | `lubricants/add-sale.php` | Form to record stock outflows with integer unit quantity and stock validation |
 | `lubricants/edit-sale.php` | Form to edit recorded stock sales |
-| `lubricants/stock-report.php` | Comprehensive stock report highlighting integer quantities, stock levels, and low-stock alerts |
+| `lubricants/stock-report.php` | Comprehensive stock report highlighting units, overall revenue, individual product revenue, and stock valuation |
 | `lubricants/get-product-ledger.php` | Modal AJAX product ledger displaying chronological integer stock inflows and outflows |
-| `dashboard.php` | Main system dashboard with automated low-stock banners, warning counts, and quick-purchase actions |
+| `dashboard.php` | Main system dashboard with automated low-stock banners and quick-purchase actions |
 | `markdown/products.md` | Module specification and complete documentation (this file) |
 
 ---
 
-## 5. UI Theme & Icon Standards
+## 5. Payment Deletion Architecture & PRG Flow
 
-- **Theme Compliance (`markdown/theme.md`)**:
-  - Primary color: `#04204e` (`var(--primary-color)`).
-  - Primary buttons: `var(--primary-gradient)` (`.btn-primary`).
-  - Table Header (`thead th`): `#04204e`.
-- **Icons (FontAwesome 5)**:
-  - Products Module Header: `<i class="fas fa-boxes mr-2 text-primary"></i>`
-  - Add Product: `<i class="fas fa-plus mr-1"></i> Add New Product`
-  - Save Product: `<i class="fas fa-save mr-1"></i> Save Product`
-  - Cancel: `<i class="fas fa-times mr-1"></i> Cancel`
-  - Low Stock Warning: `<i class="fas fa-exclamation-triangle text-danger"></i>`
+- **Post-Redirect-Get (PRG)**: Both purchase and payment forms redirect via `header("Location: edit-purchase.php?id=$id&msg=...")` after POST processing.
+- **Client AJAX Redirection**: `deletePayment()` executes a clean GET redirect upon receiving `'deleted'`, preventing browser form resubmission artifacts.

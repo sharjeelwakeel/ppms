@@ -386,13 +386,22 @@ body {
 }
 
 .btn-outline-primary {
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.6) !important;
+    color: #04204e !important;
+    border-color: #04204e !important;
+    background-color: transparent !important;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
-.btn-outline-primary:hover {
-    background-color: #ffffff !important;
-    color: var(--primary-color) !important;
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active,
+.btn-outline-primary.active {
+    background-color: #04204e !important;
+    background: var(--primary-gradient) !important;
+    border-color: #04204e !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
 }
 
 /* Centralized Table Header Styling */

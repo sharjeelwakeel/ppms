@@ -5,23 +5,36 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 
-// Auto-migrate tbl_purchase_payments to make tank_id NULLable if not already
+// Auto-migrate tbl_purchase_payments
 mysqli_query($connection, "ALTER TABLE tbl_purchase_payments MODIFY COLUMN tank_id INT NULL DEFAULT NULL");
+$chk_pp_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_purchase_payments LIKE 'deleted_at'");
+if ($chk_pp_del && mysqli_num_rows($chk_pp_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_purchase_payments ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
 
 if (isset($_GET['id']) && !empty($_GET['id'])) {
-    $id = mysqli_real_escape_string($connection, $_GET['id']);
+    $id = intval($_GET['id']);
 } else {
     header('Location: purchases-list.php');
     exit;
 }
 
 $message = '';
+if (isset($_GET['msg'])) {
+    if ($_GET['msg'] == 'payment_added') {
+        $message = '<div class="alert alert-success"><i class="fas fa-check-circle mr-1"></i> Payment recorded successfully.</div>';
+    } else if ($_GET['msg'] == 'payment_deleted') {
+        $message = '<div class="alert alert-success"><i class="fas fa-check-circle mr-1"></i> Payment removed successfully and status recalculated.</div>';
+    } else if ($_GET['msg'] == 'purchase_updated') {
+        $message = '<div class="alert alert-success"><i class="fas fa-check-circle mr-1"></i> Purchase details updated successfully.</div>';
+    }
+}
 
 // Handle Purchase Details Update
 if (isset($_POST['update_purchase'])) {
-    $item_id = mysqli_real_escape_string($connection, $_POST['item_id']);
-    $quantity = mysqli_real_escape_string($connection, $_POST['quantity']);
-    $price = mysqli_real_escape_string($connection, $_POST['price']);
+    $item_id = intval($_POST['item_id']);
+    $quantity = floatval($_POST['quantity']);
+    $price = floatval($_POST['price']);
     $date = mysqli_real_escape_string($connection, $_POST['date']);
     $route = mysqli_real_escape_string($connection, $_POST['route']);
     $invoice_number = mysqli_real_escape_string($connection, $_POST['invoice_number']);
@@ -30,13 +43,13 @@ if (isset($_POST['update_purchase'])) {
     mysqli_begin_transaction($connection);
     try {
         // Fetch current payment sum to update status if quantity/price changes
-        $pay_sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND deleted_at IS NULL");
+        $pay_sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
         $pay_sum_row = mysqli_fetch_assoc($pay_sum_res);
         $total_paid = floatval($pay_sum_row['total_paid'] ?? 0);
         $total_cost = floatval($quantity) * floatval($price);
 
         $new_status = 'unpaid';
-        if ($total_paid >= $total_cost) {
+        if ($total_paid >= $total_cost && $total_cost > 0) {
             $new_status = 'paid';
         } else if ($total_paid > 0) {
             $new_status = 'in process';
@@ -58,7 +71,8 @@ if (isset($_POST['update_purchase'])) {
         }
 
         mysqli_commit($connection);
-        $message = '<div class="alert alert-success">Purchase details updated successfully.</div>';
+        header('Location: edit-purchase.php?id=' . $id . '&msg=purchase_updated');
+        exit;
     } catch (Exception $e) {
         mysqli_rollback($connection);
         $message = '<div class="alert alert-danger">Error updating purchase details: ' . $e->getMessage() . '</div>';
@@ -71,44 +85,49 @@ if (isset($_POST['add_payment'])) {
     $payment_amount = floatval($_POST['payment_amount']);
     $bank_id = intval($_POST['bank_id']);
 
-    mysqli_begin_transaction($connection);
-    try {
-        // 1. Insert Payment without tank attachment
-        $insert_payment = "INSERT INTO tbl_purchase_payments (purchase_id, date, amount, bank_id) 
-                           VALUES ('$id', '$payment_date', '$payment_amount', '$bank_id')";
-        $ins_res = mysqli_query($connection, $insert_payment);
-        if (!$ins_res) {
-            throw new Exception(mysqli_error($connection));
+    if ($payment_amount <= 0 || $bank_id <= 0) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-1"></i> Please enter a valid payment amount and select a bank account.</div>';
+    } else {
+        mysqli_begin_transaction($connection);
+        try {
+            // 1. Insert Payment without tank attachment
+            $insert_payment = "INSERT INTO tbl_purchase_payments (purchase_id, date, amount, bank_id) 
+                               VALUES ('$id', '$payment_date', '$payment_amount', '$bank_id')";
+            $ins_res = mysqli_query($connection, $insert_payment);
+            if (!$ins_res) {
+                throw new Exception(mysqli_error($connection));
+            }
+
+            // 2. Fetch Purchase details for recalculating status
+            $purch_res = mysqli_query($connection, "SELECT quantity, price FROM tbl_purchases WHERE id = '$id' LIMIT 1");
+            $purch_row = mysqli_fetch_assoc($purch_res);
+            $total_cost = floatval($purch_row['quantity'] ?? 0) * floatval($purch_row['price'] ?? 0);
+
+            // 3. Fetch Sum of Payments
+            $sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
+            $sum_row = mysqli_fetch_assoc($sum_res);
+            $total_paid = floatval($sum_row['total_paid'] ?? 0);
+
+            // 4. Update Purchase Status
+            $new_status = 'unpaid';
+            if ($total_paid >= $total_cost && $total_cost > 0) {
+                $new_status = 'paid';
+            } else if ($total_paid > 0) {
+                $new_status = 'in process';
+            }
+
+            $upd_status_res = mysqli_query($connection, "UPDATE tbl_purchases SET payment_status = '$new_status' WHERE id = '$id'");
+            if (!$upd_status_res) {
+                throw new Exception(mysqli_error($connection));
+            }
+
+            mysqli_commit($connection);
+            header('Location: edit-purchase.php?id=' . $id . '&msg=payment_added');
+            exit;
+        } catch (Exception $e) {
+            mysqli_rollback($connection);
+            $message = '<div class="alert alert-danger">Error recording payment: ' . $e->getMessage() . '</div>';
         }
-
-        // 2. Fetch Purchase details for recalculating status
-        $purch_res = mysqli_query($connection, "SELECT quantity, price FROM tbl_purchases WHERE id = '$id' LIMIT 1");
-        $purch_row = mysqli_fetch_assoc($purch_res);
-        $total_cost = floatval($purch_row['quantity'] ?? 0) * floatval($purch_row['price'] ?? 0);
-
-        // 3. Fetch Sum of Payments
-        $sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND deleted_at IS NULL");
-        $sum_row = mysqli_fetch_assoc($sum_res);
-        $total_paid = floatval($sum_row['total_paid'] ?? 0);
-
-        // 4. Update Purchase Status
-        $new_status = 'unpaid';
-        if ($total_paid >= $total_cost) {
-            $new_status = 'paid';
-        } else if ($total_paid > 0) {
-            $new_status = 'in process';
-        }
-
-        $upd_status_res = mysqli_query($connection, "UPDATE tbl_purchases SET payment_status = '$new_status' WHERE id = '$id'");
-        if (!$upd_status_res) {
-            throw new Exception(mysqli_error($connection));
-        }
-
-        mysqli_commit($connection);
-        $message = '<div class="alert alert-success">Payment of ' . number_format($payment_amount, 2) . ' recorded successfully.</div>';
-    } catch (Exception $e) {
-        mysqli_rollback($connection);
-        $message = '<div class="alert alert-danger">Error recording payment: ' . $e->getMessage() . '</div>';
     }
 }
 
@@ -134,16 +153,16 @@ $items_result = mysqli_query($connection, $items_sql);
 $payments_sql = "SELECT pay.*, b.name as bank_name, b.account_number as bank_account
                  FROM tbl_purchase_payments pay
                  LEFT JOIN tbl_banks b ON pay.bank_id = b.id
-                 WHERE pay.purchase_id = '$id' AND pay.deleted_at IS NULL
+                 WHERE pay.purchase_id = '$id' AND (pay.deleted_at IS NULL OR pay.deleted_at = '0000-00-00 00:00:00')
                  ORDER BY pay.id DESC";
 $payments_result = mysqli_query($connection, $payments_sql);
 
 // Calculate Totals for Summary
 $total_cost = floatval($purchase['quantity']) * floatval($purchase['price']);
-$payments_sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND deleted_at IS NULL");
+$payments_sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
 $payments_sum_row = mysqli_fetch_assoc($payments_sum_res);
 $total_paid = floatval($payments_sum_row['total_paid'] ?? 0);
-$remaining_amount = $total_cost - $total_paid;
+$remaining_amount = max(0, $total_cost - $total_paid);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -383,16 +402,20 @@ $remaining_amount = $total_cost - $total_paid;
 	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
 	<script>
 	function deletePayment(payId){
-		if(confirm('Are you sure you want to remove this payment?')) {
+		if(confirm('Are you sure you want to remove this payment? The purchase payment status will be recalculated.')) {
 			$.ajax({
 				type: "POST",
 				url: "../include/deletepurchasepayment.php",
 				data: {id: payId},
 				success: function (data) {
-					location.reload();
+					if (data.trim() === 'deleted') {
+						window.location.href = 'edit-purchase.php?id=' + encodeURIComponent('<?php echo $id; ?>') + '&msg=payment_deleted';
+					} else {
+						alert('Error deleting payment: ' + data);
+					}
 				},
-				error: function (data) {
-					console.log(data);
+				error: function (xhr, status, error) {
+					alert('Server communication error: ' + error);
 				}
 			});
 		}

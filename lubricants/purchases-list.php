@@ -21,6 +21,20 @@ if ($chk_pur_qty && $col = mysqli_fetch_assoc($chk_pur_qty)) {
         mysqli_query($connection, "ALTER TABLE tbl_lubricant_purchases MODIFY COLUMN quantity INT(11) NOT NULL DEFAULT 0");
     }
 }
+mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchase_payments` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `purchase_id` INT(11) NOT NULL,
+  `date` DATE NOT NULL,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `bank_id` INT(11) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_lubricant_purchase_id` (`purchase_id`),
+  KEY `idx_bank_id` (`bank_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
 
 $canAdd    = has_permission('items', 'add');
 $canEdit   = has_permission('items', 'edit');
@@ -51,19 +65,20 @@ $canDelete = has_permission('items', 'delete');
             background-color: #04204e !important;
             background: var(--primary-color) !important;
             color: #fff !important;
+            white-space: nowrap;
         }
 		</style>
-		<title>PPMS - Stock Purchases</title>
+		<title>PPMS - Stock Purchases (Inflow)</title>
 	</head>
 	<body>
         
         <?php include('../include/navbar.php');?>
 
 		<main class="main">
-			<div class="container pt-4 pb-4">
+			<div class="container-fluid pt-4 pb-4 px-lg-5">
 				<div class="row mb-4 align-items-center">
 					<div class="col-md-6">
-						<h4><i class="fas fa-boxes mr-2 text-primary"></i>Stock Purchases (Inflow)</h4>
+						<h4><i class="fas fa-boxes mr-2 text-primary"></i>Stock Purchases (Inflow & Payments)</h4>
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if ($canAdd): ?>
@@ -71,53 +86,73 @@ $canDelete = has_permission('items', 'delete');
                         <?php endif; ?>
 					</div>
 				</div>
-				<table id="purchasesListTable" class="table table-striped table-bordered">
-					<thead>
-						<tr>
-							<th>ID</th>
-							<th>Product Name</th>
-							<th>Quantity</th>
-							<th>Purchase Price (Rs.)</th>
-							<th>Date</th>
-							<th>Status</th>
-							<th>Created At</th>
-                            <?php if ($canDelete): ?>
-							<th style="text-align: center;">Delete</th>
-                            <?php endif; ?>
-						</tr>
-					</thead>
-					<tbody>
-						<?php 
-						$sql = "SELECT pur.*, p.name as product_name 
-                                FROM tbl_lubricant_purchases pur 
-                                LEFT JOIN tbl_lubricant_products p ON pur.product_id = p.id 
-                                WHERE (pur.deleted_at IS NULL OR pur.deleted_at = '0000-00-00 00:00:00')
-                                ORDER BY pur.id DESC";
-						$result = mysqli_query($connection, $sql);
-						if($result && mysqli_num_rows($result) > 0){
-							while($row = mysqli_fetch_assoc($result)){
-                                $statusBadge = (strcasecmp($row['payment_status'], 'paid') == 0) ? 'badge-success' : 'badge-warning';
-                                $productNameDisplay = $canEdit 
-                                    ? '<a href="edit-purchase.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['product_name'] ?? 'N/A').'</a>'
-                                    : '<strong>'.htmlspecialchars($row['product_name'] ?? 'N/A').'</strong>';
-								echo' 
-									<tr>
-										<td>'.$row['id'].'</td>
-										<td>'.$productNameDisplay.'</td>
-										<td class="font-weight-bold">'.number_format($row['quantity'], 0).'</td>
-										<td>'.number_format($row['purchase_price'], 2).'</td>
-										<td>'.date("d-m-Y", strtotime($row['date'])).'</td>
-										<td><span class="badge '.$statusBadge.'">'.ucfirst(htmlspecialchars($row['payment_status'])).'</span></td>
-										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>';
-                                if ($canDelete) {
-                                    echo '<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 18px;"></i></a></td>';
-                                }
-								echo '</tr>';
+				<div class="table-responsive">
+					<table id="purchasesListTable" class="table table-striped table-bordered">
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>Product Name</th>
+								<th>Quantity</th>
+								<th>Unit Price (Rs.)</th>
+								<th>Total Amount (Rs.)</th>
+								<th>Paid Amount (Rs.)</th>
+								<th>Remaining (Rs.)</th>
+								<th>Date</th>
+								<th>Payment Status</th>
+								<?php if ($canDelete): ?>
+								<th style="text-align: center;">Delete</th>
+								<?php endif; ?>
+							</tr>
+						</thead>
+						<tbody>
+							<?php 
+							$sql = "SELECT pur.*, p.name as product_name,
+										   COALESCE((SELECT SUM(pay.amount) FROM tbl_lubricant_purchase_payments pay WHERE pay.purchase_id = pur.id AND pay.deleted_at IS NULL), 0) as paid_amount
+									FROM tbl_lubricant_purchases pur 
+									LEFT JOIN tbl_lubricant_products p ON pur.product_id = p.id 
+									WHERE (pur.deleted_at IS NULL OR pur.deleted_at = '0000-00-00 00:00:00')
+									ORDER BY pur.id DESC";
+							$result = mysqli_query($connection, $sql);
+							if($result && mysqli_num_rows($result) > 0){
+								while($row = mysqli_fetch_assoc($result)){
+									$total_amount = intval($row['quantity']) * floatval($row['purchase_price']);
+									$paid_amount = floatval($row['paid_amount']);
+									$remaining_amount = max(0, $total_amount - $paid_amount);
+
+									$statusBadge = 'badge-danger';
+									$statusLabel = 'Unpaid';
+									if (strcasecmp($row['payment_status'], 'paid') == 0 || ($paid_amount >= $total_amount && $total_amount > 0)) {
+										$statusBadge = 'badge-success';
+										$statusLabel = 'Paid';
+									} else if (strcasecmp($row['payment_status'], 'in process') == 0 || $paid_amount > 0) {
+										$statusBadge = 'badge-warning';
+										$statusLabel = 'In Process';
+									}
+
+									$productNameDisplay = $canEdit 
+										? '<a href="edit-purchase.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['product_name'] ?? 'N/A').'</a>'
+										: '<strong>'.htmlspecialchars($row['product_name'] ?? 'N/A').'</strong>';
+									echo' 
+										<tr>
+											<td>'.$row['id'].'</td>
+											<td>'.$productNameDisplay.'</td>
+											<td class="font-weight-bold">'.number_format($row['quantity'], 0).'</td>
+											<td>'.number_format($row['purchase_price'], 2).'</td>
+											<td class="font-weight-bold">'.number_format($total_amount, 2).'</td>
+											<td class="text-success font-weight-bold">'.number_format($paid_amount, 2).'</td>
+											<td class="text-danger font-weight-bold">'.number_format($remaining_amount, 2).'</td>
+											<td>'.date("d-m-Y", strtotime($row['date'])).'</td>
+											<td><span class="badge '.$statusBadge.' px-2 py-1">'.$statusLabel.'</span></td>';
+									if ($canDelete) {
+										echo '<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deletePurchase('.$row['id'].')"><i class="fas fa-trash-alt" style="font-size: 18px;"></i></a></td>';
+									}
+									echo '</tr>';
+								}
 							}
-						}
-						?>
-					</tbody>
-				</table>
+							?>
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</main>
 

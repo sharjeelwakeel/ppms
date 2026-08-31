@@ -5278,6 +5278,90 @@ INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, 
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_lubricant_products`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_products` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL,
+  `price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `reorder_level` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_lubricant_purchases`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchases` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `product_id` int(11) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 0,
+  `purchase_price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `date` date NOT NULL,
+  `payment_status` varchar(32) NOT NULL DEFAULT 'unpaid',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_payment_status` (`payment_status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_lubricant_purchase_payments`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchase_payments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `purchase_id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `bank_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_lubricant_purchase_id` (`purchase_id`),
+  KEY `idx_bank_id` (`bank_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_lubricant_sales`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `product_id` int(11) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 0,
+  `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',
+  `details` text DEFAULT NULL,
+  `date` date NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchases`
 --
 
