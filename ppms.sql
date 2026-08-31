@@ -5432,6 +5432,7 @@ CREATE TABLE `tbl_staff` (
   `joining_date` date NOT NULL,
   `shift_id` int(11) NOT NULL,
   `salary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `experience` varchar(255) DEFAULT NULL,
   `address` varchar(512) DEFAULT NULL,
   `phone` varchar(32) NOT NULL DEFAULT '',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),

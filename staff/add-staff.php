@@ -5,6 +5,12 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 
+// Auto-migrate tbl_staff if missing experience column
+$chk_exp = mysqli_query($connection, "SHOW COLUMNS FROM tbl_staff LIKE 'experience'");
+if ($chk_exp && mysqli_num_rows($chk_exp) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_staff ADD COLUMN experience VARCHAR(255) DEFAULT NULL AFTER salary");
+}
+
 $message = '';
 if (
     isset($_POST['first_name']) && 
@@ -23,6 +29,7 @@ if (
     $joining_date = mysqli_real_escape_string($connection, $_POST['joining_date']);
     $shift_id = mysqli_real_escape_string($connection, $_POST['shift_id']);
     $salary = mysqli_real_escape_string($connection, $_POST['salary']);
+    $experience = isset($_POST['experience']) && trim($_POST['experience']) !== '' ? mysqli_real_escape_string($connection, trim($_POST['experience'])) : NULL;
     $address = isset($_POST['address']) ? mysqli_real_escape_string($connection, $_POST['address']) : '';
     $phone = mysqli_real_escape_string($connection, $_POST['phone']);
 
@@ -32,8 +39,8 @@ if (
 
     mysqli_begin_transaction($connection);
     try {
-        $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, salary, address, phone) 
-                  VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$salary', " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
+        $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, salary, experience, address, phone) 
+                  VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$salary', " . ($experience === NULL ? "NULL" : "'$experience'") . ", " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
         mysqli_query($connection, $query);
         $staff_id = mysqli_insert_id($connection);
 
@@ -91,7 +98,7 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-staff.php" method="POST">
-					<h4 class="mb-5">Add Staff</h4>
+					<h4 class="mb-5"><i class="fas fa-user-tie mr-2 text-primary"></i>Add Staff</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -128,6 +135,12 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
 										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Joining Date</label>
 										<div class="col-lg-9 col-md-7 col-sm-8">
 											<input type="date" name="joining_date" class="form-control" required>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Experience</label>
+										<div class="col-lg-9 col-md-7 col-sm-8">
+											<textarea name="experience" class="form-control" rows="3" placeholder="Optional work experience details"></textarea>
 										</div>
 									</div>
 								</div>
@@ -200,8 +213,8 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
 					</div>
 
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Staff</button>
-                        <a href="staff-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Staff</button>
+                        <a href="staff-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

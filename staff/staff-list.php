@@ -10,10 +10,14 @@ require '../include/permissions.php';
 // Enforce access check for viewing staff
 check_access('staff', 'show');
 
-// Auto-migrate tbl_staff if missing deleted_at
+// Auto-migrate tbl_staff if missing deleted_at or experience
 $chk_st = mysqli_query($connection, "SHOW COLUMNS FROM tbl_staff LIKE 'deleted_at'");
 if ($chk_st && mysqli_num_rows($chk_st) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_staff ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+$chk_exp = mysqli_query($connection, "SHOW COLUMNS FROM tbl_staff LIKE 'experience'");
+if ($chk_exp && mysqli_num_rows($chk_exp) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_staff ADD COLUMN experience VARCHAR(255) DEFAULT NULL AFTER salary");
 }
 
 $canAdd    = has_permission('staff', 'add');
@@ -57,12 +61,12 @@ $canDelete = has_permission('staff', 'delete');
 			<div class="container pt-4 pb-4">
 				<div class="row mb-5 align-items-center">
 					<div class="col-md-6">
-						<h4>View Staff</h4>
+						<h4><i class="fas fa-users mr-2 text-primary"></i>View Staff</h4>
 					</div>
 					<div class="col-md-6 text-right">
 						<a href="staff-roles-list.php" class="btn btn-info font-weight-bold mr-2" style="border-radius:6px; background:linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); border:none;"><i class="fas fa-id-badge mr-1"></i> Staff Designations</a>
                         <?php if ($canAdd): ?>
-						<a href="add-staff.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Staff</a>
+						<a href="add-staff.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Staff</a>
                         <?php endif; ?>
 					</div>
 				</div>
