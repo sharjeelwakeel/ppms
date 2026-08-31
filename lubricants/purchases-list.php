@@ -10,10 +10,16 @@ require '../include/permissions.php';
 // Enforce access check for viewing lubricant purchases
 check_access('items', 'show');
 
-// Auto-migrate tbl_lubricant_purchases if missing deleted_at
+// Auto-migrate tbl_lubricant_purchases: ensure quantity is integer and deleted_at exists
 $chk_lpur = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_purchases LIKE 'deleted_at'");
 if ($chk_lpur && mysqli_num_rows($chk_lpur) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_lubricant_purchases ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+$chk_pur_qty = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_purchases LIKE 'quantity'");
+if ($chk_pur_qty && $col = mysqli_fetch_assoc($chk_pur_qty)) {
+    if (stripos($col['Type'], 'int') === false) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_purchases MODIFY COLUMN quantity INT(11) NOT NULL DEFAULT 0");
+    }
 }
 
 $canAdd    = has_permission('items', 'add');
@@ -41,7 +47,7 @@ $canDelete = has_permission('items', 'delete');
             color: #fff !important;
         }
         .btn-primary:hover { opacity: 0.9; }
-        #purchasesTable thead th {
+        #purchasesListTable thead th {
             background-color: #04204e !important;
             background: var(--primary-color) !important;
             color: #fff !important;
@@ -57,15 +63,15 @@ $canDelete = has_permission('items', 'delete');
 			<div class="container pt-4 pb-4">
 				<div class="row mb-4 align-items-center">
 					<div class="col-md-6">
-						<h4><i class="fas fa-truck-loading mr-2 text-primary"></i>Stock Purchases (Inflow)</h4>
+						<h4><i class="fas fa-boxes mr-2 text-primary"></i>Stock Purchases (Inflow)</h4>
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if ($canAdd): ?>
-						<a href="add-purchase.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Purchase</a>
+						<a href="add-purchase.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add Stock Purchase</a>
                         <?php endif; ?>
 					</div>
 				</div>
-				<table id="purchasesTable" class="table table-striped table-bordered">
+				<table id="purchasesListTable" class="table table-striped table-bordered">
 					<thead>
 						<tr>
 							<th>ID</th>
@@ -73,7 +79,7 @@ $canDelete = has_permission('items', 'delete');
 							<th>Quantity</th>
 							<th>Purchase Price (Rs.)</th>
 							<th>Date</th>
-							<th>Payment Status</th>
+							<th>Status</th>
 							<th>Created At</th>
                             <?php if ($canDelete): ?>
 							<th style="text-align: center;">Delete</th>
@@ -90,7 +96,7 @@ $canDelete = has_permission('items', 'delete');
 						$result = mysqli_query($connection, $sql);
 						if($result && mysqli_num_rows($result) > 0){
 							while($row = mysqli_fetch_assoc($result)){
-                                $statusBadge = ($row['payment_status'] == 'paid') ? 'badge-success' : 'badge-warning';
+                                $statusBadge = (strcasecmp($row['payment_status'], 'paid') == 0) ? 'badge-success' : 'badge-warning';
                                 $productNameDisplay = $canEdit 
                                     ? '<a href="edit-purchase.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['product_name'] ?? 'N/A').'</a>'
                                     : '<strong>'.htmlspecialchars($row['product_name'] ?? 'N/A').'</strong>';
@@ -98,7 +104,7 @@ $canDelete = has_permission('items', 'delete');
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td>'.$productNameDisplay.'</td>
-										<td>'.number_format($row['quantity'], 2).'</td>
+										<td class="font-weight-bold">'.number_format($row['quantity'], 0).'</td>
 										<td>'.number_format($row['purchase_price'], 2).'</td>
 										<td>'.date("d-m-Y", strtotime($row['date'])).'</td>
 										<td><span class="badge '.$statusBadge.'">'.ucfirst(htmlspecialchars($row['payment_status'])).'</span></td>
@@ -122,7 +128,7 @@ $canDelete = has_permission('items', 'delete');
 	<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
 	<script>
 	$(document).ready(function() {
-		$('#purchasesTable').DataTable({
+		$('#purchasesListTable').DataTable({
 			"order": [[ 0, "desc" ]]
 		});
 	});

@@ -10,10 +10,16 @@ require '../include/permissions.php';
 // Enforce access check for viewing lubricant sales
 check_access('items', 'show');
 
-// Auto-migrate tbl_lubricant_sales if missing deleted_at
+// Auto-migrate tbl_lubricant_sales: ensure quantity is integer and deleted_at exists
 $chk_lsal = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE 'deleted_at'");
 if ($chk_lsal && mysqli_num_rows($chk_lsal) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_lubricant_sales ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+$chk_sal_qty = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE 'quantity'");
+if ($chk_sal_qty && $col = mysqli_fetch_assoc($chk_sal_qty)) {
+    if (stripos($col['Type'], 'int') === false) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_sales MODIFY COLUMN quantity INT(11) NOT NULL DEFAULT 0");
+    }
 }
 
 $canAdd    = has_permission('items', 'add');
@@ -61,7 +67,7 @@ $canDelete = has_permission('items', 'delete');
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if ($canAdd): ?>
-						<a href="add-sale.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Sale</a>
+						<a href="add-sale.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Sale</a>
                         <?php endif; ?>
 					</div>
 				</div>
@@ -99,7 +105,7 @@ $canDelete = has_permission('items', 'delete');
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td>'.$productNameDisplay.'</td>
-										<td>'.number_format($row['quantity'], 2).'</td>
+										<td class="font-weight-bold">'.number_format($row['quantity'], 0).'</td>
 										<td>'.number_format($row['rate'], 2).'</td>
 										<td>'.number_format($row['amount'], 2).'</td>
 										<td><span class="badge '.$paymentBadge.'">'.htmlspecialchars($row['payment_type']).'</span></td>

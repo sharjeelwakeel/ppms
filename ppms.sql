@@ -5102,8 +5102,7 @@ CREATE TABLE `tbl_lubricant_products` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `category` varchar(64) NOT NULL DEFAULT '',
-  `shelf_quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `reorder_level` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
@@ -5118,7 +5117,7 @@ CREATE TABLE `tbl_lubricant_products` (
 CREATE TABLE `tbl_lubricant_purchases` (
   `id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
-  `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `quantity` int(11) NOT NULL DEFAULT 0,
   `purchase_price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `date` date NOT NULL,
   `payment_status` varchar(32) NOT NULL DEFAULT 'Paid',
@@ -5136,7 +5135,7 @@ CREATE TABLE `tbl_lubricant_purchases` (
 CREATE TABLE `tbl_lubricant_sales` (
   `id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
-  `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `quantity` int(11) NOT NULL DEFAULT 0,
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',

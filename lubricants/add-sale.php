@@ -9,10 +9,18 @@ require '../include/permissions.php';
 // Enforce access check for adding lubricant sale
 check_access('items', 'add');
 
+// Auto-migrate tbl_lubricant_sales: ensure quantity is integer
+$chk_sal_qty = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE 'quantity'");
+if ($chk_sal_qty && $col = mysqli_fetch_assoc($chk_sal_qty)) {
+    if (stripos($col['Type'], 'int') === false) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_sales MODIFY COLUMN quantity INT(11) NOT NULL DEFAULT 0");
+    }
+}
+
 $message = '';
 if (isset($_POST['product_id']) && isset($_POST['quantity']) && isset($_POST['rate']) && isset($_POST['amount']) && isset($_POST['payment_type']) && isset($_POST['date'])) {
     $product_id = intval($_POST['product_id']);
-    $quantity = floatval($_POST['quantity']);
+    $quantity = intval($_POST['quantity']);
     $rate = floatval($_POST['rate']);
     $amount = floatval($_POST['amount']);
     $payment_type = mysqli_real_escape_string($connection, $_POST['payment_type']);
@@ -29,11 +37,11 @@ if (isset($_POST['product_id']) && isset($_POST['quantity']) && isset($_POST['ra
     $avail_stock = 0;
     if ($stock_res) {
         $stock_row = mysqli_fetch_assoc($stock_res);
-        $avail_stock = floatval($stock_row['avail_stock']);
+        $avail_stock = intval($stock_row['avail_stock']);
     }
 
     if ($quantity > $avail_stock) {
-        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-2"></i>Error: Insufficient stock. Available: ' . number_format($avail_stock, 2) . ' units. Requested: ' . number_format($quantity, 2) . ' units.</div>';
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-2"></i>Error: Insufficient stock. Available: ' . number_format($avail_stock, 0) . ' units. Requested: ' . number_format($quantity, 0) . ' units.</div>';
     } else {
         $query = "INSERT INTO tbl_lubricant_sales (product_id, quantity, rate, amount, payment_type, details, date) 
                   VALUES ('$product_id', '$quantity', '$rate', '$amount', '$payment_type', '$details', '$date')";
@@ -53,6 +61,7 @@ $products_sql = "
            (COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id), 0) -
             COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id), 0)) AS avail_stock
     FROM tbl_lubricant_products p
+    WHERE (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
     ORDER BY p.name ASC
 ";
 $products_result = mysqli_query($connection, $products_sql);
@@ -96,7 +105,7 @@ if ($products_result) {
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-sale.php" method="POST" id="saleForm" onsubmit="return validateStock();">
-					<h4 class="mb-5">Add Stock Sale (Outflow)</h4>
+					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Add Stock Sale (Outflow)</h4>
                     <?php echo $message; ?>
                     <div id="jsWarning" class="alert alert-danger d-none"><i class="fas fa-exclamation-triangle mr-2"></i><span></span></div>
 					<div class="card mb-5">
@@ -110,7 +119,7 @@ if ($products_result) {
                                                 <option value="">Select Product</option>
                                                 <?php 
                                                 foreach ($products_list as $prod) {
-                                                    echo '<option value="' . $prod['id'] . '" data-price="' . $prod['price'] . '" data-stock="' . $prod['avail_stock'] . '">' . htmlspecialchars($prod['name']) . '</option>';
+                                                    echo '<option value="' . $prod['id'] . '" data-price="' . $prod['price'] . '" data-stock="' . intval($prod['avail_stock']) . '">' . htmlspecialchars($prod['name']) . '</option>';
                                                 }
                                                 ?>
 											</select>
@@ -120,7 +129,7 @@ if ($products_result) {
 									<div class="form-group row">
 										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Quantity</label>
 										<div class="col-lg-9 col-md-7 col-sm-8">
-											<input type="number" step="0.01" min="0.01" name="quantity" id="quantity" class="form-control" placeholder="0.00" oninput="calculateAmount()" required>
+											<input type="number" step="1" min="1" name="quantity" id="quantity" class="form-control" placeholder="e.g. 1" oninput="calculateAmount()" required>
 										</div>
 									</div>
 									<div class="form-group row">
@@ -163,8 +172,8 @@ if ($products_result) {
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Sale</button>
-                        <a href="sales-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Sale</button>
+                        <a href="sales-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>
@@ -178,10 +187,10 @@ if ($products_result) {
         var selectedOpt = $('#productId option:selected');
         if (selectedOpt.val() !== '') {
             var price = parseFloat(selectedOpt.data('price')) || 0;
-            var stock = parseFloat(selectedOpt.data('stock')) || 0;
+            var stock = parseInt(selectedOpt.data('stock'), 10) || 0;
             
             $('#rate').val(price.toFixed(2));
-            $('#availStockDisplay').html('<strong class="text-success">Available Stock: ' + stock.toFixed(2) + ' units</strong>');
+            $('#availStockDisplay').html('<strong class="text-success">Available Stock: ' + stock + ' units</strong>');
         } else {
             $('#rate').val('');
             $('#availStockDisplay').html('Select a product to view available stock.');
@@ -190,7 +199,7 @@ if ($products_result) {
     }
 
     function calculateAmount() {
-        var qty = parseFloat($('#quantity').val()) || 0;
+        var qty = parseInt($('#quantity').val(), 10) || 0;
         var rate = parseFloat($('#rate').val()) || 0;
         var total = qty * rate;
         $('#amount').val(total.toFixed(2));
@@ -200,12 +209,12 @@ if ($products_result) {
         var selectedOpt = $('#productId option:selected');
         if (selectedOpt.val() === '') return true;
         
-        var stock = parseFloat(selectedOpt.data('stock')) || 0;
-        var qty = parseFloat($('#quantity').val()) || 0;
+        var stock = parseInt(selectedOpt.data('stock'), 10) || 0;
+        var qty = parseInt($('#quantity').val(), 10) || 0;
         
         if (qty > stock) {
             $('#jsWarning').removeClass('d-none');
-            $('#jsWarning span').text('Insufficient stock. Only ' + stock.toFixed(2) + ' units available.');
+            $('#jsWarning span').text('Insufficient stock. Only ' + stock + ' units available.');
             $('html, body').animate({ scrollTop: 0 }, 'slow');
             return false;
         }

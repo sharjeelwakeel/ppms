@@ -9,14 +9,30 @@ require '../include/permissions.php';
 // Enforce access check for adding lubricant products
 check_access('items', 'add');
 
+// Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
+$chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
+if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
+    $chk_sq = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'shelf_quantity'");
+    if ($chk_sq && mysqli_num_rows($chk_sq) > 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products CHANGE COLUMN shelf_quantity reorder_level INT(11) NOT NULL DEFAULT 0");
+    } else {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN reorder_level INT(11) NOT NULL DEFAULT 0 AFTER category");
+    }
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products MODIFY COLUMN reorder_level INT(11) NOT NULL DEFAULT 0");
+}
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+
 $message = '';
-if (isset($_POST['name']) && isset($_POST['price']) && isset($_POST['category']) && isset($_POST['shelf_quantity'])) {
+if (isset($_POST['name']) && isset($_POST['price'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $price = floatval($_POST['price']);
-    $category = mysqli_real_escape_string($connection, $_POST['category']);
-    $shelf_quantity = floatval($_POST['shelf_quantity']);
+    $reorder_level = isset($_POST['reorder_level']) ? intval($_POST['reorder_level']) : 0;
 
-    $query = "INSERT INTO tbl_lubricant_products (name, price, category, shelf_quantity) VALUES ('$name', '$price', '$category', '$shelf_quantity')";
+    $query = "INSERT INTO tbl_lubricant_products (name, price, reorder_level) VALUES ('$name', '$price', '$reorder_level')";
     
     if (mysqli_query($connection, $query)) {
         header('Location: products-list.php');
@@ -59,7 +75,7 @@ if (isset($_POST['name']) && isset($_POST['price']) && isset($_POST['category'])
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-product.php" method="POST">
-					<h4 class="mb-5">Add Lubricant Product</h4>
+					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Add Lubricant Product</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -84,20 +100,9 @@ if (isset($_POST['name']) && isset($_POST['price']) && isset($_POST['category'])
 							<div class="row mt-3">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Category</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Reordering Level</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
-											<select name="category" class="form-control" required>
-												<option value="Stock Item">Stock Item</option>
-												<option value="Mobil Oil Company">Mobil Oil Company</option>
-											</select>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-6">
-									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Shelf Quantity</label>
-										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="number" step="0.01" min="0" name="shelf_quantity" class="form-control" value="0.00" required>
+											<input type="number" step="1" min="0" name="reorder_level" class="form-control" placeholder="e.g. 10" value="0" required>
 										</div>
 									</div>
 								</div>
@@ -105,8 +110,8 @@ if (isset($_POST['name']) && isset($_POST['price']) && isset($_POST['category'])
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Product</button>
-                        <a href="products-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Product</button>
+                        <a href="products-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

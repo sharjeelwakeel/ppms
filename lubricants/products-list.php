@@ -10,6 +10,23 @@ require '../include/permissions.php';
 // Enforce access check for viewing lubricant products
 check_access('items', 'show');
 
+// Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
+$chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
+if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
+    $chk_sq = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'shelf_quantity'");
+    if ($chk_sq && mysqli_num_rows($chk_sq) > 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products CHANGE COLUMN shelf_quantity reorder_level INT(11) NOT NULL DEFAULT 0");
+    } else {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN reorder_level INT(11) NOT NULL DEFAULT 0 AFTER category");
+    }
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products MODIFY COLUMN reorder_level INT(11) NOT NULL DEFAULT 0");
+}
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+
 $canAdd    = has_permission('items', 'add');
 $canEdit   = has_permission('items', 'edit');
 $canDelete = has_permission('items', 'delete');
@@ -55,7 +72,7 @@ $canDelete = has_permission('items', 'delete');
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if ($canAdd): ?>
-						<a href="add-product.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Product</a>
+						<a href="add-product.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Product</a>
                         <?php endif; ?>
 					</div>
 				</div>
@@ -64,8 +81,7 @@ $canDelete = has_permission('items', 'delete');
 						<tr>
 							<th>ID</th>
 							<th>Product Name</th>
-							<th>Category</th>
-							<th>Shelf Stock</th>
+							<th>Reorder Level</th>
 							<th>Selling Price (Rs.)</th>
 							<th>Created At</th>
 							<th>Updated At</th>
@@ -83,12 +99,12 @@ $canDelete = has_permission('items', 'delete');
                                 $productNameDisplay = $canEdit 
                                     ? '<a href="edit-product.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a>'
                                     : '<strong>'.htmlspecialchars($row['name']).'</strong>';
+                                $reorder_val = isset($row['reorder_level']) ? $row['reorder_level'] : ($row['shelf_quantity'] ?? 0);
 								echo' 
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td>'.$productNameDisplay.'</td>
-										<td>'.htmlspecialchars($row['category'] ?? 'Stock Item').'</td>
-										<td>'.number_format($row['shelf_quantity'] ?? 0, 2).'</td>
+										<td>'.number_format($reorder_val, 0).'</td>
 										<td>'.number_format($row['price'], 2).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['updated_at'])).'</td>';

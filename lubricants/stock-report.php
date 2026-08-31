@@ -37,12 +37,23 @@ $total_cash_sales = floatval(mysqli_fetch_row($total_cash_sales_res)[0]);
 $total_credit_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Credit'" . $sal_date_cond);
 $total_credit_sales = floatval(mysqli_fetch_row($total_credit_sales_res)[0]);
 
-$total_products_res = mysqli_query($connection, "SELECT COUNT(*) FROM tbl_lubricant_products");
-$total_products = intval(mysqli_fetch_row($total_products_res)[0]);
+// Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
+$chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
+if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
+    $chk_sq = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'shelf_quantity'");
+    if ($chk_sq && mysqli_num_rows($chk_sq) > 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products CHANGE COLUMN shelf_quantity reorder_level INT(11) NOT NULL DEFAULT 0");
+    } else {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN reorder_level INT(11) NOT NULL DEFAULT 0 AFTER category");
+    }
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products MODIFY COLUMN reorder_level INT(11) NOT NULL DEFAULT 0");
+}
 
 // Fetch products with cumulative and period metrics
 $sql = "
-    SELECT p.id, p.name, p.price, p.category, p.shelf_quantity,
+    SELECT p.id, p.name, p.price, 
+           COALESCE((SELECT reorder_level FROM tbl_lubricant_products WHERE id = p.id), 0) AS reorder_level,
            -- Cumulative stock calculations up to To Date
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id" . $cum_pur_cond . "), 0) AS cumulative_purchased,
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id" . $cum_sal_cond . "), 0) AS cumulative_sold,
@@ -52,22 +63,28 @@ $sql = "
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Cash'" . $sal_date_cond . "), 0) AS period_cash_sold,
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Credit'" . $sal_date_cond . "), 0) AS period_credit_sold
     FROM tbl_lubricant_products p
+    WHERE (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
     ORDER BY p.name ASC
 ";
 $result = mysqli_query($connection, $sql);
 $products_data = [];
 $total_valuation = 0;
+$total_low_stock = 0;
 
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
-        $row['current_stock'] = $row['cumulative_purchased'] - $row['cumulative_sold'];
-        $row['shelf_stock'] = floatval($row['shelf_quantity'] ?? 0);
-        $row['warehouse_stock'] = $row['current_stock'] - $row['shelf_stock'];
-        $row['stock_value'] = $row['current_stock'] * $row['price'];
-        $total_valuation += $row['stock_value'];
-        $products_data[] = $row;
+        $row['current_stock'] = intval($row['cumulative_purchased']) - intval($row['cumulative_sold']);
+        $row['reorder_level'] = intval($row['reorder_level'] ?? 0);
+        $row['stock_value']   = $row['current_stock'] * floatval($row['price']);
+        $total_valuation      += $row['stock_value'];
+        $row['is_low_stock']  = ($row['reorder_level'] > 0 && $row['current_stock'] <= $row['reorder_level']) || ($row['current_stock'] <= 0);
+        if ($row['is_low_stock']) {
+            $total_low_stock++;
+        }
+        $products_data[]      = $row;
     }
 }
+$total_products = count($products_data);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -297,21 +314,21 @@ if ($result) {
                 <div class="col-xl-2 col-md-4 col-sm-6 position-relative">
                     <div class="metric-card card-bg-2">
                         <div class="card-title">Purchases (Period)</div>
-                        <div class="card-value"><?php echo number_format($total_purchases, 1); ?></div>
+                        <div class="card-value"><?php echo number_format($total_purchases, 0); ?></div>
                         <i class="fas fa-download card-icon"></i>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-sm-6 position-relative">
                     <div class="metric-card card-bg-3">
                         <div class="card-title">Cash Sales (Period)</div>
-                        <div class="card-value"><?php echo number_format($total_cash_sales, 1); ?></div>
+                        <div class="card-value"><?php echo number_format($total_cash_sales, 0); ?></div>
                         <i class="fas fa-money-bill-wave card-icon"></i>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 col-sm-6 position-relative">
                     <div class="metric-card card-bg-4">
                         <div class="card-title">Credit Sales (Period)</div>
-                        <div class="card-value"><?php echo number_format($total_credit_sales, 1); ?></div>
+                        <div class="card-value"><?php echo number_format($total_credit_sales, 0); ?></div>
                         <i class="fas fa-file-invoice card-icon"></i>
                     </div>
                 </div>
@@ -332,14 +349,13 @@ if ($result) {
                             <thead>
                                 <tr>
                                     <th>Product Name</th>
-                                    <th>Category</th>
                                     <th>Purchased (Inflow)</th>
                                     <th>Cash Sales</th>
                                     <th>Credit Sales</th>
                                     <th style="background:#28a745 !important; color:#fff !important;">Total Sales</th>
-                                    <th style="background:#6c757d !important; color:#fff !important;">Warehouse Stock</th>
-                                    <th style="background:#17a2b8 !important; color:#fff !important;">Shelf Stock</th>
-                                    <th style="background:#0072ff !important; color:#fff !important;">Total Stock</th>
+                                    <th style="background:#17a2b8 !important; color:#fff !important;">Reorder Level</th>
+                                    <th style="background:#0072ff !important; color:#fff !important;">Current Stock</th>
+                                    <th style="text-align:center;">Status</th>
                                     <th>Selling Price</th>
                                     <th>Stock Value</th>
                                     <th class="d-print-none" style="min-width:140px;">Actions</th>
@@ -349,36 +365,43 @@ if ($result) {
                                 <?php 
                                 foreach ($products_data as $row) {
                                     $current_stock = $row['current_stock'];
+                                    $reorder_level = $row['reorder_level'];
                                     
-                                    // Stock Level highlight
-                                    if ($current_stock >= 50) {
-                                        $stock_badge = '<span class="stock-badge-high">' . number_format($current_stock, 1) . '</span>';
-                                    } elseif ($current_stock >= 10) {
-                                        $stock_badge = '<span class="stock-badge-mid">' . number_format($current_stock, 1) . '</span>';
+                                    // Stock Level & Status highlight
+                                    if ($current_stock <= 0) {
+                                        $stock_badge = '<span class="font-weight-bold text-danger px-2 py-1" style="background:#ffebee; border-radius:5px; border:1px solid #ffcdd2;">' . number_format($current_stock, 0) . '</span>';
+                                        $status_badge = '<span class="badge badge-dark py-1 px-2"><i class="fas fa-times-circle mr-1 text-danger"></i> Out of Stock</span>';
+                                    } elseif ($row['is_low_stock']) {
+                                        $stock_badge = '<span class="font-weight-bold text-danger px-2 py-1" style="background:#ffebee; border-radius:5px; border:1px solid #ffcdd2;">' . number_format($current_stock, 0) . '</span>';
+                                        $status_badge = '<span class="badge badge-danger py-1 px-2"><i class="fas fa-exclamation-triangle mr-1"></i> Reorder Required</span>';
+                                    } elseif ($current_stock >= 50) {
+                                        $stock_badge = '<span class="stock-badge-high font-weight-bold px-2 py-1" style="background:#e8f5e9; color:#2e7d32; border-radius:5px;">' . number_format($current_stock, 0) . '</span>';
+                                        $status_badge = '<span class="badge badge-success py-1 px-2"><i class="fas fa-check-circle mr-1"></i> In Stock</span>';
                                     } else {
-                                        $stock_badge = '<span class="stock-badge-low">' . number_format($current_stock, 1) . '</span>';
+                                        $stock_badge = '<span class="stock-badge-mid font-weight-bold px-2 py-1" style="background:#fff8e1; color:#f57f17; border-radius:5px;">' . number_format($current_stock, 0) . '</span>';
+                                        $status_badge = '<span class="badge badge-info py-1 px-2"><i class="fas fa-check mr-1"></i> Adequate</span>';
                                     }
                                     
                                     $period_total_sales = $row['period_cash_sold'] + $row['period_credit_sold'];
+                                    $row_bg = $row['is_low_stock'] ? 'style="background-color: #fff9f9;"' : '';
                                     
                                     echo '
-                                        <tr>
+                                        <tr ' . $row_bg . '>
                                             <td class="text-left font-weight-bold" style="color:var(--primary-color);">' . htmlspecialchars($row['name']) . '</td>
-                                            <td>' . htmlspecialchars($row['category'] ?? 'Stock Item') . '</td>
-                                            <td>' . number_format($row['period_purchased'], 1) . '</td>
-                                            <td class="text-success">' . number_format($row['period_cash_sold'], 1) . '</td>
-                                            <td class="text-warning font-weight-bold">' . number_format($row['period_credit_sold'], 1) . '</td>
-                                            <td class="font-weight-bold" style="background:#f4fbf4; color:#28a745;">' . number_format($period_total_sales, 1) . '</td>
-                                            <td>' . number_format($row['warehouse_stock'], 1) . '</td>
-                                            <td>' . number_format($row['shelf_stock'], 1) . '</td>
+                                            <td>' . number_format($row['period_purchased'], 0) . '</td>
+                                            <td class="text-success">' . number_format($row['period_cash_sold'], 0) . '</td>
+                                            <td class="text-warning font-weight-bold">' . number_format($row['period_credit_sold'], 0) . '</td>
+                                            <td class="font-weight-bold" style="background:#f4fbf4; color:#28a745;">' . number_format($period_total_sales, 0) . '</td>
+                                            <td class="font-weight-bold">' . number_format($reorder_level, 0) . '</td>
                                             <td>' . $stock_badge . '</td>
+                                            <td class="text-center">' . $status_badge . '</td>
                                             <td>' . number_format($row['price'], 2) . '</td>
                                             <td class="font-weight-bold" style="background:#f0f5ff; color:#0052cc;">Rs. ' . number_format($row['stock_value'], 2) . '</td>
                                             <td class="d-print-none">
                                                 <button class="btn btn-outline-info btn-xs py-1 px-2 font-weight-bold" style="font-size:11px; border-radius:5px;" onclick="viewLedger(' . $row['id'] . ', \'' . addslashes(htmlspecialchars($row['name'])) . '\')">
                                                     <i class="fas fa-receipt mr-1"></i> Ledger
                                                 </button>
-                                                <a href="add-purchase.php" class="btn btn-outline-success btn-xs py-1 px-2 font-weight-bold ml-1" style="font-size:11px; border-radius:5px;">
+                                                <a href="add-purchase.php?product_id=' . $row['id'] . '" class="btn btn-outline-success btn-xs py-1 px-2 font-weight-bold ml-1" style="font-size:11px; border-radius:5px;">
                                                     <i class="fas fa-plus mr-1"></i> Stock
                                                 </a>
                                             </td>

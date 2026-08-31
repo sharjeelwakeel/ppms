@@ -9,17 +9,33 @@ require '../include/permissions.php';
 // Enforce access check for editing lubricant products
 check_access('items', 'edit');
 
+// Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
+$chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
+if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
+    $chk_sq = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'shelf_quantity'");
+    if ($chk_sq && mysqli_num_rows($chk_sq) > 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products CHANGE COLUMN shelf_quantity reorder_level INT(11) NOT NULL DEFAULT 0");
+    } else {
+        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN reorder_level INT(11) NOT NULL DEFAULT 0 AFTER category");
+    }
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products MODIFY COLUMN reorder_level INT(11) NOT NULL DEFAULT 0");
+}
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-if (isset($_POST['id']) && isset($_POST['category']) && isset($_POST['shelf_quantity'])) {
+if (isset($_POST['id']) && isset($_POST['name']) && isset($_POST['price'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $price = floatval($_POST['price']);
-    $category = mysqli_real_escape_string($connection, $_POST['category']);
-    $shelf_quantity = floatval($_POST['shelf_quantity']);
+    $reorder_level = isset($_POST['reorder_level']) ? intval($_POST['reorder_level']) : 0;
 
-    $query = "UPDATE tbl_lubricant_products SET name='$name', price='$price', category='$category', shelf_quantity='$shelf_quantity' WHERE id='$id'";
+    $query = "UPDATE tbl_lubricant_products SET name='$name', price='$price', reorder_level='$reorder_level' WHERE id='$id'";
     
     if (mysqli_query($connection, $query)) {
         header('Location: products-list.php');
@@ -73,7 +89,7 @@ if (!$product) {
 			<div class="container pt-4 pb-4">
 				<form action="edit-product.php" method="POST">
 					<input type="hidden" name="id" value="<?php echo $product['id']; ?>">
-					<h4 class="mb-5">Edit Lubricant Product</h4>
+					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Edit Lubricant Product</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -98,20 +114,9 @@ if (!$product) {
 							<div class="row mt-3">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Category</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Reordering Level</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
-											<select name="category" class="form-control" required>
-												<option value="Stock Item" <?php if (($product['category'] ?? 'Stock Item') == 'Stock Item') echo 'selected'; ?>>Stock Item</option>
-												<option value="Mobil Oil Company" <?php if (($product['category'] ?? '') == 'Mobil Oil Company') echo 'selected'; ?>>Mobil Oil Company</option>
-											</select>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-6">
-									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Shelf Quantity</label>
-										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="number" step="0.01" min="0" name="shelf_quantity" class="form-control" value="<?php echo htmlspecialchars($product['shelf_quantity'] ?? '0.00'); ?>" required>
+											<input type="number" step="1" min="0" name="reorder_level" class="form-control" placeholder="e.g. 10" value="<?php echo intval($product['reorder_level'] ?? ($product['shelf_quantity'] ?? 0)); ?>" required>
 										</div>
 									</div>
 								</div>
@@ -119,8 +124,8 @@ if (!$product) {
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Update Product</button>
-                        <a href="products-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Update Product</button>
+                        <a href="products-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

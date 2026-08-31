@@ -54,8 +54,8 @@ $cn = 1;
 foreach ($history as $row) {
     $date = date("d-m-Y", strtotime($row['date']));
     $typeBadge = ($row['type'] == 'Purchase') ? 'badge-success' : 'badge-info';
-    $qtyIn = ($row['type'] == 'Purchase') ? number_format($row['quantity'], 2) : '—';
-    $qtyOut = ($row['type'] == 'Sale') ? number_format($row['quantity'], 2) : '—';
+    $qtyIn = ($row['type'] == 'Purchase') ? number_format($row['quantity'], 0) : '—';
+    $qtyOut = ($row['type'] == 'Sale') ? number_format($row['quantity'], 0) : '—';
     
     echo '
         <tr>
