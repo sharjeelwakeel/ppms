@@ -10,7 +10,7 @@ require '../include/permissions.php';
 // Enforce access check for viewing customers
 check_access('customers', 'show');
 
-// Auto-migrate tbl_customers
+// Auto-migrate tbl_customers and tbl_customer_vehicles
 mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
@@ -29,9 +29,31 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
 
-$canAdd    = has_permission('customers', 'add');
-$canEdit   = has_permission('customers', 'edit');
-$canDelete = has_permission('customers', 'delete');
+mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customer_vehicles` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` INT(11) NOT NULL,
+  `vehicle_name` VARCHAR(128) NOT NULL,
+  `reg_number` VARCHAR(64) NOT NULL,
+  `numeric_number` VARCHAR(64) DEFAULT NULL,
+  `fuel_limit` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `vehicle_type` ENUM('Petrol','Diesel') NOT NULL DEFAULT 'Petrol',
+  `status` ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_reg_number` (`reg_number`),
+  KEY `idx_numeric_number` (`numeric_number`),
+  KEY `idx_vehicle_type` (`vehicle_type`),
+  KEY `idx_status` (`status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
+
+$canAdd          = has_permission('customers', 'add');
+$canEdit         = has_permission('customers', 'edit');
+$canDelete       = has_permission('customers', 'delete');
+$canViewVehicles = has_permission('vehicles', 'show');
 
 $alert_message = '';
 if (isset($_GET['msg'])) {
@@ -86,9 +108,14 @@ if (isset($_GET['msg'])) {
                     <h4 class="font-weight-bold" style="color:var(--primary-color);">
                         <i class="fas fa-user-friends mr-2 text-primary"></i>Customer Master
                     </h4>
-                    <p class="text-muted small mb-0">Manage customer accounts, default rate tiers (Cash/Credit), contact details, and suspension status.</p>
+                    <p class="text-muted small mb-0">Manage customer accounts, default rate tiers, registered vehicles, and account status.</p>
                 </div>
                 <div class="col-md-6 text-right">
+                    <?php if ($canViewVehicles): ?>
+                    <a href="vehicles.php" class="btn btn-outline-primary font-weight-bold shadow-sm mr-2">
+                        <i class="fas fa-car mr-1"></i> All Vehicles
+                    </a>
+                    <?php endif; ?>
                     <?php if ($canAdd): ?>
                     <a href="add-customer.php" class="btn btn-primary font-weight-bold shadow-sm">
                         <i class="fas fa-plus mr-1"></i> Add New Customer
@@ -110,6 +137,7 @@ if (isset($_GET['msg'])) {
                                     <th style="text-align:center;">Fuel Rate</th>
                                     <th style="text-align:center;">Other Rate</th>
                                     <th style="text-align:center;">Status</th>
+                                    <th style="text-align:center;">Vehicles</th>
                                     <th>Created At</th>
                                     <?php if ($canDelete): ?>
                                     <th style="text-align: center; width: 6%;">Delete</th>
@@ -118,9 +146,11 @@ if (isset($_GET['msg'])) {
                             </thead>
                             <tbody>
                                 <?php 
-                                $sql = "SELECT * FROM tbl_customers 
-                                        WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') 
-                                        ORDER BY id DESC";
+                                $sql = "SELECT c.*, 
+                                               COALESCE((SELECT COUNT(*) FROM tbl_customer_vehicles v WHERE v.customer_id = c.id AND (v.deleted_at IS NULL OR v.deleted_at = '0000-00-00 00:00:00')), 0) AS vehicle_count
+                                        FROM tbl_customers c 
+                                        WHERE (c.deleted_at IS NULL OR c.deleted_at = '0000-00-00 00:00:00') 
+                                        ORDER BY c.id DESC";
                                 $result = mysqli_query($connection, $sql);
                                 if ($result && mysqli_num_rows($result) > 0) {
                                     while ($row = mysqli_fetch_assoc($result)) {
@@ -140,6 +170,10 @@ if (isset($_GET['msg'])) {
                                             ? '<span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Active</span>'
                                             : '<span class="badge badge-danger px-2 py-1"><i class="fas fa-ban mr-1"></i> Inactive</span>';
                                         
+                                        $vehicleBtn = $canViewVehicles
+                                            ? '<a href="vehicles.php?customer_id='.$row['id'].'" class="btn btn-outline-primary btn-sm font-weight-bold px-2 py-1" style="font-size:11px; border-radius:5px;"><i class="fas fa-car mr-1"></i> Vehicles ('.$row['vehicle_count'].')</a>'
+                                            : '<span class="badge badge-light border">'.$row['vehicle_count'].'</span>';
+                                        
                                         echo ' 
                                             <tr>
                                                 <td>'.$row['id'].'</td>
@@ -149,6 +183,7 @@ if (isset($_GET['msg'])) {
                                                 <td class="text-center">'.$fuelBadge.'</td>
                                                 <td class="text-center">'.$otherBadge.'</td>
                                                 <td class="text-center">'.$statusBadge.'</td>
+                                                <td class="text-center">'.$vehicleBtn.'</td>
                                                 <td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>';
                                         if ($canDelete) {
                                             echo '<td class="text-center"><a class="btn btn-large btn-link p-0 text-danger" onclick="deleteCustomer('.$row['id'].', \''.addslashes(htmlspecialchars($row['name'])).'\')"><i class="fas fa-trash-alt" style="font-size: 18px;"></i></a></td>';

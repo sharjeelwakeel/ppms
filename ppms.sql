@@ -5386,6 +5386,33 @@ CREATE TABLE IF NOT EXISTS `tbl_customers` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_customer_vehicles`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_customer_vehicles` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL,
+  `vehicle_name` varchar(128) NOT NULL,
+  `reg_number` varchar(64) NOT NULL,
+  `numeric_number` varchar(64) DEFAULT NULL,
+  `fuel_limit` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `vehicle_type` enum('Petrol','Diesel') NOT NULL DEFAULT 'Petrol',
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_reg_number` (`reg_number`),
+  KEY `idx_numeric_number` (`numeric_number`),
+  KEY `idx_vehicle_type` (`vehicle_type`),
+  KEY `idx_status` (`status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchases`
 --
 

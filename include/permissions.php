@@ -14,6 +14,7 @@ if ($check_acc_role && mysqli_num_rows($check_acc_role) == 0) {
 function get_system_modules() {
     return [
         'customers'      => 'Customer Master',
+        'vehicles'       => 'Customer Vehicles',
         'expenses'       => 'Expenses Management',
         'purchases'      => 'Purchases & Tank Links',
         'meter_readings' => 'Meter Readings',
