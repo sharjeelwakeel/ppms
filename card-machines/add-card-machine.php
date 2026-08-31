@@ -9,6 +9,13 @@ require '../include/permissions.php';
 // Enforce access check for adding card machines
 check_access('card_machines', 'add');
 
+// Auto-migrate tbl_card_machines charges_percentage to DECIMAL(8,4) and ensure deleted_at exists
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_machines LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN charges_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+
 $message = '';
 if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POST['contact_person_number'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
@@ -59,7 +66,7 @@ if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POS
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-card-machine.php" method="POST">
-					<h4 class="mb-5">Add Card Machine</h4>
+					<h4 class="mb-5"><i class="fas fa-credit-card mr-2 text-primary"></i>Add Card Machine</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -76,7 +83,7 @@ if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POS
 									<div class="form-group row">
 										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Service Charges (%)</label>
 										<div class="col-lg-7 col-md-6 col-sm-8">
-											<input type="number" step="0.01" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 1.50" value="0.00" required>
+											<input type="number" step="0.0001" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 0.3456" value="0.0000" required>
 										</div>
 									</div>
 								</div>
@@ -102,8 +109,8 @@ if (isset($_POST['name']) && isset($_POST['contact_person_name']) && isset($_POS
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Save Machine</button>
-                        <a href="card-machines-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Machine</button>
+                        <a href="card-machines-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>

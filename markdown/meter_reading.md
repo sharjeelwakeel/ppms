@@ -110,7 +110,12 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
 - **Real-Time UI Enforcement**: If a user enters a `current_reading` less than `last_reading`, an inline red error is rendered under the input, the row is flagged red, and form submission is prevented (`e.preventDefault()`).
 
 ### 2. Multi-Entry Card Sales per Nozzle (View & PDF Export)
-- Card Sales support **all multiple dynamic entries** linked to nozzles.
+- Card Sales support **all multiple dynamic entries** linked to nozzles and card machines (`tbl_card_machines`).
+- **4-Decimal Service Charges Calculation**:
+  - Card machine commission rates support 4 decimal places precision (e.g. `0.3456%`).
+  - Automatic service charges & net amount calculation:
+    $$\text{service\_charges} = \text{amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
+    $$\text{net\_amount} = \text{amount} - \text{service\_charges}$$
 - In `view-meter-reading.php` and `generate-pdf-meter-reading.php`, ALL card sales records associated with the meter reading ID are looped and rendered in a clean table format:
   - Columns: `#`, `Nozzle`, `Card Machine`, `Batch No`, `No. of Cards`, `Amount (Rs.)`, `Service Charges (Rs.)`, `Net Amount (Rs.)`.
   - Footer row summarizes Total Card Sale Amount.

@@ -10,6 +10,13 @@ require '../include/permissions.php';
 // Enforce access check for viewing card machines
 check_access('card_machines', 'show');
 
+// Auto-migrate tbl_card_machines charges_percentage to DECIMAL(8,4) and ensure deleted_at exists
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_machines LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN charges_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+
 $canAdd    = has_permission('card_machines', 'add');
 $canEdit   = has_permission('card_machines', 'edit');
 $canDelete = has_permission('card_machines', 'delete');
@@ -55,7 +62,7 @@ $canDelete = has_permission('card_machines', 'delete');
 					</div>
 					<div class="col-md-6 text-right">
                         <?php if ($canAdd): ?>
-						<a href="add-card-machine.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add Card Machine</a>
+						<a href="add-card-machine.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add Card Machine</a>
                         <?php endif; ?>
 					</div>
 				</div>
@@ -85,7 +92,7 @@ $canDelete = has_permission('card_machines', 'delete');
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td>'.$machineNameDisplay.'</td>
-										<td>'.number_format($row['charges_percentage'], 2).'%</td>
+										<td>'.number_format($row['charges_percentage'], 4).'%</td>
 										<td>'.htmlspecialchars($row['contact_person_name']).'</td>
 										<td>'.htmlspecialchars($row['contact_person_number']).'</td>';
                                 if ($canDelete) {

@@ -9,6 +9,13 @@ require '../include/permissions.php';
 // Enforce access check for editing card machines
 check_access('card_machines', 'edit');
 
+// Auto-migrate tbl_card_machines charges_percentage to DECIMAL(8,4) and ensure deleted_at exists
+$chk_del = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_machines LIKE 'deleted_at'");
+if ($chk_del && mysqli_num_rows($chk_del) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+}
+mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN charges_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -73,7 +80,7 @@ if (!$machine) {
 			<div class="container pt-4 pb-4">
 				<form action="edit-card-machine.php" method="POST">
 					<input type="hidden" name="id" value="<?php echo $machine['id']; ?>">
-					<h4 class="mb-5">Edit Card Machine</h4>
+					<h4 class="mb-5"><i class="fas fa-credit-card mr-2 text-primary"></i>Edit Card Machine</h4>
                     <?php echo $message; ?>
 					<div class="card mb-5">
 						<div class="card-body">
@@ -90,7 +97,7 @@ if (!$machine) {
 									<div class="form-group row">
 										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Service Charges (%)</label>
 										<div class="col-lg-7 col-md-6 col-sm-8">
-											<input type="number" step="0.01" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 1.50" value="<?php echo htmlspecialchars($machine['charges_percentage']); ?>" required>
+											<input type="number" step="0.0001" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 0.3456" value="<?php echo htmlspecialchars($machine['charges_percentage']); ?>" required>
 										</div>
 									</div>
 								</div>
@@ -116,8 +123,8 @@ if (!$machine) {
 						</div>	
 					</div>
 					<div class="txt-center">
-						<button type="submit" class="btn btn-primary m-top">Update Machine</button>
-                        <a href="card-machines-list.php" class="btn btn-secondary m-top ml-2">Cancel</a>
+						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Update Machine</button>
+                        <a href="card-machines-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
 					</div>
 				</form>
 			</div>
