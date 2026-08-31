@@ -25,7 +25,7 @@ require_once __DIR__ . '/permissions.php';
                           has_permission('tanks', 'show') || has_permission('roles', 'show') || 
                           has_permission('users', 'show') || has_permission('nozzles', 'show') || 
                           has_permission('staff', 'show') || has_permission('card_machines', 'show') || 
-                          has_permission('banks', 'show');
+                          has_permission('banks', 'show') || has_permission('customers', 'show');
             if ($showMaster): 
             ?>
             <li class="nav-item dropdown">
@@ -33,6 +33,10 @@ require_once __DIR__ . '/permissions.php';
                 <i class="fas fa-database mr-1"></i> Master
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                    <?php if (has_permission('customers', 'show')): ?>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>customers/customers-list.php"><i class="fas fa-user-friends mr-1 text-muted"></i> Customers</a>
+                    <?php endif; ?>
+
                     <?php if (has_permission('shifts', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>shifts/shifts-list.php"><i class="fas fa-clock mr-1 text-muted"></i> Shifts</a>
                     <?php endif; ?>

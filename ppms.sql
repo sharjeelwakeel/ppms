@@ -5362,6 +5362,30 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_customers`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_customers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `address` text DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `fuel_rate` enum('Cash','Credit') NOT NULL DEFAULT 'Cash',
+  `other_rate` enum('Cash','Credit') NOT NULL DEFAULT 'Cash',
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_fuel_rate` (`fuel_rate`),
+  KEY `idx_other_rate` (`other_rate`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_purchases`
 --
 
