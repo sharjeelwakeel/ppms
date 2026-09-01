@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   - The **Cash Rate** (`credit_cash_rate[]`) field is populated with the standard cash rate for comparison and accounting reconciliation.
   - Credit amount is computed dynamically: $\text{amount} = \text{quantity} \times \text{sale\_rate}$.
 - In `view-meter-reading.php` and `generate-pdf-meter-reading.php`, ALL credit sales records associated with the meter reading ID are looped and rendered in a clean table format:
-  - Columns: `#`, `Nozzle`, `Item`, `Slip Date`, `Slip No`, `Slip Type`, `Account No (Customer ID & Name)`, `Vehicle No`, `Qty`, `Sale Rate (Credit Rate)`, `Amount (Rs.)`, `Cash Rate`, `Issue Qty`, `Balance 1`, `Balance 2`, `Wasoli`.
+  - Columns: `#`, `Nozzle`, `Item`, `Slip Date`, `Slip No`, `Slip Type`, `Account No (Customer ID & Name)`, `Vehicle No`, `Qty`, `Sale Rate (Credit Rate)`, `Amount (Rs.)`, `Cash Rate`, `Issue Qty`, `Balance 1`, `Balance 2`, `Tmp. Receive`.
   - Footer row summarizes Total Credit Sale Amount.
 
 ### 4. Read-Only Baseline Meter & Running Meter Tracking (`tbl_nozzles.start_reading`)

@@ -476,7 +476,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                         <th class="text-right">Issue Qty</th>
                         <th class="text-right">Balance 1</th>
                         <th class="text-right">Balance 2</th>
-                        <th class="text-right">Wasoli</th>
+                        <th class="text-right">Tmp. Receive</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -657,7 +657,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 <th class="r">Issue Qty</th>
                 <th class="r">Bal 1</th>
                 <th class="r">Bal 2</th>
-                <th class="r">Wasoli</th>
+                <th class="r">Tmp. Receive</th>
             </tr>
         </thead>
         <tbody>

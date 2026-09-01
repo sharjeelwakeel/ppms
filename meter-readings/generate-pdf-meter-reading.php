@@ -558,7 +558,7 @@ body {
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Issue Qty</th>
                     <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 1</th>
                     <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 2</th>
-                    <th style="width:5%; color:#000; background:#ddd;" class="r">Wasoli</th>
+                    <th style="width:6%; color:#000; background:#ddd;" class="r">Tmp. Receive</th>
                 </tr>
             </thead>
             <tbody>

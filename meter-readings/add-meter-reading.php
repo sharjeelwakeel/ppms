@@ -686,7 +686,7 @@ if ($vehicles_res && mysqli_num_rows($vehicles_res) > 0) {
                                         <th style="width: 80px;">Issue Qty</th>
                                         <th style="width: 80px;">Balance 1</th>
                                         <th style="width: 80px;">Balance 2</th>
-                                        <th style="width: 80px;">Wasoli</th>
+                                        <th style="width: 85px;">Tmp. Receive</th>
                                         <th style="width: 50px;">Action</th>
                                     </tr>
                                 </thead>
