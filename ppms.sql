@@ -5206,6 +5206,7 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
   `nozzle_id` int(11) NOT NULL,
   `slip_date` date NOT NULL,
   `slip_no` varchar(64) NOT NULL,
+  `slip_type` enum('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip',
   `account_number` varchar(128) NOT NULL,
   `vehicle_number` varchar(64) NOT NULL,
   `quantity` decimal(12,2) NOT NULL DEFAULT 0.00,

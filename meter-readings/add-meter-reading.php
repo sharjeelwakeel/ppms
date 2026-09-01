@@ -24,6 +24,7 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_
   `nozzle_id` INT NOT NULL,
   `slip_date` DATE NOT NULL,
   `slip_no` VARCHAR(64) NOT NULL,
+  `slip_type` ENUM('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip',
   `account_number` VARCHAR(128) NOT NULL,
   `vehicle_number` VARCHAR(64) NOT NULL,
   `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
@@ -36,6 +37,10 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_
   `wasoli` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
 )");
+$chk_st = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE 'slip_type'");
+if ($chk_st && mysqli_num_rows($chk_st) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN slip_type ENUM('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip' AFTER slip_no");
+}
 
 $message = '';
 
@@ -139,9 +144,13 @@ if (isset($_POST['submit'])) {
                 foreach ($_POST['credit_nozzle_id'] as $idx => $c_nozzle_id) {
                     $c_nozzle_id      = intval($c_nozzle_id);
                     $c_slip_date      = mysqli_real_escape_string($connection, $_POST['credit_slip_date'][$idx] ?? '');
-                    $c_slip_no        = mysqli_real_escape_string($connection, $_POST['credit_slip_no'][$idx] ?? '');
-                    $c_account_number = mysqli_real_escape_string($connection, $_POST['credit_account_number'][$idx] ?? '');
-                    $c_vehicle_number = mysqli_real_escape_string($connection, $_POST['credit_vehicle_number'][$idx] ?? '');
+                    $c_slip_no        = mysqli_real_escape_string($connection, trim($_POST['credit_slip_no'][$idx] ?? ''));
+                    $c_slip_type      = mysqli_real_escape_string($connection, trim($_POST['credit_slip_type'][$idx] ?? 'Permanent Slip'));
+                    if (!in_array($c_slip_type, ['Permanent Slip', 'Balanced Slip', 'Temporary Slip'])) {
+                        $c_slip_type = 'Permanent Slip';
+                    }
+                    $c_account_number = mysqli_real_escape_string($connection, trim($_POST['credit_account_number'][$idx] ?? ''));
+                    $c_vehicle_number = mysqli_real_escape_string($connection, trim($_POST['credit_vehicle_number'][$idx] ?? ''));
                     $c_quantity       = floatval($_POST['credit_quantity'][$idx] ?? 0);
                     $c_rate           = floatval($_POST['credit_rate'][$idx] ?? 0);
                     $c_amount         = floatval($_POST['credit_amount'][$idx] ?? 0);
@@ -151,11 +160,20 @@ if (isset($_POST['submit'])) {
                     $c_balance_2      = floatval($_POST['credit_balance_2'][$idx] ?? 0);
                     $c_wasoli         = floatval($_POST['credit_wasoli'][$idx] ?? 0);
 
-                    if ($c_nozzle_id > 0 && $c_amount > 0) {
+                    // Slip No is mandatory, along with nozzle and amount
+                    if ($c_nozzle_id > 0 && ($c_amount > 0 || $c_quantity > 0) && !empty($c_slip_no)) {
+                        // If account_number is empty but vehicle_number exists, auto-resolve customer_id from tbl_customer_vehicles
+                        if (empty($c_account_number) && !empty($c_vehicle_number)) {
+                            $vh_chk = mysqli_query($connection, "SELECT customer_id FROM tbl_customer_vehicles WHERE (reg_number = '$c_vehicle_number' OR numeric_number = '$c_vehicle_number') AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') LIMIT 1");
+                            if ($vh_chk && ($vh_row = mysqli_fetch_assoc($vh_chk))) {
+                                $c_account_number = $vh_row['customer_id'];
+                            }
+                        }
+
                         $credit_sales_sql = "INSERT INTO tbl_meter_reading_credit_sales 
-                            (meter_reading_id, nozzle_id, slip_date, slip_no, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
+                            (meter_reading_id, nozzle_id, slip_date, slip_no, slip_type, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
                             VALUES 
-                            ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
+                            ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_slip_type', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
                         mysqli_query($connection, $credit_sales_sql);
                     }
                 }
@@ -171,8 +189,8 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// Fetch all active nozzles with item info, price, and last reading (from tbl_nozzles.start_reading)
-$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, n.start_reading, i.name AS item_name, i.cash_rate AS price, t.tank_name
+// Fetch all active nozzles with item info, price, credit rate, and last reading (from tbl_nozzles.start_reading)
+$nozzles_sql = "SELECT n.id, n.name AS nozzle_name, n.start_reading, i.name AS item_name, i.cash_rate AS price, i.credit_rate, t.tank_name
                 FROM tbl_nozzles n
                 LEFT JOIN tbl_items i ON n.item_id = i.id
                 LEFT JOIN tbl_tanks t ON n.tank_id = t.id
@@ -203,6 +221,21 @@ $items_sql = "SELECT id, name, cash_rate AS price FROM tbl_items ORDER BY name A
 $items_result = mysqli_query($connection, $items_sql);
 $items_list = [];
 while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
+
+// Fetch active vehicles with customer details from tbl_customer_vehicles
+$vehicles_sql = "SELECT v.id, v.customer_id, v.vehicle_name, v.reg_number, v.numeric_number, v.fuel_limit, v.vehicle_type, c.name AS customer_name, c.fuel_rate, c.status AS customer_status
+                 FROM tbl_customer_vehicles v
+                 LEFT JOIN tbl_customers c ON v.customer_id = c.id
+                 WHERE (v.deleted_at IS NULL OR v.deleted_at = '0000-00-00 00:00:00') 
+                   AND v.status = 'Active'
+                 ORDER BY v.reg_number ASC";
+$vehicles_res = mysqli_query($connection, $vehicles_sql);
+$vehicles_list = [];
+if ($vehicles_res && mysqli_num_rows($vehicles_res) > 0) {
+    while ($vh = mysqli_fetch_assoc($vehicles_res)) {
+        $vehicles_list[] = $vh;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -624,8 +657,9 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
             </div>
 
             <!-- Credit Sale Modal (Multiple Entries per Nozzle) -->
+            <!-- Credit Sale Modal (Multiple Entries per Nozzle) -->
             <div class="modal fade" id="creditSaleModal" tabindex="-1" role="dialog" aria-labelledby="creditSaleModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-xl" role="document" style="max-width: 95%;">
+                <div class="modal-dialog modal-xl" role="document" style="max-width: 96%;">
                     <div class="modal-content" style="border-radius:12px; overflow:hidden; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
                         <div class="modal-header bg-dark text-white py-3">
                             <h5 class="modal-title font-weight-bold" id="creditSaleModalLabel"><i class="fas fa-file-invoice mr-2 text-warning"></i>Credit Sale Details (Multiple Entries)</h5>
@@ -634,15 +668,17 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                             </button>
                         </div>
                         <div class="modal-body p-4" style="overflow-x: auto;">
-                            <table class="table table-bordered table-striped text-center table-sm" id="creditSalesTable" style="min-width: 1400px; font-size: 12px;">
+                            <div id="creditModalErrorAlert" class="alert alert-danger py-2 px-3 mb-3 font-weight-bold" style="display:none; font-size:13px; border-left: 5px solid #dc3545;"></div>
+                            <table class="table table-bordered table-striped text-center table-sm" id="creditSalesTable" style="min-width: 1700px; font-size: 12px;">
                                 <thead class="bg-secondary text-white">
                                     <tr>
-                                        <th style="width: 140px;">Nozzle <span class="text-danger">*</span></th>
-                                        <th style="width: 120px;">Slip Date</th>
-                                        <th style="width: 100px;">Slip No</th>
-                                        <th style="width: 110px;">Account No</th>
-                                        <th style="width: 110px;">Vehicle No</th>
-                                        <th style="width: 120px;">Item Name</th>
+                                        <th style="width: 130px;">Nozzle <span class="text-danger">*</span></th>
+                                        <th style="width: 110px;">Slip Date</th>
+                                        <th style="width: 110px;">Slip No <span class="text-danger">*</span></th>
+                                        <th style="width: 250px;">Slip Type <span class="text-danger">*</span></th>
+                                        <th style="width: 170px;">Vehicle No <span class="text-danger">*</span></th>
+                                        <th style="width: 140px;">Account No (Cust ID) <span class="text-danger">*</span></th>
+                                        <th style="width: 110px;">Item Name</th>
                                         <th style="width: 80px;">Qty</th>
                                         <th style="width: 80px;">Sale Rate</th>
                                         <th style="width: 90px;">Amount <span class="text-danger">*</span></th>
@@ -658,6 +694,11 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                     <!-- Rows added dynamically -->
                                 </tbody>
                             </table>
+                            <datalist id="registeredVehiclesList">
+                                <?php foreach ($vehicles_list as $vh): ?>
+                                    <option value="<?php echo htmlspecialchars($vh['reg_number']); ?>"><?php echo htmlspecialchars($vh['vehicle_name'] . ' — ' . $vh['customer_name'] . ' (ID: ' . $vh['customer_id'] . ')'); ?></option>
+                                <?php endforeach; ?>
+                            </datalist>
                             <div class="mt-2">
                                 <button type="button" class="btn btn-success btn-sm font-weight-bold" onclick="addCreditRow()">
                                     <i class="fas fa-plus mr-1"></i> Add Credit Sale Row
@@ -666,7 +707,7 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                         </div>
                         <div class="modal-footer bg-light py-2">
                             <span class="mr-auto font-weight-bold text-muted" style="font-size:13px;">Total Credit Sale: <span id="modal_credit_total_display" class="text-warning font-weight-bold" style="font-size:16px; margin-left:5px;">0.00</span></span>
-                            <button type="button" class="btn btn-primary px-4 font-weight-bold btn-sm" data-dismiss="modal">Confirm</button>
+                            <button type="button" class="btn btn-primary px-4 font-weight-bold btn-sm" onclick="confirmCreditSalesModal()"><i class="fas fa-check mr-1"></i> Confirm</button>
                         </div>
                     </div>
                 </div>
@@ -680,15 +721,26 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 <script>
-var totalRows = <?php echo count($nozzles); ?>;
-var nozzlesData = <?php echo json_encode($nozzles); ?>;
+var totalRows    = <?php echo count($nozzles); ?>;
+var nozzlesData  = <?php echo json_encode($nozzles); ?>;
 var machinesData = <?php echo json_encode($machines_list); ?>;
+var vehiclesData = <?php echo json_encode($vehicles_list); ?>;
 
 $(document).ready(function() {
     for (var i = 0; i < totalRows; i++) {
         calculate(i);
     }
 });
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 /**
  * Recalculate a single nozzle row & validate current_reading >= last_reading:
@@ -770,7 +822,11 @@ function removeCardRow(btn) {
 }
 
 // Dynamic Credit Sale rows (Multiple Entries per Nozzle)
+var creditRowCounter = 0;
+
 function addCreditRow() {
+    creditRowCounter++;
+    var rowId = creditRowCounter;
     var today = new Date().toISOString().slice(0, 10);
     
     var nozzleOptions = '<option value="">-- Select Nozzle --</option>';
@@ -778,15 +834,38 @@ function addCreditRow() {
         nozzleOptions += '<option value="' + nz.id + '">' + nz.nozzle_name + '</option>';
     });
 
-    var rowHtml = '<tr>' +
+    var rowHtml = '<tr id="credit_row_' + rowId + '">' +
         '<td><select name="credit_nozzle_id[]" class="form-control form-control-sm credit-nozzle-select" onchange="updateCreditItem(this)" required>' + nozzleOptions + '</select></td>' +
         '<td><input type="date" name="credit_slip_date[]" class="form-control form-control-sm" value="' + today + '"></td>' +
-        '<td><input type="text" name="credit_slip_no[]" class="form-control form-control-sm"></td>' +
-        '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm"></td>' +
-        '<td><input type="text" name="credit_vehicle_number[]" class="form-control form-control-sm"></td>' +
+        '<td><input type="text" name="credit_slip_no[]" class="form-control form-control-sm credit-slip-no font-weight-bold" placeholder="Slip #" required></td>' +
+        '<td>' +
+            '<div class="d-flex flex-column text-left px-1" style="gap:2px;">' +
+                '<div class="custom-control custom-radio custom-control-inline m-0">' +
+                    '<input type="radio" id="st_perm_' + rowId + '" name="slip_type_radio_' + rowId + '" class="custom-control-input" value="Permanent Slip" checked onchange="onSlipTypeChange(this, ' + rowId + ')">' +
+                    '<label class="custom-control-label font-weight-bold text-primary" for="st_perm_' + rowId + '" style="font-size:11px; cursor:pointer;">Permanent Slip</label>' +
+                '</div>' +
+                '<div class="custom-control custom-radio custom-control-inline m-0">' +
+                    '<input type="radio" id="st_bal_' + rowId + '" name="slip_type_radio_' + rowId + '" class="custom-control-input" value="Balanced Slip" onchange="onSlipTypeChange(this, ' + rowId + ')">' +
+                    '<label class="custom-control-label font-weight-bold text-info" for="st_bal_' + rowId + '" style="font-size:11px; cursor:pointer;">Balanced Slip</label>' +
+                '</div>' +
+                '<div class="custom-control custom-radio custom-control-inline m-0">' +
+                    '<input type="radio" id="st_temp_' + rowId + '" name="slip_type_radio_' + rowId + '" class="custom-control-input" value="Temporary Slip" onchange="onSlipTypeChange(this, ' + rowId + ')">' +
+                    '<label class="custom-control-label font-weight-bold text-warning" for="st_temp_' + rowId + '" style="font-size:11px; cursor:pointer; color:#b07800 !important;">Temporary Slip</label>' +
+                '</div>' +
+            '</div>' +
+            '<input type="hidden" name="credit_slip_type[]" class="credit-slip-type-val" value="Permanent Slip">' +
+        '</td>' +
+        '<td>' +
+            '<input type="text" name="credit_vehicle_number[]" list="registeredVehiclesList" class="form-control form-control-sm credit-vehicle-number font-weight-bold text-monospace" placeholder="Type / Pick Vehicle" oninput="onCreditVehicleInput(this)" onchange="onCreditVehicleInput(this)" required>' +
+            '<div class="vehicle-match-info small text-left mt-1" style="display:none; font-size:10.5px; line-height:1.2;"></div>' +
+        '</td>' +
+        '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm credit-account-number font-weight-bold" placeholder="Customer ID" readonly style="background-color:#e9ecef; cursor:not-allowed;" required></td>' +
         '<td><input type="text" class="form-control form-control-sm credit-item-name" disabled></td>' +
-        '<td><input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm" value="0"></td>' +
-        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td>' +
+            '<input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm credit-qty" value="0" oninput="calculateCreditRow(this)">' +
+            '<div class="fuel-limit-warning text-danger small text-left mt-1" style="display:none; font-size:10px;"></div>' +
+        '</td>' +
+        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate" value="0" oninput="calculateCreditRow(this)"></td>' +
         '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="0" oninput="calculateCreditTotal()" required></td>' +
         '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="0"></td>' +
         '<td><input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm" value="0"></td>' +
@@ -799,6 +878,80 @@ function addCreditRow() {
     $('#creditSalesBody').append(rowHtml);
 }
 
+function onSlipTypeChange(radioElement, rowId) {
+    var val = $(radioElement).val();
+    $(radioElement).closest('tr').find('.credit-slip-type-val').val(val);
+}
+
+function onCreditVehicleInput(inputElement) {
+    var $row = $(inputElement).closest('tr');
+    var enteredVal = $(inputElement).val().trim().toUpperCase();
+    var $accountInput = $row.find('.credit-account-number');
+    var $matchInfo = $row.find('.vehicle-match-info');
+    
+    if (!enteredVal) {
+        $accountInput.val('');
+        $matchInfo.hide().html('');
+        $(inputElement).removeClass('is-valid is-invalid');
+        return;
+    }
+
+    // Search in vehiclesData by reg_number or numeric_number
+    var match = vehiclesData.find(function(v) {
+        var reg = (v.reg_number || '').trim().toUpperCase();
+        var num = (v.numeric_number || '').trim().toUpperCase();
+        return reg === enteredVal || (num && num === enteredVal);
+    });
+
+    // If not exact match, try prefix matching
+    if (!match && enteredVal.length >= 2) {
+        match = vehiclesData.find(function(v) {
+            var reg = (v.reg_number || '').trim().toUpperCase();
+            return reg.indexOf(enteredVal) === 0 || reg.indexOf(enteredVal) !== -1;
+        });
+    }
+
+    if (match) {
+        $accountInput.val(match.customer_id);
+        $row.data('fuel_limit', parseFloat(match.fuel_limit) || 0);
+        $row.data('vehicle_type', match.vehicle_type || '');
+        
+        var badgeHtml = '<span class="badge badge-success px-1 py-0.5"><i class="fas fa-user-check mr-1"></i>' + 
+            escapeHtml(match.customer_name) + ' (ID: ' + match.customer_id + ')</span>';
+        if (parseFloat(match.fuel_limit) > 0) {
+            badgeHtml += '<br><span class="badge badge-info px-1 py-0.5 mt-0.5"><i class="fas fa-gas-pump mr-1"></i>Limit: ' + 
+                parseFloat(match.fuel_limit).toFixed(2) + ' Ltr</span>';
+        }
+        $matchInfo.show().html(badgeHtml);
+        $(inputElement).removeClass('is-invalid').addClass('is-valid');
+    } else {
+        $accountInput.val('');
+        $row.data('fuel_limit', 0);
+        $row.data('vehicle_type', '');
+        $matchInfo.show().html('<span class="badge badge-warning text-dark px-1"><i class="fas fa-exclamation-triangle mr-1"></i>Unregistered Vehicle</span>');
+        $(inputElement).removeClass('is-valid');
+    }
+}
+
+function calculateCreditRow(inputElement) {
+    var $row = $(inputElement).closest('tr');
+    var qty = parseFloat($row.find('.credit-qty').val()) || 0;
+    var rate = parseFloat($row.find('.credit-rate').val()) || 0;
+    var limit = parseFloat($row.data('fuel_limit')) || 0;
+    var $limitWarning = $row.find('.fuel-limit-warning');
+
+    if (limit > 0 && qty > limit) {
+        $limitWarning.show().html('<i class="fas fa-exclamation-circle mr-1"></i>Exceeds quota (' + limit.toFixed(2) + ' Ltr)');
+    } else {
+        $limitWarning.hide().html('');
+    }
+
+    if (qty > 0 && rate > 0) {
+        $row.find('.credit-amount-field').val((qty * rate).toFixed(2));
+    }
+    calculateCreditTotal();
+}
+
 function updateCreditItem(selectElement) {
     var $row = $(selectElement).closest('tr');
     var nozzleId = $(selectElement).val();
@@ -809,12 +962,18 @@ function updateCreditItem(selectElement) {
         });
         if (nozzle) {
             $row.find('.credit-item-name').val(nozzle.item_name || 'N/A');
-            $row.find('.credit-cash-rate').val(nozzle.price || 0);
+            $row.find('.credit-cash-rate').val(parseFloat(nozzle.price) || 0);
+            
+            // Set Sale Rate to Credit Rate from items master (fallback to cash price if credit_rate is 0)
+            var creditRate = parseFloat(nozzle.credit_rate) || parseFloat(nozzle.price) || 0;
+            $row.find('.credit-rate').val(creditRate.toFixed(2));
         }
     } else {
         $row.find('.credit-item-name').val('');
         $row.find('.credit-cash-rate').val(0);
+        $row.find('.credit-rate').val(0);
     }
+    calculateCreditRow(selectElement);
 }
 
 function calculateCreditTotal() {
@@ -832,9 +991,55 @@ function removeCreditRow(btn) {
     calculateCreditTotal();
 }
 
+// Validation function for Modal Confirm Button
+function confirmCreditSalesModal() {
+    var hasError = false;
+    var errorMsg = '';
+    var $firstInvalid = null;
+
+    $('#creditModalErrorAlert').hide().html('');
+
+    $('#creditSalesBody tr').each(function(idx) {
+        var $row = $(this);
+        var rowNum = idx + 1;
+        var nozzleId  = $row.find('.credit-nozzle-select').val();
+        var slipNo    = $row.find('.credit-slip-no').val().trim();
+        var vehicleNo = $row.find('.credit-vehicle-number').val().trim();
+        var amount    = parseFloat($row.find('.credit-amount-field').val()) || 0;
+        var qty       = parseFloat($row.find('.credit-qty').val()) || 0;
+
+        if (nozzleId || amount > 0 || qty > 0 || vehicleNo || slipNo) {
+            if (!slipNo) {
+                hasError = true;
+                $row.find('.credit-slip-no').addClass('is-invalid');
+                if (!$firstInvalid) {
+                    $firstInvalid = $row.find('.credit-slip-no');
+                    errorMsg = '<i class="fas fa-exclamation-triangle mr-1"></i>Validation Error: Please enter Slip No on Line #' + rowNum + ' before confirming.';
+                }
+            } else {
+                $row.find('.credit-slip-no').removeClass('is-invalid');
+            }
+        }
+    });
+
+    if (hasError) {
+        $('#creditModalErrorAlert').html(errorMsg).fadeIn();
+        if ($firstInvalid) {
+            $firstInvalid.focus();
+        }
+        return false;
+    }
+
+    $('#creditModalErrorAlert').hide().html('');
+    $('#creditSaleModal').modal('hide');
+    calculateCreditTotal();
+}
+
 // Form submit validation check
 $('#meterForm').on('submit', function(e) {
     var invalid = false;
+    var errorMsg = '';
+
     for (var i = 0; i < totalRows; i++) {
         var last = parseFloat($('#last_' + i).val()) || 0;
         var curr = parseFloat($('#curr_' + i).val()) || 0;
@@ -842,11 +1047,53 @@ $('#meterForm').on('submit', function(e) {
             invalid = true;
             $('#curr_' + i).addClass('reading-invalid');
             $('#err_curr_' + i).show();
+            errorMsg = 'Validation Error: Current Reading must be greater than or equal to Previous Reading for all nozzles.';
         }
     }
+
     if (invalid) {
         e.preventDefault();
-        alert('Validation Error: Current Reading must be greater than or equal to Previous Reading for all nozzles.');
+        alert(errorMsg);
+        return false;
+    }
+
+    // Validate credit sales mandatory Slip No & Vehicle No
+    var creditError = false;
+    $('#creditSalesBody tr').each(function(idx) {
+        var $row = $(this);
+        var rowNum = idx + 1;
+        var nozzleId  = $row.find('.credit-nozzle-select').val();
+        var slipNo    = $row.find('.credit-slip-no').val().trim();
+        var vehicleNo = $row.find('.credit-vehicle-number').val().trim();
+        var amount    = parseFloat($row.find('.credit-amount-field').val()) || 0;
+        var qty       = parseFloat($row.find('.credit-qty').val()) || 0;
+
+        if (nozzleId || amount > 0 || qty > 0 || vehicleNo || slipNo) {
+            if (!slipNo) {
+                creditError = true;
+                $row.find('.credit-slip-no').addClass('is-invalid');
+                errorMsg = 'Slip No is mandatory for all credit sales entries (Line #' + rowNum + '). Please provide the slip number before saving.';
+                return false;
+            } else {
+                $row.find('.credit-slip-no').removeClass('is-invalid');
+            }
+
+            if (!vehicleNo) {
+                creditError = true;
+                $row.find('.credit-vehicle-number').addClass('is-invalid');
+                errorMsg = 'Vehicle No is mandatory for credit sales (Line #' + rowNum + ').';
+                return false;
+            } else {
+                $row.find('.credit-vehicle-number').removeClass('is-invalid');
+            }
+        }
+    });
+
+    if (creditError) {
+        e.preventDefault();
+        $('#creditSaleModal').modal('show');
+        $('#creditModalErrorAlert').html('<i class="fas fa-exclamation-triangle mr-1"></i>' + errorMsg).show();
+        alert(errorMsg);
         return false;
     }
 });

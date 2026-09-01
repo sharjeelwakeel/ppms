@@ -71,10 +71,12 @@ if ($card_sales_result) {
 // Fetch Credit Sales (All entries)
 $credit_sales_sql = "SELECT mrcs.*,
                             n.name AS nozzle_name,
-                            i.name AS item_name
+                            i.name AS item_name,
+                            c.name AS customer_name
                      FROM tbl_meter_reading_credit_sales mrcs
                      LEFT JOIN tbl_nozzles n ON mrcs.nozzle_id = n.id
                      LEFT JOIN tbl_items i ON n.item_id = i.id
+                     LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
                      WHERE mrcs.meter_reading_id = $id
                      ORDER BY mrcs.id ASC";
 $credit_sales_result = mysqli_query($connection, $credit_sales_sql);
@@ -546,16 +548,17 @@ body {
                     <th style="width:10%; color:#000; background:#ddd;">Item</th>
                     <th style="width:8%; color:#000; background:#ddd;">Slip Date</th>
                     <th style="width:8%; color:#000; background:#ddd;">Slip No</th>
+                    <th style="width:9%; color:#000; background:#ddd;">Slip Type</th>
                     <th style="width:10%; color:#000; background:#ddd;">Account No</th>
-                    <th style="width:10%; color:#000; background:#ddd;">Vehicle No</th>
+                    <th style="width:9%; color:#000; background:#ddd;">Vehicle No</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Qty</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Rate</th>
                     <th style="width:8%; color:#000; background:#ddd;" class="r">Amount</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Cash Rate</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Issue Qty</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Bal 1</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Bal 2</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Wasoli</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 1</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 2</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Wasoli</th>
                 </tr>
             </thead>
             <tbody>
@@ -565,8 +568,16 @@ body {
                     <td><strong><?php echo htmlspecialchars($crs['nozzle_name'] ?? '—'); ?></strong></td>
                     <td class="c"><?php echo htmlspecialchars($crs['item_name'] ?? '—'); ?></td>
                     <td class="c"><?php echo date('d-m-Y', strtotime($crs['slip_date'])); ?></td>
-                    <td class="c"><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></td>
-                    <td class="c"><?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?></td>
+                    <td class="c"><strong><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></strong></td>
+                    <td class="c" style="font-size:8.5px;">
+                        <?php echo htmlspecialchars($crs['slip_type'] ?? 'Permanent Slip'); ?>
+                    </td>
+                    <td class="c">
+                        <?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?>
+                        <?php if (!empty($crs['customer_name'])): ?>
+                            <br><span style="font-size:8px; color:#555;"><?php echo htmlspecialchars($crs['customer_name']); ?></span>
+                        <?php endif; ?>
+                    </td>
                     <td class="c"><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></td>
                     <td class="r"><?php echo number_format($crs['quantity'], 2); ?></td>
                     <td class="r"><?php echo number_format($crs['rate'], 2); ?></td>
@@ -581,7 +592,7 @@ body {
             </tbody>
             <tfoot>
                 <tr class="totals-row">
-                    <td colspan="9" class="r">Total Credit Sale:</td>
+                    <td colspan="10" class="r">Total Credit Sale:</td>
                     <td class="r col-amt">Rs. <?php echo number_format($credit_sales_total, 2); ?></td>
                     <td colspan="5"></td>
                 </tr>

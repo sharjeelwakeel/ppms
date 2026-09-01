@@ -120,10 +120,27 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   - Columns: `#`, `Nozzle`, `Card Machine`, `Batch No`, `No. of Cards`, `Amount (Rs.)`, `Service Charges (Rs.)`, `Net Amount (Rs.)`.
   - Footer row summarizes Total Card Sale Amount.
 
-### 3. Multi-Entry Credit Sales per Nozzle (View & PDF Export)
-- Credit Sales support **all multiple dynamic entries** linked to nozzles.
+### 3. Multi-Entry Credit Sales, Slip Type Radio & Vehicle Master Integration
+- **Mandatory Slip No & Modal Confirm Validation**:
+  - `Slip No` (`credit_slip_no[]`) is strictly **mandatory** for every credit sale row.
+  - Clicking the modal **Confirm** button or submitting the form verifies that all rows have a non-empty Slip No. If missing, the modal remains open, highlights the field, focuses it, and specifies the exact line: `"Validation Error: Please enter Slip No on Line #[N] before confirming."`
+  - The server verifies `!empty($c_slip_no)` before executing database insertion into `tbl_meter_reading_credit_sales`.
+- **Slip Type Radio Selection (Mandatory, Default: Permanent Slip)**:
+  - Each credit sale row features an inline radio button selector with 3 options:
+    - `Permanent Slip` (**Default**, `checked`): Standard credit billing chit to customer account.
+    - `Balanced Slip`: Slip balancing outstanding credit/advance payments.
+    - `Temporary Slip`: Temporary voucher pending formal bill generation.
+  - Stored in `tbl_meter_reading_credit_sales.slip_type` (`ENUM('Permanent Slip', 'Balanced Slip', 'Temporary Slip') NOT NULL DEFAULT 'Permanent Slip'`).
+- **Vehicle Master Search & Auto-Resolved Account No (Customer ID)**:
+  - `Vehicle No` is linked to the vehicle master (`tbl_customer_vehicles`) with an autocomplete datalist matching registration numbers and numeric suffixes.
+  - Upon typing or picking a vehicle number, the system searches the vehicle table, retrieves the linked `customer_id`, and auto-populates `Account No` (`credit_account_number[]`) with the Customer ID in read-only mode (`readonly`, `background-color: #e9ecef`).
+  - An inline confirmation badge displays the owner's Customer Name and configured fuel quota (`fuel_limit` in Litres).
+- **Credit Rate Auto-Binding for Sale Rate**:
+  - When selecting a Nozzle in a Credit Sale entry, the **Sale Rate** (`credit_rate[]`) is automatically populated from the attached fuel item's **Credit Rate** (`tbl_items.credit_rate`). If `credit_rate` is `0.00` or unset, it falls back to the cash rate (`tbl_items.cash_rate`).
+  - The **Cash Rate** (`credit_cash_rate[]`) field is populated with the standard cash rate for comparison and accounting reconciliation.
+  - Credit amount is computed dynamically: $\text{amount} = \text{quantity} \times \text{sale\_rate}$.
 - In `view-meter-reading.php` and `generate-pdf-meter-reading.php`, ALL credit sales records associated with the meter reading ID are looped and rendered in a clean table format:
-  - Columns: `#`, `Nozzle`, `Item`, `Slip Date`, `Slip No`, `Account No`, `Vehicle No`, `Qty`, `Sale Rate`, `Amount (Rs.)`, `Cash Rate`, `Issue Qty`, `Balance 1`, `Balance 2`, `Wasoli`.
+  - Columns: `#`, `Nozzle`, `Item`, `Slip Date`, `Slip No`, `Slip Type`, `Account No (Customer ID & Name)`, `Vehicle No`, `Qty`, `Sale Rate (Credit Rate)`, `Amount (Rs.)`, `Cash Rate`, `Issue Qty`, `Balance 1`, `Balance 2`, `Wasoli`.
   - Footer row summarizes Total Credit Sale Amount.
 
 ### 4. Read-Only Baseline Meter & Running Meter Tracking (`tbl_nozzles.start_reading`)

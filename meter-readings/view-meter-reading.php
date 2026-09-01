@@ -82,10 +82,12 @@ if ($card_sales_result) {
 // Fetch Credit Sales (All entries)
 $credit_sales_sql = "SELECT mrcs.*,
                             n.name AS nozzle_name,
-                            i.name AS item_name
+                            i.name AS item_name,
+                            c.name AS customer_name
                      FROM tbl_meter_reading_credit_sales mrcs
                      LEFT JOIN tbl_nozzles n ON mrcs.nozzle_id = n.id
                      LEFT JOIN tbl_items i ON n.item_id = i.id
+                     LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
                      WHERE mrcs.meter_reading_id = $id
                      ORDER BY mrcs.id ASC";
 $credit_sales_result = mysqli_query($connection, $credit_sales_sql);
@@ -464,6 +466,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                         <th>Item</th>
                         <th>Slip Date</th>
                         <th>Slip No</th>
+                        <th>Slip Type</th>
                         <th>Account No</th>
                         <th>Vehicle No</th>
                         <th class="text-right">Qty</th>
@@ -483,9 +486,26 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                         <td><strong><?php echo htmlspecialchars($crs['nozzle_name'] ?? '—'); ?></strong></td>
                         <td><?php echo htmlspecialchars($crs['item_name'] ?? '—'); ?></td>
                         <td><?php echo date('d-m-Y', strtotime($crs['slip_date'])); ?></td>
-                        <td><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></td>
-                        <td><?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?></td>
-                        <td><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></td>
+                        <td><strong><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></strong></td>
+                        <td>
+                            <?php 
+                            $st = $crs['slip_type'] ?? 'Permanent Slip';
+                            if ($st == 'Balanced Slip') {
+                                echo '<span class="badge badge-info px-2 py-1"><i class="fas fa-balance-scale mr-1"></i>Balanced</span>';
+                            } elseif ($st == 'Temporary Slip') {
+                                echo '<span class="badge badge-warning px-2 py-1 text-dark"><i class="fas fa-clock mr-1"></i>Temporary</span>';
+                            } else {
+                                echo '<span class="badge badge-primary px-2 py-1"><i class="fas fa-file-invoice mr-1"></i>Permanent</span>';
+                            }
+                            ?>
+                        </td>
+                        <td>
+                            <strong><?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?></strong>
+                            <?php if (!empty($crs['customer_name'])): ?>
+                                <br><small class="text-muted"><i class="fas fa-user-circle mr-1"></i><?php echo htmlspecialchars($crs['customer_name']); ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="badge badge-light border font-weight-bold px-2 py-1"><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></span></td>
                         <td class="text-right"><?php echo number_format($crs['quantity'], 2); ?></td>
                         <td class="text-right"><?php echo number_format($crs['rate'], 2); ?></td>
                         <td class="text-right font-weight-bold text-warning">PKR <?php echo number_format($crs['amount'], 2); ?></td>
@@ -499,7 +519,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 </tbody>
                 <tfoot>
                     <tr class="font-weight-bold bg-light">
-                        <td colspan="9" class="text-right">Total Credit Sale:</td>
+                        <td colspan="10" class="text-right">Total Credit Sale:</td>
                         <td class="text-right text-warning">PKR <?php echo number_format($credit_sales_total, 2); ?></td>
                         <td colspan="5"></td>
                     </tr>
