@@ -157,7 +157,8 @@ $items_result = mysqli_query($connection, $items_sql);
 									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-sm-5 col-form-label">Current Reading</label>
 										<div class="col-lg-8 col-md-7 col-sm-7">
-											<input type="number" step="0.01" name="start_reading" class="form-control" value="<?php echo htmlspecialchars($nozzle['start_reading']); ?>" required>
+											<input type="number" step="0.01" name="start_reading" class="form-control" value="<?php echo htmlspecialchars($nozzle['start_reading']); ?>" readonly style="background-color: #e9ecef; cursor: not-allowed;" required>
+											<small class="text-muted"><i class="fas fa-lock mr-1"></i> Running meter reading is updated automatically from Meter Readings.</small>
 										</div>
 									</div>
 									<div class="form-group row">

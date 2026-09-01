@@ -33,12 +33,9 @@ CREATE TABLE IF NOT EXISTS `tbl_nozzles` (
 - When creating a new nozzle, the **Current Reading** (`start_reading`) field is initialized with **`0.00`** by default.
 - Creation requires non-negative values ($\text{start\_reading} \ge 0.00$).
 
-### 2. Greater Than or Equal To Validation on Edit (`edit-nozzle.php`)
-- When editing a nozzle, the updated reading must be **greater than or equal to** the existing/previous stored reading:
-  $$\text{New Reading} \ge \text{Previous Reading}$$
-- **Allow Equal**: If the reading remains unchanged ($\text{New Reading} = \text{Previous Reading}$), the system allows the user to update nozzle name, tank association, or active/inactive status without raising an error.
-- **Disallow Decrease**: If $\text{New Reading} < \text{Previous Reading}$, the update is blocked with the error notification:
-  > *Error: The new reading must be greater than or equal to the previous reading (X.XX).*
+### 2. Current Reading Lock on Edit (`edit-nozzle.php`)
+- When editing a nozzle, the **Current Reading** (`start_reading`) field is locked to **read-only** mode with informative status guidance (`<i class="fas fa-lock mr-1"></i> Running meter reading is updated automatically from Meter Readings.`).
+- This prevents manual tampering of the running meter from the Nozzles master form, ensuring that nozzle readings can only be changed/advanced sequentially through **Meter Readings** (`meter-readings/add-meter-reading.php`).
 
 ---
 

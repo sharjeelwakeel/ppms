@@ -126,7 +126,10 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   - Columns: `#`, `Nozzle`, `Item`, `Slip Date`, `Slip No`, `Account No`, `Vehicle No`, `Qty`, `Sale Rate`, `Amount (Rs.)`, `Cash Rate`, `Issue Qty`, `Balance 1`, `Balance 2`, `Wasoli`.
   - Footer row summarizes Total Credit Sale Amount.
 
-### 4. Running Meter Tracking (`tbl_nozzles.start_reading` Update)
+### 4. Read-Only Baseline Meter & Running Meter Tracking (`tbl_nozzles.start_reading`)
+- **Read-Only Baseline (`last_reading`)**: In [`meter-readings/add-meter-reading.php`](../meter-readings/add-meter-reading.php), the `last_reading` input field is strictly **read-only** (`readonly`, `background-color: #e9ecef; cursor: not-allowed;`) to prevent unauthorized tampering with the previous shift's baseline meter.
+- **Operator Entry**: Operators enter the closing meter value into `current_reading`, which computes sales and advances the running meter.
+- **Nozzle Master Lock**: In [`nozzles/edit-nozzle.php`](../nozzles/edit-nozzle.php), the **Current Reading** field is locked to read-only mode so running meter readings are exclusively updated and advanced through Meter Readings.
 - Whenever a meter reading is successfully saved, the backend automatically updates each nozzle's running meter reading in `tbl_nozzles`:
   ```sql
   UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id';

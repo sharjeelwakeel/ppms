@@ -493,13 +493,14 @@ while ($item = mysqli_fetch_assoc($items_result)) { $items_list[] = $item; }
                                     <?php echo number_format($nozzle['price'], 2); ?>
                                 </td>
 
-                                <!-- Last Reading -->
+                                <!-- Last Reading (Read-only baseline) -->
                                 <td>
                                     <input type="number" step="0.01" min="0"
                                            name="last_reading[]"
                                            id="last_<?php echo $i; ?>"
                                            class="form-control last_reading"
                                            value="<?php echo htmlspecialchars($nozzle['start_reading']); ?>"
+                                           readonly style="background-color: #e9ecef; cursor: not-allowed;"
                                            oninput="calculate(<?php echo $i; ?>)">
                                 </td>
 
