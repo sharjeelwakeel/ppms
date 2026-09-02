@@ -141,6 +141,19 @@ require_once __DIR__ . '/permissions.php';
                 </div>
             </li>
             <?php endif; ?>
+
+            <!-- Reports Menu -->
+            <?php if (has_permission('reports', 'show') || has_permission('customers', 'show') || has_permission('meter_readings', 'show')): ?>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkReports" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-chart-bar mr-1"></i> Reports
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkReports">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>reports/customer-report.php"><i class="fas fa-user-tag mr-1 text-primary"></i> Customer Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php"><i class="fas fa-boxes mr-1 text-info"></i> Stock Report</a>
+                </div>
+            </li>
+            <?php endif; ?>
         </ul>
         <div class="nav-action-wrapper mt-3 mt-lg-0 ml-lg-3">
             <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-light btn-sm btn-logout d-block d-lg-inline-block font-weight-bold">

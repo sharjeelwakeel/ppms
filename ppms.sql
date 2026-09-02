@@ -5212,11 +5212,14 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
   `quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `charge_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `issue_quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `balance_1` decimal(12,2) NOT NULL DEFAULT 0.00,
   `balance_2` decimal(12,2) NOT NULL DEFAULT 0.00,
   `wasoli` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `is_returned` tinyint(1) NOT NULL DEFAULT 0,
+  `returned_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

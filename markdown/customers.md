@@ -64,4 +64,6 @@ The Customer Master is fully integrated with the PPMS RBAC permission framework 
 | `customers/add-customer.php` | Form to create a new customer with clean `Cash`/`Credit` and `Active`/`Inactive` dropdowns |
 | `customers/edit-customer.php` | Form to update customer contact info, pricing tiers, and active status |
 | `include/deletecustomer.php` | Soft-delete handler setting `deleted_at = NOW()` |
+| `reports/customer-report.php` | Comprehensive Customer Credit & Fuel Ledger Report with metric cards and slip drilldown |
 | `markdown/customers.md` | Module technical specification and documentation (this file) |
+| `markdown/customer_report.md` | Customer report technical specification and user guide |

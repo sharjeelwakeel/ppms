@@ -41,6 +41,16 @@ $chk_st = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_
 if ($chk_st && mysqli_num_rows($chk_st) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN slip_type ENUM('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip' AFTER slip_no");
 }
+$chk_ca = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE 'charge_amount'");
+if ($chk_ca && mysqli_num_rows($chk_ca) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN charge_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount");
+    mysqli_query($connection, "UPDATE tbl_meter_reading_credit_sales SET charge_amount = IF(slip_type = 'Balanced Slip', 0.00, amount)");
+}
+$chk_ret = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE 'is_returned'");
+if ($chk_ret && mysqli_num_rows($chk_ret) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN is_returned TINYINT(1) NOT NULL DEFAULT 0 AFTER wasoli");
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN returned_at DATETIME DEFAULT NULL AFTER is_returned");
+}
 
 $message = '';
 
@@ -154,14 +164,33 @@ if (isset($_POST['submit'])) {
                     $c_quantity       = floatval($_POST['credit_quantity'][$idx] ?? 0);
                     $c_rate           = floatval($_POST['credit_rate'][$idx] ?? 0);
                     $c_amount         = floatval($_POST['credit_amount'][$idx] ?? 0);
+                    $c_charge_amount  = floatval($_POST['credit_charge_amount'][$idx] ?? 0);
                     $c_cash_rate      = floatval($_POST['credit_cash_rate'][$idx] ?? 0);
                     $c_issue_quantity = floatval($_POST['credit_issue_quantity'][$idx] ?? 0);
                     $c_balance_1      = floatval($_POST['credit_balance_1'][$idx] ?? 0);
                     $c_balance_2      = floatval($_POST['credit_balance_2'][$idx] ?? 0);
                     $c_wasoli         = floatval($_POST['credit_wasoli'][$idx] ?? 0);
 
+                    // If Received check is ticked, is_returned = 1 (we received it), otherwise 0 (we don't receive)
+                    $c_is_returned = 0;
+                    if ($c_slip_type === 'Temporary Slip') {
+                        $c_is_returned = (isset($_POST['credit_is_returned'][$idx]) && intval($_POST['credit_is_returned'][$idx]) === 1) ? 1 : 0;
+                    }
+
+                    // Calculation strictly on QTY
+                    if ($c_slip_type === 'Balanced Slip') {
+                        $c_charge_amount = 0.00;
+                    } elseif ($c_slip_type === 'Temporary Slip') {
+                        $effective_qty = $c_wasoli > 0 ? $c_wasoli : $c_quantity;
+                        // If Received is checked (is_returned = 1), charge is 0; if NOT checked (we don't receive), charge is effective_qty * rate (must collect!)
+                        $c_charge_amount = ($c_is_returned === 1) ? 0.00 : ($effective_qty * $c_rate);
+                    } else { // Permanent Slip
+                        $effective_qty = $c_quantity > 0 ? $c_quantity : $c_issue_quantity;
+                        $c_charge_amount = $effective_qty * $c_rate;
+                    }
+
                     // Slip No is mandatory, along with nozzle and amount
-                    if ($c_nozzle_id > 0 && ($c_amount > 0 || $c_quantity > 0) && !empty($c_slip_no)) {
+                    if ($c_nozzle_id > 0 && ($c_amount > 0 || $c_quantity > 0 || $c_issue_quantity > 0 || $c_wasoli > 0) && !empty($c_slip_no)) {
                         // If account_number is empty but vehicle_number exists, auto-resolve customer_id from tbl_customer_vehicles
                         if (empty($c_account_number) && !empty($c_vehicle_number)) {
                             $vh_chk = mysqli_query($connection, "SELECT customer_id FROM tbl_customer_vehicles WHERE (reg_number = '$c_vehicle_number' OR numeric_number = '$c_vehicle_number') AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') LIMIT 1");
@@ -170,10 +199,11 @@ if (isset($_POST['submit'])) {
                             }
                         }
 
+                        $ret_date_val = ($c_is_returned === 1) ? 'NOW()' : 'NULL';
                         $credit_sales_sql = "INSERT INTO tbl_meter_reading_credit_sales 
-                            (meter_reading_id, nozzle_id, slip_date, slip_no, slip_type, account_number, vehicle_number, quantity, rate, amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, created_at)
+                            (meter_reading_id, nozzle_id, slip_date, slip_no, slip_type, account_number, vehicle_number, quantity, rate, amount, charge_amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, is_returned, returned_at, created_at)
                             VALUES 
-                            ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_slip_type', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', NOW())";
+                            ('$reading_id', '$c_nozzle_id', '$c_slip_date', '$c_slip_no', '$c_slip_type', '$c_account_number', '$c_vehicle_number', '$c_quantity', '$c_rate', '$c_amount', '$c_charge_amount', '$c_cash_rate', '$c_issue_quantity', '$c_balance_1', '$c_balance_2', '$c_wasoli', '$c_is_returned', $ret_date_val, NOW())";
                         mysqli_query($connection, $credit_sales_sql);
                     }
                 }
@@ -669,7 +699,7 @@ if ($vehicles_res && mysqli_num_rows($vehicles_res) > 0) {
                         </div>
                         <div class="modal-body p-4" style="overflow-x: auto;">
                             <div id="creditModalErrorAlert" class="alert alert-danger py-2 px-3 mb-3 font-weight-bold" style="display:none; font-size:13px; border-left: 5px solid #dc3545;"></div>
-                            <table class="table table-bordered table-striped text-center table-sm" id="creditSalesTable" style="min-width: 1700px; font-size: 12px;">
+                            <table class="table table-bordered table-striped text-center table-sm" id="creditSalesTable" style="min-width: 1750px; font-size: 12px;">
                                 <thead class="bg-secondary text-white">
                                     <tr>
                                         <th style="width: 130px;">Nozzle <span class="text-danger">*</span></th>
@@ -679,13 +709,14 @@ if ($vehicles_res && mysqli_num_rows($vehicles_res) > 0) {
                                         <th style="width: 170px;">Vehicle No <span class="text-danger">*</span></th>
                                         <th style="width: 140px;">Account No (Cust ID) <span class="text-danger">*</span></th>
                                         <th style="width: 110px;">Item Name</th>
-                                        <th style="width: 80px;">Qty</th>
-                                        <th style="width: 80px;">Sale Rate</th>
-                                        <th style="width: 90px;">Amount <span class="text-danger">*</span></th>
-                                        <th style="width: 80px;">Cash Rate</th>
+                                        <th style="width: 75px;">Qty</th>
+                                        <th style="width: 75px;">Sale Rate</th>
+                                        <th style="width: 85px;">Amount</th>
+                                        <th style="width: 95px;">Charge Amt <span class="text-danger">*</span></th>
+                                        <th style="width: 75px;">Cash Rate</th>
                                         <th style="width: 80px;">Issue Qty</th>
-                                        <th style="width: 80px;">Balance 1</th>
-                                        <th style="width: 80px;">Balance 2</th>
+                                        <th style="width: 75px;">Bal 1</th>
+                                        <th style="width: 75px;">Bal 2</th>
                                         <th style="width: 85px;">Tmp. Receive</th>
                                         <th style="width: 50px;">Action</th>
                                     </tr>
@@ -852,6 +883,16 @@ function addCreditRow() {
                     '<input type="radio" id="st_temp_' + rowId + '" name="slip_type_radio_' + rowId + '" class="custom-control-input" value="Temporary Slip" onchange="onSlipTypeChange(this, ' + rowId + ')">' +
                     '<label class="custom-control-label font-weight-bold text-warning" for="st_temp_' + rowId + '" style="font-size:11px; cursor:pointer; color:#b07800 !important;">Temporary Slip</label>' +
                 '</div>' +
+                '<div class="mt-1 return-slip-box return-slip-box_' + rowId + '" style="display:none;">' +
+                    '<div class="custom-control custom-checkbox">' +
+                        '<input type="hidden" name="credit_is_returned[]" class="credit-is-returned-val" value="0">' +
+                        '<input type="checkbox" class="custom-control-input credit-is-returned" id="chk_ret_' + rowId + '" onchange="onReturnCheckboxChange(this)">' +
+                        '<label class="custom-control-label font-weight-bold text-success" for="chk_ret_' + rowId + '" style="font-size:11px; cursor:pointer;">Received</label>' +
+                    '</div>' +
+                    '<span class="badge badge-warning text-dark font-weight-bold p-1 mt-1 slip-return-status-text" style="font-size:9.5px; display:block; text-align:left;">' +
+                        '<i class="fas fa-hand-holding mr-1"></i> Giving (Loan Petrol)' +
+                    '</span>' +
+                '</div>' +
             '</div>' +
             '<input type="hidden" name="credit_slip_type[]" class="credit-slip-type-val" value="Permanent Slip">' +
         '</td>' +
@@ -861,26 +902,81 @@ function addCreditRow() {
         '</td>' +
         '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm credit-account-number font-weight-bold" placeholder="Customer ID" readonly style="background-color:#e9ecef; cursor:not-allowed;" required></td>' +
         '<td><input type="text" class="form-control form-control-sm credit-item-name" disabled></td>' +
+        '<td><input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm credit-qty" value="0" oninput="calculateCreditRow(this)"></td>' +
+        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate" value="0" oninput="calculateCreditRow(this)"></td>' +
+        '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="0" readonly style="background-color:#f8f9fa;"></td>' +
+        '<td><input type="number" step="0.01" name="credit_charge_amount[]" class="form-control form-control-sm credit-charge-amount-field font-weight-bold text-primary" value="0" readonly style="background-color:#eef2ff;" required></td>' +
+        '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="0"></td>' +
         '<td>' +
-            '<input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm credit-qty" value="0" oninput="calculateCreditRow(this)">' +
+            '<input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm credit-issue-qty" value="0" oninput="calculateCreditRow(this)">' +
             '<div class="fuel-limit-warning text-danger small text-left mt-1" style="display:none; font-size:10px;"></div>' +
         '</td>' +
-        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate" value="0" oninput="calculateCreditRow(this)"></td>' +
-        '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="0" oninput="calculateCreditTotal()" required></td>' +
-        '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="0"></td>' +
-        '<td><input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm" value="0"></td>' +
         '<td><input type="number" step="0.01" name="credit_balance_1[]" class="form-control form-control-sm" value="0"></td>' +
         '<td><input type="number" step="0.01" name="credit_balance_2[]" class="form-control form-control-sm" value="0"></td>' +
-        '<td><input type="number" step="0.01" name="credit_wasoli[]" class="form-control form-control-sm" value="0"></td>' +
+        '<td><input type="number" step="0.01" name="credit_wasoli[]" class="form-control form-control-sm credit-wasoli" value="0" disabled style="background-color:#e9ecef;" oninput="calculateCreditRow(this)"></td>' +
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCreditRow(this)"><i class="fas fa-trash-alt"></i></button></td>' +
         '</tr>';
 
     $('#creditSalesBody').append(rowHtml);
 }
 
+function onReturnCheckboxChange(checkboxElement) {
+    var $box = $(checkboxElement).closest('.return-slip-box');
+    var isChecked = $(checkboxElement).is(':checked');
+    $box.find('.credit-is-returned-val').val(isChecked ? 1 : 0);
+    var $statusLabel = $box.find('.slip-return-status-text');
+    if (isChecked) {
+        $statusLabel.removeClass('badge-warning text-dark').addClass('badge-success text-white')
+                    .html('<i class="fas fa-check-circle mr-1"></i> Received (Settled)');
+    } else {
+        $statusLabel.removeClass('badge-success text-white').addClass('badge-warning text-dark')
+                    .html('<i class="fas fa-hand-holding mr-1"></i> Giving (Loan Petrol)');
+    }
+    calculateCreditRow(checkboxElement);
+}
+
 function onSlipTypeChange(radioElement, rowId) {
     var val = $(radioElement).val();
-    $(radioElement).closest('tr').find('.credit-slip-type-val').val(val);
+    var $row = $(radioElement).closest('tr');
+    $row.find('.credit-slip-type-val').val(val);
+
+    var $issueQty = $row.find('.credit-issue-qty');
+    var $wasoli   = $row.find('.credit-wasoli');
+    var $chargeAmt = $row.find('.credit-charge-amount-field');
+    var $retBox   = $row.find('.return-slip-box');
+
+    if (val === 'Balanced Slip') {
+        // Balanced slip: Issue Qty active, Tmp Receive disabled/0, Charge Amount = 0.00
+        $issueQty.prop('disabled', false).css('background-color', '');
+        $wasoli.prop('disabled', true).css('background-color', '#e9ecef').val(0);
+        $retBox.hide();
+        $retBox.find('input[type="checkbox"]').prop('checked', false);
+        $retBox.find('.credit-is-returned-val').val(0);
+        $retBox.find('.slip-return-status-text').removeClass('badge-success text-white').addClass('badge-warning text-dark').html('<i class="fas fa-hand-holding mr-1"></i> Giving (Loan Petrol)');
+        $chargeAmt.val('0.00');
+    } else if (val === 'Temporary Slip') {
+        // Temporary slip: Issue Qty disabled/0, Tmp Receive active
+        $issueQty.prop('disabled', true).css('background-color', '#e9ecef').val(0);
+        $wasoli.prop('disabled', false).css('background-color', '');
+        $retBox.show();
+        var isChecked = $retBox.find('input[type="checkbox"]').is(':checked');
+        var $statusLabel = $retBox.find('.slip-return-status-text');
+        if (isChecked) {
+            $statusLabel.removeClass('badge-warning text-dark').addClass('badge-success text-white').html('<i class="fas fa-check-circle mr-1"></i> Received (Settled)');
+        } else {
+            $statusLabel.removeClass('badge-success text-white').addClass('badge-warning text-dark').html('<i class="fas fa-hand-holding mr-1"></i> Giving (Loan Petrol)');
+        }
+    } else { // Permanent Slip
+        // Permanent slip: Issue Qty active, Tmp Receive disabled/0
+        $issueQty.prop('disabled', false).css('background-color', '');
+        $wasoli.prop('disabled', true).css('background-color', '#e9ecef').val(0);
+        $retBox.hide();
+        $retBox.find('input[type="checkbox"]').prop('checked', false);
+        $retBox.find('.credit-is-returned-val').val(0);
+        $retBox.find('.slip-return-status-text').removeClass('badge-success text-white').addClass('badge-warning text-dark').html('<i class="fas fa-hand-holding mr-1"></i> Giving (Loan Petrol)');
+    }
+
+    calculateCreditRow($row.find('.credit-nozzle-select')[0]);
 }
 
 function onCreditVehicleInput(inputElement) {
@@ -935,20 +1031,45 @@ function onCreditVehicleInput(inputElement) {
 
 function calculateCreditRow(inputElement) {
     var $row = $(inputElement).closest('tr');
-    var qty = parseFloat($row.find('.credit-qty').val()) || 0;
+    var slipType = $row.find('.credit-slip-type-val').val() || 'Permanent Slip';
     var rate = parseFloat($row.find('.credit-rate').val()) || 0;
+    var baseQty = parseFloat($row.find('.credit-qty').val()) || 0;
+    var issueQty = parseFloat($row.find('.credit-issue-qty').val()) || 0;
+    var wasoli = parseFloat($row.find('.credit-wasoli').val()) || 0;
     var limit = parseFloat($row.data('fuel_limit')) || 0;
     var $limitWarning = $row.find('.fuel-limit-warning');
 
-    if (limit > 0 && qty > limit) {
+    var effectiveQty = 0;
+    var nominalAmount = 0;
+    var chargeAmount = 0;
+
+    if (slipType === 'Balanced Slip') {
+        effectiveQty = baseQty > 0 ? baseQty : issueQty;
+        nominalAmount = effectiveQty * rate;
+        chargeAmount = 0; // Free / already charged previously
+    } else if (slipType === 'Temporary Slip') {
+        effectiveQty = wasoli > 0 ? wasoli : baseQty;
+        nominalAmount = effectiveQty * rate;
+        var isRet = $row.find('.credit-is-returned').is(':checked');
+        // If Received check is checked: we received it (charge to collect = 0).
+        // If Received check is NOT checked: we don't receive (unpaid loan petrol, must collect!).
+        chargeAmount = isRet ? 0 : (effectiveQty * rate);
+    } else { // Permanent Slip
+        effectiveQty = baseQty > 0 ? baseQty : issueQty;
+        nominalAmount = effectiveQty * rate;
+        chargeAmount = effectiveQty * rate; // Always calculation depends on Qty
+    }
+
+    // Fuel Limit verification
+    if (limit > 0 && effectiveQty > limit) {
         $limitWarning.show().html('<i class="fas fa-exclamation-circle mr-1"></i>Exceeds quota (' + limit.toFixed(2) + ' Ltr)');
     } else {
         $limitWarning.hide().html('');
     }
 
-    if (qty > 0 && rate > 0) {
-        $row.find('.credit-amount-field').val((qty * rate).toFixed(2));
-    }
+    $row.find('.credit-amount-field').val(nominalAmount.toFixed(2));
+    $row.find('.credit-charge-amount-field').val(chargeAmount.toFixed(2));
+
     calculateCreditTotal();
 }
 
@@ -977,13 +1098,13 @@ function updateCreditItem(selectElement) {
 }
 
 function calculateCreditTotal() {
-    var total = 0;
-    $('.credit-amount-field').each(function() {
+    var totalCharge = 0;
+    $('.credit-charge-amount-field').each(function() {
         var val = parseFloat($(this).val()) || 0;
-        total += val;
+        totalCharge += val;
     });
-    $('#credit_sale_total_display').text(total.toFixed(2));
-    $('#modal_credit_total_display').text(total.toFixed(2));
+    $('#credit_sale_total_display').text(totalCharge.toFixed(2));
+    $('#modal_credit_total_display').text(totalCharge.toFixed(2));
 }
 
 function removeCreditRow(btn) {
@@ -1006,9 +1127,12 @@ function confirmCreditSalesModal() {
         var slipNo    = $row.find('.credit-slip-no').val().trim();
         var vehicleNo = $row.find('.credit-vehicle-number').val().trim();
         var amount    = parseFloat($row.find('.credit-amount-field').val()) || 0;
+        var chargeAmt = parseFloat($row.find('.credit-charge-amount-field').val()) || 0;
         var qty       = parseFloat($row.find('.credit-qty').val()) || 0;
+        var issueQty  = parseFloat($row.find('.credit-issue-qty').val()) || 0;
+        var wasoli    = parseFloat($row.find('.credit-wasoli').val()) || 0;
 
-        if (nozzleId || amount > 0 || qty > 0 || vehicleNo || slipNo) {
+        if (nozzleId || amount > 0 || chargeAmt > 0 || qty > 0 || issueQty > 0 || wasoli > 0 || vehicleNo || slipNo) {
             if (!slipNo) {
                 hasError = true;
                 $row.find('.credit-slip-no').addClass('is-invalid');
@@ -1066,9 +1190,12 @@ $('#meterForm').on('submit', function(e) {
         var slipNo    = $row.find('.credit-slip-no').val().trim();
         var vehicleNo = $row.find('.credit-vehicle-number').val().trim();
         var amount    = parseFloat($row.find('.credit-amount-field').val()) || 0;
+        var chargeAmt = parseFloat($row.find('.credit-charge-amount-field').val()) || 0;
         var qty       = parseFloat($row.find('.credit-qty').val()) || 0;
+        var issueQty  = parseFloat($row.find('.credit-issue-qty').val()) || 0;
+        var wasoli    = parseFloat($row.find('.credit-wasoli').val()) || 0;
 
-        if (nozzleId || amount > 0 || qty > 0 || vehicleNo || slipNo) {
+        if (nozzleId || amount > 0 || chargeAmt > 0 || qty > 0 || issueQty > 0 || wasoli > 0 || vehicleNo || slipNo) {
             if (!slipNo) {
                 creditError = true;
                 $row.find('.credit-slip-no').addClass('is-invalid');

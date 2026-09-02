@@ -2,6 +2,7 @@
 require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
+require '../include/permissions.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     header('Location: meter-reading-list.php'); exit;
@@ -93,10 +94,16 @@ $credit_sales_sql = "SELECT mrcs.*,
 $credit_sales_result = mysqli_query($connection, $credit_sales_sql);
 $credit_sales = [];
 $credit_sales_total = 0;
+$credit_sales_charge_total = 0;
 if ($credit_sales_result) {
     while ($cs = mysqli_fetch_assoc($credit_sales_result)) {
         $credit_sales[] = $cs;
         $credit_sales_total += floatval($cs['amount']);
+        $chg = floatval($cs['charge_amount'] ?? ($cs['slip_type'] == 'Balanced Slip' ? 0 : $cs['amount']));
+        if ($cs['slip_type'] === 'Temporary Slip' && !empty($cs['is_returned'])) {
+            $chg = 0.00;
+        }
+        $credit_sales_charge_total += $chg;
     }
 }
 ?>
@@ -271,6 +278,16 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
         <a href="meter-reading-list.php" class="btn btn-outline-light btn-sm mr-2">
             <i class="fas fa-arrow-left mr-1"></i> Back
         </a>
+        <?php if (has_permission('meter_readings', 'add')): ?>
+        <a href="add-meter-reading.php" class="btn btn-outline-light btn-sm mr-2 font-weight-bold">
+            <i class="fas fa-plus mr-1"></i> New Reading
+        </a>
+        <?php endif; ?>
+        <?php if (has_permission('meter_readings', 'edit') && !$isSoftDeleted): ?>
+        <a href="edit-meter-reading.php?id=<?php echo $id; ?>" class="btn btn-warning btn-sm mr-2 font-weight-bold text-dark">
+            <i class="fas fa-edit mr-1"></i> Edit Reading
+        </a>
+        <?php endif; ?>
         <a href="generate-pdf-meter-reading.php?id=<?php echo $id; ?>" target="_blank"
            class="btn-print mr-2" style="display:inline-block;text-decoration:none;background:linear-gradient(135deg,#6a1b9a,#8e24aa);">
             <i class="fas fa-file-pdf mr-1"></i> Full PDF
@@ -278,6 +295,11 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
         <button onclick="window.print()" class="btn-print">
             <i class="fas fa-print mr-1"></i> Print
         </button>
+        <?php if (has_permission('meter_readings', 'delete') && !$isSoftDeleted): ?>
+        <button onclick="deleteMeterReading(<?php echo $id; ?>)" class="btn btn-danger btn-sm ml-2 font-weight-bold">
+            <i class="fas fa-trash-alt mr-1"></i> Delete
+        </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -472,6 +494,7 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                         <th class="text-right">Qty</th>
                         <th class="text-right">Sale Rate</th>
                         <th class="text-right">Amount</th>
+                        <th class="text-right">Charge Amt</th>
                         <th class="text-right">Cash Rate</th>
                         <th class="text-right">Issue Qty</th>
                         <th class="text-right">Balance 1</th>
@@ -508,7 +531,14 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                         <td><span class="badge badge-light border font-weight-bold px-2 py-1"><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></span></td>
                         <td class="text-right"><?php echo number_format($crs['quantity'], 2); ?></td>
                         <td class="text-right"><?php echo number_format($crs['rate'], 2); ?></td>
-                        <td class="text-right font-weight-bold text-warning">PKR <?php echo number_format($crs['amount'], 2); ?></td>
+                        <td class="text-right text-muted">PKR <?php echo number_format($crs['amount'], 2); ?></td>
+                        <td class="text-right font-weight-bold <?php echo ($crs['slip_type'] == 'Balanced Slip') ? 'text-muted' : 'text-warning'; ?>">
+                            <?php if ($crs['slip_type'] == 'Balanced Slip'): ?>
+                                <span class="badge badge-light border text-muted">Rs. 0.00</span>
+                            <?php else: ?>
+                                PKR <?php echo number_format($crs['charge_amount'] ?? $crs['amount'], 2); ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-right"><?php echo number_format($crs['cash_rate'], 2); ?></td>
                         <td class="text-right"><?php echo number_format($crs['issue_quantity'], 2); ?></td>
                         <td class="text-right"><?php echo number_format($crs['balance_1'], 2); ?></td>
@@ -519,8 +549,9 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 </tbody>
                 <tfoot>
                     <tr class="font-weight-bold bg-light">
-                        <td colspan="10" class="text-right">Total Credit Sale:</td>
-                        <td class="text-right text-warning">PKR <?php echo number_format($credit_sales_total, 2); ?></td>
+                        <td colspan="10" class="text-right">Total Fuel Value / Total Charge:</td>
+                        <td class="text-right text-muted">PKR <?php echo number_format($credit_sales_total, 2); ?></td>
+                        <td class="text-right text-warning">PKR <?php echo number_format($credit_sales_charge_total, 2); ?></td>
                         <td colspan="5"></td>
                     </tr>
                 </tfoot>
@@ -648,11 +679,13 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 <th>Item</th>
                 <th>Slip Date</th>
                 <th>Slip No</th>
+                <th>Slip Type</th>
                 <th>Account No</th>
                 <th>Vehicle No</th>
                 <th class="r">Qty</th>
                 <th class="r">Rate</th>
                 <th class="r">Amount</th>
+                <th class="r">Charge Amt</th>
                 <th class="r">Cash Rate</th>
                 <th class="r">Issue Qty</th>
                 <th class="r">Bal 1</th>
@@ -668,23 +701,44 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
                 <td><?php echo htmlspecialchars($crs['item_name'] ?? '—'); ?></td>
                 <td><?php echo date('d-m-Y', strtotime($crs['slip_date'])); ?></td>
                 <td><?php echo htmlspecialchars($crs['slip_no'] ?? '—'); ?></td>
+                <td class="c"><?php echo htmlspecialchars($crs['slip_type'] ?? 'Permanent Slip'); ?></td>
                 <td><?php echo htmlspecialchars($crs['account_number'] ?? '—'); ?></td>
                 <td><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></td>
                 <td class="r"><?php echo number_format($crs['quantity'], 2); ?></td>
                 <td class="r"><?php echo number_format($crs['rate'], 2); ?></td>
-                <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($crs['amount'], 2); ?></td>
+                <td class="r">Rs. <?php echo number_format($crs['amount'], 2); ?></td>
+                <td class="r" style="font-weight:bold;">
+                    <?php if ($crs['slip_type'] == 'Balanced Slip'): ?>
+                        Rs. 0.00 <span class="badge badge-light border" style="font-size:8px;">Pre-paid</span>
+                    <?php elseif ($crs['slip_type'] == 'Temporary Slip' && !empty($crs['is_returned'])): ?>
+                        Rs. 0.00 <span class="badge badge-success" style="font-size:8px;">Received</span>
+                    <?php else: ?>
+                        Rs. <?php echo number_format($crs['charge_amount'] ?? $crs['amount'], 2); ?>
+                    <?php endif; ?>
+                </td>
                 <td class="r"><?php echo number_format($crs['cash_rate'], 2); ?></td>
                 <td class="r"><?php echo number_format($crs['issue_quantity'], 2); ?></td>
                 <td class="r"><?php echo number_format($crs['balance_1'], 2); ?></td>
                 <td class="r"><?php echo number_format($crs['balance_2'], 2); ?></td>
-                <td class="r"><?php echo number_format($crs['wasoli'], 2); ?></td>
+                <td class="r">
+                    <?php if ($crs['slip_type'] == 'Temporary Slip'): ?>
+                        <?php if (!empty($crs['is_returned'])): ?>
+                            <span class="badge badge-success" style="font-size:8px;">✓ <?php echo number_format($crs['wasoli'] > 0 ? $crs['wasoli'] : $crs['quantity'], 2); ?> (Received)</span>
+                        <?php else: ?>
+                            <span class="badge badge-warning text-dark font-weight-bold" style="font-size:8px;">⏳ <?php echo number_format($crs['wasoli'] > 0 ? $crs['wasoli'] : $crs['quantity'], 2); ?> (Not Received)</span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <?php echo number_format($crs['wasoli'], 2); ?>
+                    <?php endif; ?>
+                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>
         <tfoot>
             <tr style="font-weight:bold; background:#eceff1;">
-                <td colspan="9" style="text-align:right;">Total Credit Sale:</td>
+                <td colspan="10" style="text-align:right;">Total Fuel Value / Charge Total:</td>
                 <td class="r">Rs. <?php echo number_format($credit_sales_total, 2); ?></td>
+                <td class="r" style="font-weight:bold;">Rs. <?php echo number_format($credit_sales_charge_total, 2); ?></td>
                 <td colspan="5"></td>
             </tr>
         </tfoot>
@@ -707,5 +761,26 @@ $grandDisplay = $calcGrand > 0 ? $calcGrand : floatval($header['grand_total']);
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<script>
+function deleteMeterReading(id) {
+    if (confirm('Are you sure you want to delete Meter Reading #' + id + '?')) {
+        $.ajax({
+            type: "POST",
+            url: "../include/deletemeterreading.php",
+            data: { id: id },
+            success: function (data) {
+                if (data.indexOf('deleted') !== -1) {
+                    window.location.href = 'meter-reading-list.php?msg=deleted';
+                } else {
+                    alert(data);
+                }
+            },
+            error: function (xhr, status, error) {
+                alert('Server error: ' + error);
+            }
+        });
+    }
+}
+</script>
 </body>
 </html>

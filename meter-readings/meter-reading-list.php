@@ -20,6 +20,15 @@ if ($result_active === false) {
     $result_active = mysqli_query($connection, $sql_active);
 }
 
+// Message handling
+$alert_message = '';
+if (isset($_GET['msg'])) {
+    if ($_GET['msg'] === 'deleted') {
+        $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Meter reading deleted successfully!<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
+    } elseif ($_GET['msg'] === 'updated') {
+        $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Meter reading updated successfully!<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -84,11 +93,15 @@ if ($result_active === false) {
 <main class="main">
 <div class="container-fluid pt-4 pb-5 px-4">
 
+    <?php if (!empty($alert_message)): ?>
+        <?php echo $alert_message; ?>
+    <?php endif; ?>
+
     <!-- Page Header -->
     <div class="page-header">
         <div>
             <h4><i class="fas fa-tachometer-alt mr-2"></i>Meter Readings</h4>
-            <small style="opacity:.8;">All recorded meter readings — click <i class="fas fa-eye"></i> to view details</small>
+            <small style="opacity:.8;">All recorded meter readings &mdash; click on <strong>Date</strong> to edit reading</small>
         </div>
         <?php if (has_permission('meter_readings', 'add')): ?>
         <a href="add-meter-reading.php" class="btn-new btn">
@@ -121,14 +134,22 @@ if ($result_active === false) {
                 ?>
                 <tr>
                     <td data-order="<?php echo $row['id']; ?>"><strong>#<?php echo $row['id']; ?></strong></td>
-                    <td data-order="<?php echo strtotime($row['date']); ?>"><?php echo date('d-m-Y', strtotime($row['date'])); ?></td>
+                    <td data-order="<?php echo strtotime($row['date']); ?>">
+                        <?php if (has_permission('meter_readings', 'edit')): ?>
+                            <a href="edit-meter-reading.php?id=<?php echo $row['id']; ?>" class="font-weight-bold" style="color:var(--primary-color); text-decoration:underline;" title="Click to Edit Meter Reading #<?php echo $row['id']; ?>">
+                                <?php echo date('d-m-Y', strtotime($row['date'])); ?>
+                            </a>
+                        <?php else: ?>
+                            <?php echo date('d-m-Y', strtotime($row['date'])); ?>
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo htmlspecialchars($row['shift_name'] ?? 'N/A'); ?></td>
 
                     <td style="text-align:right;font-weight:700;color: var(--primary-color);" data-order="<?php echo $row['grand_total']; ?>">
                         <?php echo number_format($row['grand_total'], 2); ?>
                     </td>
                     <td data-order="<?php echo strtotime($row['created_at']); ?>"><?php echo date('d-m-Y h:i A', strtotime($row['created_at'])); ?></td>
-                    <td style="text-align:center;">
+                    <td style="text-align:center; white-space:nowrap;">
                         <a href="view-meter-reading.php?id=<?php echo $row['id']; ?>"
                            class="btn btn-sm btn-info" title="View" style="background: var(--primary-gradient); border: none;">
                             <i class="fas fa-eye"></i>
@@ -138,6 +159,11 @@ if ($result_active === false) {
                            style="background:linear-gradient(135deg,#6a1b9a,#8e24aa);border:none;color:#fff;">
                             <i class="fas fa-file-pdf"></i>
                         </a>
+                        <?php if (has_permission('meter_readings', 'delete')): ?>
+                        <button type="button" class="btn btn-sm btn-danger ml-1" title="Delete Meter Reading" onclick="deleteMeterReading(<?php echo $row['id']; ?>)">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endwhile; else: ?>
@@ -158,9 +184,32 @@ if ($result_active === false) {
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
 <script>
-$(document).ready(function () {
-    $('#meterReadingTable').DataTable({ order: [[0, 'desc']] });
+$(document).ready(function() {
+    $('#meterReadingTable').DataTable({
+        "order": [[ 0, "desc" ]],
+        "pageLength": 25
+    });
 });
+
+function deleteMeterReading(id) {
+    if (confirm('Are you sure you want to delete Meter Reading #' + id + '?')) {
+        $.ajax({
+            type: "POST",
+            url: "../include/deletemeterreading.php",
+            data: { id: id },
+            success: function (data) {
+                if (data.indexOf('deleted') !== -1) {
+                    window.location.href = 'meter-reading-list.php?msg=deleted';
+                } else {
+                    alert(data);
+                }
+            },
+            error: function (xhr, status, error) {
+                alert('Server error: ' + error);
+            }
+        });
+    }
+}
 </script>
 </body>
 </html>

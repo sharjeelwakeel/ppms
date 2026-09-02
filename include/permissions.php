@@ -26,7 +26,8 @@ function get_system_modules() {
         'items'          => 'Items / Fuel Products',
         'banks'          => 'Bank Masters',
         'roles'          => 'Roles & Permissions',
-        'users'          => 'System Users / Accounts'
+        'users'          => 'System Users / Accounts',
+        'reports'        => 'Reports & Analytics'
     ];
 }
 

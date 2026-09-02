@@ -82,10 +82,16 @@ $credit_sales_sql = "SELECT mrcs.*,
 $credit_sales_result = mysqli_query($connection, $credit_sales_sql);
 $credit_sales = [];
 $credit_sales_total = 0;
+$credit_sales_charge_total = 0;
 if ($credit_sales_result) {
     while ($cs = mysqli_fetch_assoc($credit_sales_result)) {
         $credit_sales[] = $cs;
         $credit_sales_total += floatval($cs['amount']);
+        $chg = floatval($cs['charge_amount'] ?? ($cs['slip_type'] == 'Balanced Slip' ? 0 : $cs['amount']));
+        if ($cs['slip_type'] === 'Temporary Slip' && !empty($cs['is_returned'])) {
+            $chg = 0.00;
+        }
+        $credit_sales_charge_total += $chg;
     }
 }
 ?>
@@ -552,12 +558,13 @@ body {
                     <th style="width:10%; color:#000; background:#ddd;">Account No</th>
                     <th style="width:9%; color:#000; background:#ddd;">Vehicle No</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Qty</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Rate</th>
-                    <th style="width:8%; color:#000; background:#ddd;" class="r">Amount</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Cash Rate</th>
-                    <th style="width:6%; color:#000; background:#ddd;" class="r">Issue Qty</th>
-                    <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 1</th>
-                    <th style="width:5%; color:#000; background:#ddd;" class="r">Bal 2</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Rate</th>
+                    <th style="width:7%; color:#000; background:#ddd;" class="r">Amount</th>
+                    <th style="width:8%; color:#000; background:#ddd;" class="r">Charge Amt</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Cash Rate</th>
+                    <th style="width:5%; color:#000; background:#ddd;" class="r">Issue Qty</th>
+                    <th style="width:4%; color:#000; background:#ddd;" class="r">Bal 1</th>
+                    <th style="width:4%; color:#000; background:#ddd;" class="r">Bal 2</th>
                     <th style="width:6%; color:#000; background:#ddd;" class="r">Tmp. Receive</th>
                 </tr>
             </thead>
@@ -581,19 +588,39 @@ body {
                     <td class="c"><?php echo htmlspecialchars($crs['vehicle_number'] ?? '—'); ?></td>
                     <td class="r"><?php echo number_format($crs['quantity'], 2); ?></td>
                     <td class="r"><?php echo number_format($crs['rate'], 2); ?></td>
-                    <td class="r col-amt" style="font-weight:bold; color:#000;">Rs. <?php echo number_format($crs['amount'], 2); ?></td>
+                    <td class="r" style="color:#555;">Rs. <?php echo number_format($crs['amount'], 2); ?></td>
+                    <td class="r col-amt" style="font-weight:bold; color:#000;">
+                        <?php if ($crs['slip_type'] == 'Balanced Slip'): ?>
+                            Rs. 0.00
+                        <?php elseif ($crs['slip_type'] == 'Temporary Slip' && !empty($crs['is_returned'])): ?>
+                            Rs. 0.00 (Rec)
+                        <?php else: ?>
+                            Rs. <?php echo number_format($crs['charge_amount'] ?? $crs['amount'], 2); ?>
+                        <?php endif; ?>
+                    </td>
                     <td class="r"><?php echo number_format($crs['cash_rate'], 2); ?></td>
                     <td class="r"><?php echo number_format($crs['issue_quantity'], 2); ?></td>
                     <td class="r"><?php echo number_format($crs['balance_1'], 2); ?></td>
                     <td class="r"><?php echo number_format($crs['balance_2'], 2); ?></td>
-                    <td class="r"><?php echo number_format($crs['wasoli'], 2); ?></td>
+                    <td class="r">
+                        <?php if ($crs['slip_type'] == 'Temporary Slip'): ?>
+                            <?php if (!empty($crs['is_returned'])): ?>
+                                ✓ <?php echo number_format($crs['wasoli'] > 0 ? $crs['wasoli'] : $crs['quantity'], 2); ?> (Received)
+                            <?php else: ?>
+                                ⏳ <?php echo number_format($crs['wasoli'] > 0 ? $crs['wasoli'] : $crs['quantity'], 2); ?> (Not Received)
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <?php echo number_format($crs['wasoli'], 2); ?>
+                        <?php endif; ?>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
                 <tr class="totals-row">
-                    <td colspan="10" class="r">Total Credit Sale:</td>
-                    <td class="r col-amt">Rs. <?php echo number_format($credit_sales_total, 2); ?></td>
+                    <td colspan="10" class="r">Total Fuel Value / Charge Total:</td>
+                    <td class="r">Rs. <?php echo number_format($credit_sales_total, 2); ?></td>
+                    <td class="r col-amt">Rs. <?php echo number_format($credit_sales_charge_total, 2); ?></td>
                     <td colspan="5"></td>
                 </tr>
             </tfoot>
