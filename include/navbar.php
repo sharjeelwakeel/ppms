@@ -115,14 +115,25 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
 
-            <!-- Transactions / Meter Readings -->
-            <?php if (has_permission('meter_readings', 'show')): ?>
+            <!-- Transactions Menu -->
+            <?php 
+            $showTransactions = has_permission('meter_readings', 'show') || has_permission('credit_sales', 'show') || has_permission('card_sales', 'show');
+            if ($showTransactions): 
+            ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-calculator mr-1"></i> Transactions
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink3">
+                    <?php if (has_permission('meter_readings', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>meter-readings/meter-reading-list.php"><i class="fas fa-tachometer-alt mr-1"></i> Meter Reading</a>
+                    <?php endif; ?>
+                    <?php if (has_permission('credit_sales', 'show')): ?>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>credit-sales/credit-sales-list.php"><i class="fas fa-file-invoice-dollar mr-1"></i> Credit Sale Reading</a>
+                    <?php endif; ?>
+                    <?php if (has_permission('card_sales', 'show')): ?>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>card-sales/card-sales-list.php"><i class="fas fa-credit-card mr-1"></i> Card Sale Reading</a>
+                    <?php endif; ?>
                 </div>
             </li>
             <?php endif; ?>

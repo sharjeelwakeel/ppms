@@ -40,7 +40,7 @@ $report_sql = "SELECT mrcs.*,
                LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
                LEFT JOIN tbl_nozzles n ON (mrcs.nozzle_id = n.id)
                LEFT JOIN tbl_items i ON (n.item_id = i.id)
-               WHERE $where_sql
+               WHERE $where_sql AND (mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')
                ORDER BY COALESCE(c.name, 'ZZZ') ASC, mrcs.slip_date DESC, mrcs.id DESC";
 
 $report_res = mysqli_query($connection, $report_sql);

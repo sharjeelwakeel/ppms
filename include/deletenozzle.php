@@ -14,7 +14,7 @@ if (!has_permission('nozzles', 'delete')) {
 
 if (isset($_POST['id']) && !empty($_POST['id'])) {
     $id = mysqli_real_escape_string($connection, $_POST['id']);
-    $sql = "UPDATE tbl_nozzles SET deleted_at = NOW() WHERE id = '$id'";
+    $sql = "UPDATE tbl_nozzles SET deleted_at = NOW(), status = 'Inactive' WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
         echo 'Nozzle deleted.';
     } else {

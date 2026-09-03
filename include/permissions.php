@@ -18,6 +18,8 @@ function get_system_modules() {
         'expenses'       => 'Expenses Management',
         'purchases'      => 'Purchases & Tank Links',
         'meter_readings' => 'Meter Readings',
+        'credit_sales'   => 'Credit Sale Reading',
+        'card_sales'     => 'Card Sale Reading',
         'tanks'          => 'Tanks & Dip Chart Log',
         'nozzles'        => 'Nozzles',
         'staff'          => 'Sales Staff',
@@ -86,6 +88,14 @@ function has_permission($module_slug, $action) {
     $perm_res = mysqli_query($connection, "SELECT $col_name FROM tbl_role_permissions WHERE role_id = '$role_id' AND module_slug = '$module_slug' LIMIT 1");
     if ($perm_res && ($perm = mysqli_fetch_assoc($perm_res))) {
         return intval($perm[$col_name]) === 1;
+    }
+
+    // Fallback: If credit_sales or card_sales is queried, inherit from meter_readings
+    if ($module_slug === 'credit_sales' || $module_slug === 'card_sales') {
+        $fb_res = mysqli_query($connection, "SELECT $col_name FROM tbl_role_permissions WHERE role_id = '$role_id' AND module_slug = 'meter_readings' LIMIT 1");
+        if ($fb_res && ($fb_perm = mysqli_fetch_assoc($fb_res))) {
+            return intval($fb_perm[$col_name]) === 1;
+        }
     }
 
     return false; // Default deny if explicit permission row is missing or 0

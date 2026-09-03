@@ -342,37 +342,7 @@ if (isset($_POST['submit_dip_log'])) {
 			</div>
 		</main>
 
-        <!-- MODAL 1: Missing Meter Reading Warning Modal -->
-        <div class="modal fade" id="missingMeterModal" tabindex="-1" role="dialog" aria-labelledby="missingMeterModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content border-0 shadow">
-                    <div class="modal-header modal-header-navy">
-                        <h5 class="modal-title" id="missingMeterModalLabel">
-                            <i class="fas fa-exclamation-triangle text-warning mr-2"></i>Meter Reading Missing
-                        </h5>
-                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body text-center p-4">
-                        <i class="fas fa-tachometer-alt text-warning mb-3" style="font-size: 48px;"></i>
-                        <p class="mb-0 font-weight-bold text-dark" id="missingMeterModalMsg">
-                            You don't add meter reading for this date & shift. Please add manually or complete meter reading entry.
-                        </p>
-                    </div>
-                    <div class="modal-footer justify-content-center bg-light">
-                        <a href="../meter-readings/add-meter-reading.php" target="_blank" class="btn btn-primary">
-                            <i class="fas fa-plus mr-1"></i> Add Meter Reading
-                        </a>
-                        <button type="button" class="btn btn-secondary" id="btnEnterUsageManually" data-dismiss="modal">
-                            <i class="fas fa-edit mr-1"></i> Enter Manually
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL 2: Unmapped Dip MM Modal -->
+        <!-- MODAL: Unmapped Dip MM Modal -->
         <div class="modal fade" id="missingDipModal" tabindex="-1" role="dialog" aria-labelledby="missingDipModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content border-0 shadow">
@@ -481,32 +451,15 @@ if (isset($_POST['submit_dip_log'])) {
             data: { tank_id: tankId, date: dateVal, shift_id: shiftId },
             dataType: 'json',
             success: function(res) {
-                if (res.success) {
-                    if (res.meter_found) {
-                        // Auto-fill prev_reading and current_reading for nozzles
-                        if (res.nozzles && res.nozzles.length > 0) {
-                            res.nozzles.forEach(function(n) {
-                                const prevR = parseFloat(n.prev_reading) || 0.00;
-                                const currR = parseFloat(n.current_reading) || 0.00;
-                                $('#nozzle_reading_' + n.id).attr('data-prev-reading', prevR);
-                                $('#nozzle_prev_badge_' + n.id).text('Prev: ' + prevR.toFixed(2));
-                                $('#nozzle_reading_' + n.id).val(currR.toFixed(2));
-                            });
-                        }
-                        calculateTotalNozzleUsage();
-                    } else {
-                        if (res.nozzles && res.nozzles.length > 0) {
-                            res.nozzles.forEach(function(n) {
-                                const prevR = parseFloat(n.prev_reading) || 0.00;
-                                $('#nozzle_reading_' + n.id).attr('data-prev-reading', prevR);
-                                $('#nozzle_prev_badge_' + n.id).text('Prev: ' + prevR.toFixed(2));
-                            });
-                        }
-                        // Trigger Warning Modal if meter reading not found
-                        $('#missingMeterModalMsg').text(res.message || 'You don\'t add meter reading for this date and shift. Please add manually or complete meter reading.');
-                        $('#missingMeterModal').modal('show');
-                        calculateTotalNozzleUsage();
-                    }
+                if (res.success && res.nozzles && res.nozzles.length > 0) {
+                    res.nozzles.forEach(function(n) {
+                        const prevR = parseFloat(n.prev_reading) || 0.00;
+                        const currR = parseFloat(n.current_reading) || 0.00;
+                        $('#nozzle_reading_' + n.id).attr('data-prev-reading', prevR);
+                        $('#nozzle_prev_badge_' + n.id).text('Prev: ' + prevR.toFixed(2));
+                        $('#nozzle_reading_' + n.id).val(currR.toFixed(2));
+                    });
+                    calculateTotalNozzleUsage();
                 }
                 calculateFormulas();
             }

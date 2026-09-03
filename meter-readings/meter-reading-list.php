@@ -150,10 +150,6 @@ if (isset($_GET['msg'])) {
                     </td>
                     <td data-order="<?php echo strtotime($row['created_at']); ?>"><?php echo date('d-m-Y h:i A', strtotime($row['created_at'])); ?></td>
                     <td style="text-align:center; white-space:nowrap;">
-                        <a href="view-meter-reading.php?id=<?php echo $row['id']; ?>"
-                           class="btn btn-sm btn-info" title="View" style="background: var(--primary-gradient); border: none;">
-                            <i class="fas fa-eye"></i>
-                        </a>
                         <a href="generate-pdf-meter-reading.php?id=<?php echo $row['id']; ?>" target="_blank"
                            class="btn btn-sm btn-secondary" title="Generate PDF"
                            style="background:linear-gradient(135deg,#6a1b9a,#8e24aa);border:none;color:#fff;">

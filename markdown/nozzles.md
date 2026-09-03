@@ -48,11 +48,19 @@ CREATE TABLE IF NOT EXISTS `tbl_nozzles` (
 
 ## 5. Running Meter Synchronization
 
-- Whenever a sales shift or daily meter reading is finalized (`meter-readings/add-meter-reading.php`), the closing meter reading is automatically recorded to update `tbl_nozzles.start_reading`:
+- **From Meter Readings (`meter-readings/add-meter-reading.php`)**:
+  Whenever a sales shift or daily meter reading is finalized, the closing meter reading is automatically recorded to update `tbl_nozzles.start_reading`:
   ```sql
   UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id';
   ```
-- This ensures sequential meter reading calculations for next shift / dip log reconciliation.
+- **From Card Sales (`card-sales/add-card-sale.php`)**:
+  Whenever a card sale is logged, the dispensed petrol volume ($\text{qty} = \frac{\text{amount}}{\text{rate}}$) is automatically added to the nozzle's running meter:
+  ```sql
+  UPDATE tbl_nozzles SET start_reading = start_reading + $quantity WHERE id = '$nozzle_id';
+  ```
+  Editing or deleting card sales automatically adjusts or rolls back the nozzle's meter reading to preserve total volume integrity.
+- **For Tank Dip Logs (`tanks/get-tank-meter-readings.php`)**:
+  Tank dip calculations and nozzle readings are always retrieved directly from `tbl_nozzles.start_reading`, completely decoupling dip log entry from the separate `tbl_meter_readings` table.
 
 ---
 

@@ -5179,7 +5179,9 @@ INSERT INTO `tbl_meter_readings` (`id`, `date`, `shift_id`, `payment_type`, `gra
 
 CREATE TABLE `tbl_meter_reading_card_sales` (
   `id` int(11) NOT NULL,
-  `meter_reading_id` int(11) NOT NULL,
+  `meter_reading_id` int(11) NOT NULL DEFAULT 0,
+  `sale_date` date NOT NULL,
+  `shift_id` int(11) NOT NULL DEFAULT 0,
   `staff_id` int(11) NOT NULL DEFAULT 0,
   `card_machine_id` int(11) NOT NULL,
   `item_id` int(11) NOT NULL,
@@ -5191,7 +5193,8 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
   `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `nozzle_id` int(11) DEFAULT NULL,
   `no_of_cards` int(11) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -5202,9 +5205,10 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
 
 CREATE TABLE `tbl_meter_reading_credit_sales` (
   `id` int(11) NOT NULL,
-  `meter_reading_id` int(11) NOT NULL,
+  `meter_reading_id` int(11) NOT NULL DEFAULT 0,
   `nozzle_id` int(11) NOT NULL,
   `slip_date` date NOT NULL,
+  `shift_id` int(11) NOT NULL DEFAULT 0,
   `slip_no` varchar(64) NOT NULL,
   `slip_type` enum('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip',
   `account_number` varchar(128) NOT NULL,
@@ -5220,7 +5224,8 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
   `wasoli` decimal(12,2) NOT NULL DEFAULT 0.00,
   `is_returned` tinyint(1) NOT NULL DEFAULT 0,
   `returned_at` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

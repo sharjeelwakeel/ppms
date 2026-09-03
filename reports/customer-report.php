@@ -84,7 +84,7 @@ if ($isSearched) {
                    LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
                    LEFT JOIN tbl_nozzles n ON (mrcs.nozzle_id = n.id)
                    LEFT JOIN tbl_items i ON (n.item_id = i.id)
-                   WHERE $where_sql
+                   WHERE $where_sql AND (mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')
                    ORDER BY COALESCE(c.name, 'ZZZ') ASC, mrcs.slip_date DESC, mrcs.id DESC";
 
     $report_res = mysqli_query($connection, $report_sql);
@@ -474,9 +474,15 @@ if ($isSearched) {
                                         <td class="text-center font-weight-bold text-muted"><?php echo $sn++; ?></td>
                                         <td class="text-center"><?php echo date('d-m-Y', strtotime($slip['slip_date'])); ?></td>
                                         <td class="text-center">
-                                            <a href="../meter-readings/view-meter-reading.php?id=<?php echo $slip['meter_reading_id']; ?>" target="_blank" class="font-weight-bold text-primary">
-                                                #<?php echo $slip['meter_reading_id']; ?>
-                                            </a>
+                                            <?php if (!empty($slip['meter_reading_id']) && $slip['meter_reading_id'] > 0): ?>
+                                                <a href="../meter-readings/view-meter-reading.php?id=<?php echo $slip['meter_reading_id']; ?>" target="_blank" class="font-weight-bold text-primary">
+                                                    #<?php echo $slip['meter_reading_id']; ?>
+                                                </a>
+                                            <?php else: ?>
+                                                <a href="../credit-sales/credit-sales-list.php?from_date=<?php echo $slip['slip_date']; ?>&to_date=<?php echo $slip['slip_date']; ?>" target="_blank" class="badge badge-info" title="View in Credit Sales">
+                                                    <i class="fas fa-file-invoice-dollar mr-1"></i>Slip
+                                                </a>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-center font-weight-bold"><?php echo htmlspecialchars($slip['slip_no']); ?></td>
                                         <td class="text-center">
