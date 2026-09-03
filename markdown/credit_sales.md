@@ -143,6 +143,22 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
 - Professional print layout styled with deep navy `#04204e` branding.
 - Station header displaying Date and Shift name, summary metric cards, itemized slip table, and authorization signatures.
 
+### 6. Automatic Nozzle Running Meter & Daily Ledger Synchronization
+- **On Add (`credit-sales/add-credit-sale.php`)**:
+  - For each credit slip, the dispensed fuel quantity ($+\text{qty}$) automatically advances the nozzle's running meter reading in `tbl_nozzles`:
+    ```sql
+    UPDATE tbl_nozzles SET start_reading = start_reading + $quantity WHERE id = '$nozzle_id';
+    ```
+  - Also updates the daily nozzle snapshot ledger in `tbl_daily_nozzle_readings`.
+- **On Edit (`credit-sales/edit-credit-sale.php`)**:
+  - Reverts previously logged slip volumes ($-\text{old\_qty}$) and applies updated slip volumes ($+\text{new\_qty}$) atomically.
+- **On Delete (`include/deletecreditsale.php`)**:
+  - Soft-deleting credit slips by date/shift or single slip ID automatically deducts the exact fuel volume from `tbl_nozzles`:
+    ```sql
+    UPDATE tbl_nozzles SET start_reading = GREATEST(start_reading - $total_qty, 0.00) WHERE id = '$nozzle_id';
+    ```
+  - Deducts the dispensed volume from `tbl_daily_nozzle_readings`.
+
 ---
 
 ## 5. File Architecture

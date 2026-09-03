@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 check_access('card_sales', 'add');
 
@@ -109,6 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!mysqli_query($connection, $upd_noz)) {
                         throw new Exception("Error updating nozzle meter reading: " . mysqli_error($connection));
                     }
+
+                    // Synchronize daily nozzle snapshot
+                    sync_nozzle_daily_card_sale_delta($connection, $sale_date, $shift_id, $noz_id, $qty);
                 }
             }
             mysqli_commit($connection);

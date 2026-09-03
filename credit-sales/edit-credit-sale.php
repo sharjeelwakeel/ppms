@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 check_access('credit_sales', 'edit');
 
@@ -112,8 +113,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($valid) {
             mysqli_begin_transaction($connection);
             try {
-                // Soft-delete previous rows for this date and shift
                 $del_shift_clause = ($current_shift_id > 0) ? " AND shift_id = '$current_shift_id'" : "";
+
+                // Revert previously logged fuel quantities from tbl_nozzles
+                $prev_q = mysqli_query($connection, "SELECT nozzle_id, SUM(quantity) AS prev_qty 
+                                                      FROM tbl_meter_reading_credit_sales 
+                                                      WHERE slip_date = '$date_safe' $del_shift_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') 
+                                                      GROUP BY nozzle_id");
+                if ($prev_q) {
+                    while ($prow = mysqli_fetch_assoc($prev_q)) {
+                        $p_noz = intval($prow['nozzle_id']);
+                        $p_qty = floatval($prow['prev_qty']);
+                        if ($p_noz > 0 && $p_qty > 0) {
+                            mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = GREATEST(start_reading - $p_qty, 0.00) WHERE id = '$p_noz'");
+                            sync_nozzle_daily_card_sale_delta($connection, $date_safe, $current_shift_id, $p_noz, -$p_qty);
+                        }
+                    }
+                }
+
+                // Soft-delete previous rows for this date and shift
                 $del_sql = "UPDATE tbl_meter_reading_credit_sales SET deleted_at = NOW() 
                             WHERE slip_date = '$date_safe' $del_shift_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')";
                 if (!mysqli_query($connection, $del_sql)) {
@@ -147,6 +165,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                  '$qty', '$rate', '$amount', '$charge_amt', '$cash_rate', '$issue_qty', '$bal1', '$bal2', '$wasoli', '$is_ret', $ret_at)";
                     if (!mysqli_query($connection, $ins_sql)) {
                         throw new Exception("Error re-saving slip #$slip_no: " . mysqli_error($connection));
+                    }
+
+                    // Advance nozzle meter reading and sync daily ledger
+                    if ($noz_id > 0 && $qty > 0) {
+                        mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = start_reading + $qty WHERE id = '$noz_id'");
+                        sync_nozzle_daily_card_sale_delta($connection, $new_date, $new_shift_id, $noz_id, $qty);
                     }
                 }
                 mysqli_commit($connection);

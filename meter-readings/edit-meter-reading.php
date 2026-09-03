@@ -6,6 +6,7 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 // Enforce edit access check
 check_access('meter_readings', 'edit');
@@ -86,6 +87,9 @@ if (isset($_POST['submit'])) {
 
                         // Update running start_reading in tbl_nozzles
                         mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'");
+
+                        // Synchronize daily snapshot in tbl_daily_nozzle_readings
+                        sync_nozzle_daily_meter_reading($connection, $date, $shift_id, $nozzle_id, $last_reading, $current_reading, $net_sale);
                     }
                 }
 

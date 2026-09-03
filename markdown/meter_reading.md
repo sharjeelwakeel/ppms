@@ -80,6 +80,20 @@ For each nozzle row:
   UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id';
   ```
 
+### 4. Automatic Reversion on Meter Reading Deletion (`include/deletemeterreading.php`)
+- When a shift meter reading is deleted:
+  - The system iterates over all attached nozzles in `tbl_meter_reading_details`.
+  - If the nozzle is still at the closing reading, its running meter (`tbl_nozzles.start_reading`) reverts directly back to `last_reading` (or deducts `net_sale` if subsequent transactions occurred):
+    ```sql
+    UPDATE tbl_nozzles 
+    SET start_reading = CASE 
+        WHEN ROUND(start_reading, 2) = ROUND($current_reading, 2) THEN $last_reading 
+        ELSE GREATEST(start_reading - $net_sale, 0.00) 
+    END 
+    WHERE id = '$nozzle_id';
+    ```
+  - Cleans up the daily snapshot from `tbl_daily_nozzle_readings`.
+
 ---
 
 ## 4. CRUD Workflow & Navigation

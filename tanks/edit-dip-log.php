@@ -6,6 +6,7 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 // Enforce access check for editing dip logs
 check_access('tanks', 'edit');
@@ -142,8 +143,12 @@ if (isset($_POST['update_dip_log'])) {
                 foreach ($_POST['nozzle_reading'] as $noz_id => $rdg) {
                     $noz_id_int = intval($noz_id);
                     $rdg_val = floatval($rdg);
+                    $prev_rdg_val = floatval($_POST['nozzle_prev_reading'][$noz_id] ?? $rdg_val);
                     mysqli_stmt_bind_param($stmt_m, "iid", $id, $noz_id_int, $rdg_val);
                     mysqli_stmt_execute($stmt_m);
+
+                    // Sync to tbl_daily_nozzle_readings
+                    sync_nozzle_daily_dip_reading($connection, $date, $shift_id, $noz_id_int, $tank_id, $rdg_val, $prev_rdg_val);
                 }
                 mysqli_stmt_close($stmt_m);
             }
@@ -270,6 +275,7 @@ if (isset($_POST['update_dip_log'])) {
                                                                     </span>
                                                                 </div>
                                                                 <label class="small text-muted mb-1">Current Reading</label>
+                                                                <input type="hidden" name="nozzle_prev_reading[<?php echo $noz['id']; ?>]" id="nozzle_prev_reading_input_<?php echo $noz['id']; ?>" value="<?php echo $noz['prev_reading']; ?>">
                                                                 <input type="number" step="0.01" min="0" 
                                                                        class="form-control nozzle-reading-input font-weight-bold text-primary" 
                                                                        name="nozzle_reading[<?php echo $noz['id']; ?>]" 
@@ -484,6 +490,7 @@ if (isset($_POST['update_dip_log'])) {
                         const prevR = parseFloat(n.prev_reading) || 0.00;
                         const currR = parseFloat(n.current_reading) || 0.00;
                         $('#nozzle_reading_' + n.id).attr('data-prev-reading', prevR);
+                        $('#nozzle_prev_reading_input_' + n.id).val(prevR);
                         $('#nozzle_prev_badge_' + n.id).text('Prev: ' + prevR.toFixed(2));
                         $('#nozzle_reading_' + n.id).val(currR.toFixed(2));
                     });

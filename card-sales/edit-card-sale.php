@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 check_access('card_sales', 'edit');
 
@@ -101,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $p_qty = floatval($prow['prev_qty']);
                     if ($p_noz > 0 && $p_qty > 0) {
                         mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = GREATEST(start_reading - $p_qty, 0.00) WHERE id = '$p_noz'");
+                        sync_nozzle_daily_card_sale_delta($connection, $date_safe, $current_shift_id, $p_noz, -$p_qty);
                     }
                 }
             }
@@ -162,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!mysqli_query($connection, $upd_noz)) {
                         throw new Exception("Error updating nozzle meter reading: " . mysqli_error($connection));
                     }
+                    sync_nozzle_daily_card_sale_delta($connection, $new_date, $new_shift_id, $noz_id, $qty);
                 }
             }
             mysqli_commit($connection);

@@ -6146,10 +6146,28 @@ ALTER TABLE `tbl_staff_guarantors`
   ADD CONSTRAINT `tbl_staff_guarantors_ibfk_1` FOREIGN KEY (`staff_id`) REFERENCES `tbl_staff` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `tbl_tank_dip_charts`
+-- Table structure for table `tbl_daily_nozzle_readings`
 --
-ALTER TABLE `tbl_tank_dip_charts`
-  ADD CONSTRAINT `tbl_tank_dip_charts_ibfk_1` FOREIGN KEY (`tank_id`) REFERENCES `tbl_tanks` (`id`) ON DELETE CASCADE;
+
+CREATE TABLE IF NOT EXISTS `tbl_daily_nozzle_readings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` date NOT NULL,
+  `shift_id` int(11) NOT NULL DEFAULT 0,
+  `nozzle_id` int(11) NOT NULL,
+  `tank_id` int(11) NOT NULL DEFAULT 0,
+  `opening_reading` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `closing_reading` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `dispensed_litres` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `source` enum('meter_reading','card_sale','manual_dip','auto_sync') NOT NULL DEFAULT 'auto_sync',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_date_shift_nozzle` (`date`,`shift_id`,`nozzle_id`),
+  KEY `idx_date` (`date`),
+  KEY `idx_nozzle_id` (`nozzle_id`),
+  KEY `idx_tank_id` (`tank_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

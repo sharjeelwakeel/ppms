@@ -111,8 +111,10 @@ $$\text{Accumulative PMG} = \text{Previous Accumulative PMG} + \text{Usage}$$
 | `tanks/dip-chart.php` | Dip Chart dashboard for a specific tank with summary metric cards & DataTables log history |
 | `tanks/add-dip-log.php` | Create Dip Chart log with per-nozzle meter reading inputs, net usage subtraction ($C_i - P_i$), and auto-calculations |
 | `tanks/edit-dip-log.php` | Edit Dip Chart log entry with per-nozzle meter reading pre-filling and recalculation |
-| `tanks/get-tank-meter-readings.php` | AJAX endpoint returning `prev_reading`, `current_reading`, and `net_sale` ($C_i - P_i$) for attached nozzles |
+| `tanks/get-tank-meter-readings.php` | AJAX endpoint returning day-to-day `prev_reading`, `current_reading`, and `net_sale` from `tbl_daily_nozzle_readings` |
 | `tanks/get-prev-dip-log.php` | AJAX endpoint returning previous dip log values for sequential calculation |
+| `include/nozzle_daily_sync.php` | Centralized helper synchronizing daily nozzle meters across Add, Edit, and Delete |
+| `markdown/daily_nozzle_readings.md` | Full architecture and lifecycle of day-to-day nozzle meter tracking |
 | `dip-lookup/lookup-by-mm.php` | Sub-2ms indexed lookup for matching `dip_mm` to `balance` (`dip_litre`) |
 | `include/deletediplog.php` | Soft delete backend handler (`UPDATE tbl_tank_dip_logs SET deleted_at = NOW() WHERE id = ?`) |
 | `include/navbar.php` | Navigation bar link updates |

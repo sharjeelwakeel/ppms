@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 check_access('credit_sales', 'add');
 
@@ -110,6 +111,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                  '$qty', '$rate', '$amount', '$charge_amt', '$cash_rate', '$issue_qty', '$bal1', '$bal2', '$wasoli', '$is_ret', $ret_at)";
                     if (!mysqli_query($connection, $ins_sql)) {
                         throw new Exception("Error saving slip #$slip_no: " . mysqli_error($connection));
+                    }
+
+                    // Advance nozzle meter reading and sync daily ledger
+                    if ($noz_id > 0 && $qty > 0) {
+                        mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = start_reading + $qty WHERE id = '$noz_id'");
+                        sync_nozzle_daily_card_sale_delta($connection, $sale_date, $shift_id, $noz_id, $qty);
                     }
                 }
                 mysqli_commit($connection);

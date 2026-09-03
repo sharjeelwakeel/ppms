@@ -182,6 +182,7 @@ if ($stmt_latest) {
                                         <th>ID</th>
                                         <th>Date</th>
                                         <th>Shift</th>
+                                        <th>Nozzle Meters</th>
                                         <th>Dip (mm)</th>
                                         <th>Balance (Ltrs)</th>
                                         <th>Addition (Ltrs)</th>
@@ -197,6 +198,33 @@ if ($stmt_latest) {
                                 </thead>
                                 <tbody>
                                     <?php 
+                                    // Pre-fetch nozzle meters from tbl_tank_dip_meter_logs
+                                    $meter_logs = [];
+                                    $q_ml = mysqli_query($connection, "SELECT ml.dip_log_id, ml.nozzle_id, ml.reading, n.name AS nozzle_name 
+                                                                        FROM tbl_tank_dip_meter_logs ml 
+                                                                        JOIN tbl_tank_dip_logs dl ON ml.dip_log_id = dl.id 
+                                                                        JOIN tbl_nozzles n ON ml.nozzle_id = n.id 
+                                                                        WHERE dl.tank_id = $tank_id AND dl.deleted_at IS NULL 
+                                                                        ORDER BY n.name ASC");
+                                    if ($q_ml) {
+                                        while ($m_row = mysqli_fetch_assoc($q_ml)) {
+                                            $meter_logs[$m_row['dip_log_id']][] = $m_row;
+                                        }
+                                    }
+
+                                    // Pre-fetch daily nozzle readings from tbl_daily_nozzle_readings as fallback
+                                    $daily_readings = [];
+                                    $q_dr = mysqli_query($connection, "SELECT dnr.date, dnr.shift_id, dnr.closing_reading, n.name AS nozzle_name 
+                                                                       FROM tbl_daily_nozzle_readings dnr 
+                                                                       JOIN tbl_nozzles n ON dnr.nozzle_id = n.id 
+                                                                       WHERE dnr.tank_id = $tank_id 
+                                                                       ORDER BY n.name ASC");
+                                    if ($q_dr) {
+                                        while ($d_row = mysqli_fetch_assoc($q_dr)) {
+                                            $daily_readings[$d_row['date'] . '_' . $d_row['shift_id']][] = $d_row;
+                                        }
+                                    }
+
                                     $sql_logs = "SELECT d.*, s.name AS shift_name 
                                                  FROM tbl_tank_dip_logs d 
                                                  LEFT JOIN tbl_shifts s ON d.shift_id = s.id 
@@ -211,11 +239,26 @@ if ($stmt_latest) {
                                             $ov_class = floatval($row['overall_gain_loss']) >= 0 ? 'text-success' : 'text-danger';
                                             $ov_sign = floatval($row['overall_gain_loss']) >= 0 ? '+' : '';
 
+                                            // Format nozzle meters badges
+                                            $m_html = '';
+                                            if (!empty($meter_logs[$row['id']])) {
+                                                foreach ($meter_logs[$row['id']] as $mlog) {
+                                                    $m_html .= '<span class="badge badge-light border text-dark font-weight-normal mr-1 mb-1"><strong>' . htmlspecialchars($mlog['nozzle_name']) . ':</strong> ' . number_format($mlog['reading'], 2) . '</span>';
+                                                }
+                                            } elseif (!empty($daily_readings[$row['date'] . '_' . $row['shift_id']])) {
+                                                foreach ($daily_readings[$row['date'] . '_' . $row['shift_id']] as $dlog) {
+                                                    $m_html .= '<span class="badge badge-light border text-dark font-weight-normal mr-1 mb-1"><strong>' . htmlspecialchars($dlog['nozzle_name']) . ':</strong> ' . number_format($dlog['closing_reading'], 2) . '</span>';
+                                                }
+                                            } else {
+                                                $m_html = '<span class="text-muted small font-italic">-</span>';
+                                            }
+
                                             echo '
                                                 <tr>
                                                     <td>'.$row['id'].'</td>
                                                     <td>'.date("d-m-Y", strtotime($row['date'])).'</td>
                                                     <td>'.htmlspecialchars($row['shift_name'] ?? 'Shift #'.$row['shift_id']).'</td>
+                                                    <td>'.$m_html.'</td>
                                                     <td class="font-weight-bold">'.number_format($row['dip_mm'], 2).' mm</td>
                                                     <td class="font-weight-bold text-primary">'.number_format($row['balance'], 2).'</td>
                                                     <td>'.number_format($row['addition'], 2).'</td>

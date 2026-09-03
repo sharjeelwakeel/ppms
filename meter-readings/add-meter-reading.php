@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/nozzle_daily_sync.php';
 
 // Enforce access check for adding meter readings
 check_access('meter_readings', 'add');
@@ -69,6 +70,9 @@ if (isset($_POST['submit'])) {
                     // Update start_reading in tbl_nozzles with the new current_reading (stores current meter running position)
                     $update_nozzle_sql = "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'";
                     mysqli_query($connection, $update_nozzle_sql);
+
+                    // Synchronize daily snapshot in tbl_daily_nozzle_readings
+                    sync_nozzle_daily_meter_reading($connection, $date, $shift_id, $nozzle_id, $last_reading, $current_reading, $net_sale);
                 }
             }
 
