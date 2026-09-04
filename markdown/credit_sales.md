@@ -87,6 +87,21 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
 - Selecting a nozzle automatically fetches the fuel item's credit rate (`tbl_items.credit_rate`).
 - If credit rate is `0.00` or unset, it falls back to the standard cash rate (`tbl_items.cash_rate`).
 
+### 5. Automatic Row Expansion & Fast Data Entry ("Add New Row")
+- **Spreadsheet-Style Auto-Spawn**:
+  - When typing or selecting data in the **last row** of the table (e.g., entering Slip No, picking a Vehicle, or typing Quantity), the system automatically creates and appends the next blank row below it.
+  - Allows rapid, hands-on-keyboard entry without mouse intervention.
+- **Manual "Add New Row" Button**:
+  - Prominent buttons are provided in both the card header (`btn-light text-primary`) and bottom actions bar (`btn-primary`):
+    ```html
+    <button type="button" class="btn btn-primary btn-sm font-weight-bold" onclick="addCreditRow()">
+        <i class="fas fa-plus mr-1"></i> Add New Row
+    </button>
+    ```
+- **Smart Pruning of Trailing Empty Rows on Submit**:
+  - If a user finishes entering transactions and leaves the automatically spawned next row blank/untouched, clicking **Save Credit Sales** or **Update Credit Sales** automatically prunes the trailing blank row before validation and database insertion.
+  - Prevents validation blocks or saving empty dummy rows.
+
 ---
 
 ## 4. CRUD Workflow & Navigation

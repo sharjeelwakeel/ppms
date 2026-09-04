@@ -68,6 +68,21 @@ For each card transaction entry:
   - **On Edit**: Atomically adjusts the nozzle's `start_reading` by reverting the previous litres and applying the new transaction litres.
   - **On Delete**: Soft-deleting card sales for a date or single swipe automatically deducts and rolls back the petrol volume (`GREATEST(start_reading - $quantity, 0.00)`) from `tbl_nozzles`.
 
+### 5. Automatic Row Expansion & Fast Data Entry ("Add New Row")
+- **Spreadsheet-Style Auto-Spawn**:
+  - When typing or selecting data in the **last row** of the card sales table (e.g., selecting a Card Machine, typing a Batch No, or entering Amount), the next blank row automatically appears directly below it.
+  - Enables smooth, fast POS card transaction entries without touching the mouse.
+- **Manual "Add New Row" Button**:
+  - Prominent buttons are provided in both the card header (`btn-light text-primary`) and below the table (`btn-primary`):
+    ```html
+    <button type="button" class="btn btn-primary btn-sm font-weight-bold" onclick="addCardRow()">
+        <i class="fas fa-plus mr-1"></i> Add New Row
+    </button>
+    ```
+- **Smart Pruning of Trailing Empty Rows on Submit**:
+  - When saving or updating card sales, any trailing auto-spawned rows that were left untouched/empty are automatically pruned from the form before validation and submission.
+  - Guarantees zero validation errors and eliminates blank or zero-amount dummy database records.
+
 ---
 
 ## 4. CRUD Workflow & Navigation

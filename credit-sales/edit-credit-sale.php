@@ -268,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <?php endif; ?>
 
-    <form method="POST" id="creditSaleForm" onsubmit="return validateCreditForm()">
+    <form method="POST" id="creditSaleForm" onsubmit="return validateCreditForm()" novalidate>
         <!-- Date Card -->
         <div class="form-card mb-3">
             <div class="form-card-header d-flex justify-content-between align-items-center">
@@ -305,7 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-card-header d-flex justify-content-between align-items-center">
                 <span><i class="fas fa-list mr-2"></i> Credit Sale Slips</span>
                 <button type="button" class="btn btn-sm btn-light font-weight-bold text-primary" onclick="addCreditRow()">
-                    <i class="fas fa-plus mr-1"></i> Add Another Row
+                    <i class="fas fa-plus mr-1"></i> Add New Row
                 </button>
             </div>
             <div class="p-3">
@@ -339,8 +339,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Bottom Summary & Action -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-3 border-top">
-                    <button type="button" class="btn btn-outline-primary btn-sm font-weight-bold" onclick="addCreditRow()">
-                        <i class="fas fa-plus mr-1"></i> Add Another Row
+                    <button type="button" class="btn btn-primary btn-sm font-weight-bold" onclick="addCreditRow()">
+                        <i class="fas fa-plus mr-1"></i> Add New Row
                     </button>
 
                     <div class="d-flex flex-wrap align-items-center gap-3 mt-2 mt-md-0 summary-badge-box">
@@ -398,7 +398,24 @@ $(document).ready(function() {
         addCreditRow();
     }
     updateAllTotals();
+
+    // Auto-append next row when typing or selecting in the current last row
+    $('#creditSalesBody').on('input change', 'tr:last-child input, tr:last-child select', function() {
+        var $tr = $(this).closest('tr');
+        if ($tr.is(':last-child') && isCreditRowActive($tr)) {
+            addCreditRow();
+        }
+    });
 });
+
+function isCreditRowActive($tr) {
+    if (!$tr || $tr.length === 0) return false;
+    var slipNo = ($tr.find('.credit-slip-no').val() || '').trim();
+    var veh = ($tr.find('.credit-vehicle-number').val() || '').trim();
+    var qty = parseFloat($tr.find('.credit-qty').val()) || 0;
+    var wasoli = parseFloat($tr.find('.credit-wasoli').val()) || 0;
+    return (slipNo !== '' || veh !== '' || qty > 0 || wasoli > 0);
+}
 
 function addCreditRow() {
     addCreditRowWithData(null);
@@ -433,7 +450,7 @@ function addCreditRowWithData(data) {
 
     var rowHtml = '<tr id="credit_row_' + rowId + '">' +
         '<td>' +
-            '<select name="credit_nozzle_id[]" class="form-control form-control-sm credit-nozzle-select" onchange="updateCreditItem(this)" required>' +
+            '<select name="credit_nozzle_id[]" class="form-control form-control-sm credit-nozzle-select" onchange="updateCreditItem(this)">' +
                 nozzleOptionsHtml +
             '</select>' +
         '</td>' +
@@ -465,18 +482,18 @@ function addCreditRowWithData(data) {
             '<input type="hidden" name="credit_slip_type[]" class="credit-slip-type-val" value="' + slipTypeVal + '">' +
         '</td>' +
         '<td>' +
-            '<input type="text" name="credit_slip_no[]" class="form-control form-control-sm credit-slip-no font-weight-bold text-monospace" placeholder="Slip #" value="' + slipNoVal + '" required>' +
+            '<input type="text" name="credit_slip_no[]" class="form-control form-control-sm credit-slip-no font-weight-bold text-monospace" placeholder="Slip #" value="' + slipNoVal + '">' +
         '</td>' +
         '<td>' +
-            '<input type="text" name="credit_vehicle_number[]" list="registeredVehiclesList" class="form-control form-control-sm credit-vehicle-number font-weight-bold text-monospace" placeholder="Pick Vehicle" value="' + vehicleVal + '" oninput="onCreditVehicleInput(this)" onchange="onCreditVehicleInput(this)" required>' +
+            '<input type="text" name="credit_vehicle_number[]" list="registeredVehiclesList" class="form-control form-control-sm credit-vehicle-number font-weight-bold text-monospace" placeholder="Pick Vehicle" value="' + vehicleVal + '" oninput="onCreditVehicleInput(this)" onchange="onCreditVehicleInput(this)">' +
             '<div class="vehicle-match-info small text-left mt-1" style="display:none; font-size:10.5px; line-height:1.2;"></div>' +
         '</td>' +
-        '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm credit-account-number font-weight-bold" placeholder="Cust ID" value="' + accountVal + '" readonly style="background-color:#e9ecef; cursor:not-allowed;" required></td>' +
+        '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm credit-account-number font-weight-bold" placeholder="Cust ID" value="' + accountVal + '" readonly style="background-color:#e9ecef; cursor:not-allowed;"></td>' +
         '<td><input type="text" class="form-control form-control-sm credit-item-name" disabled></td>' +
         '<td><input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm credit-qty font-weight-bold text-primary" value="' + qtyVal + '" oninput="calculateCreditRow(this)"></td>' +
         '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate font-weight-bold" value="' + rateVal + '" oninput="calculateCreditRow(this)"></td>' +
         '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="' + amountVal + '" readonly style="background-color:#f8f9fa;"></td>' +
-        '<td><input type="number" step="0.01" name="credit_charge_amount[]" class="form-control form-control-sm credit-charge-amount-field font-weight-bold text-primary" value="' + chargeVal + '" readonly style="background-color:#eef2ff;" required></td>' +
+        '<td><input type="number" step="0.01" name="credit_charge_amount[]" class="form-control form-control-sm credit-charge-amount-field font-weight-bold text-primary" value="' + chargeVal + '" readonly style="background-color:#eef2ff;"></td>' +
         '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="' + cashRateVal + '"></td>' +
         '<td><input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm credit-issue-qty" value="' + issueVal + '" oninput="calculateCreditRow(this)"></td>' +
         '<td><input type="number" step="0.01" name="credit_balance_1[]" class="form-control form-control-sm" value="' + bal1Val + '"></td>' +
@@ -647,12 +664,54 @@ function updateAllTotals() {
 }
 
 function validateCreditForm() {
+    // 1. Automatically prune trailing blank/untouched rows
+    while ($('#creditSalesBody tr').length > 1) {
+        var $lastRow = $('#creditSalesBody tr:last-child');
+        if (!isCreditRowActive($lastRow)) {
+            $lastRow.remove();
+        } else {
+            break;
+        }
+    }
+    updateAllTotals();
+
+    // 2. Ensure at least one active row exists
+    var $rows = $('#creditSalesBody tr');
+    if ($rows.length === 0 || !isCreditRowActive($rows.first())) {
+        alert('Please enter at least one credit sale slip before saving.');
+        return false;
+    }
+
+    // 3. Validate mandatory fields on all retained active rows
     var valid = true;
-    $('#creditSalesBody tr').each(function(idx) {
+    $rows.each(function(idx) {
+        var rowNum = idx + 1;
         var slipNo = $(this).find('.credit-slip-no').val().trim();
+        var vehicle = $(this).find('.credit-vehicle-number').val().trim();
+        var account = $(this).find('.credit-account-number').val().trim();
+        var qty = parseFloat($(this).find('.credit-qty').val()) || 0;
+
         if (!slipNo) {
-            alert('Please enter Slip No on row #' + (idx + 1));
+            alert('Please enter Slip No on row #' + rowNum);
             $(this).find('.credit-slip-no').focus();
+            valid = false;
+            return false;
+        }
+        if (!vehicle) {
+            alert('Please enter Vehicle No on row #' + rowNum);
+            $(this).find('.credit-vehicle-number').focus();
+            valid = false;
+            return false;
+        }
+        if (!account) {
+            alert('Please select a registered vehicle or valid account on row #' + rowNum);
+            $(this).find('.credit-vehicle-number').focus();
+            valid = false;
+            return false;
+        }
+        if (qty <= 0) {
+            alert('Please enter a valid Quantity greater than 0 on row #' + rowNum);
+            $(this).find('.credit-qty').focus();
             valid = false;
             return false;
         }

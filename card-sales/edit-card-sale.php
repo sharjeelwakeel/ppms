@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <?php endif; ?>
 
-    <form method="POST" id="cardSaleForm">
+    <form method="POST" id="cardSaleForm" onsubmit="return validateAndCleanCardForm()">
         <!-- Date Card -->
         <div class="form-card mb-3">
             <div class="form-card-header d-flex justify-content-between align-items-center">
@@ -273,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-card-header d-flex justify-content-between align-items-center">
                 <span><i class="fas fa-credit-card mr-2"></i> Card Sale Details (Multiple Entries)</span>
                 <button type="button" class="btn btn-sm btn-light font-weight-bold text-primary" onclick="addCardRow()">
-                    <i class="fas fa-plus mr-1"></i> Add Card Sale Row
+                    <i class="fas fa-plus mr-1"></i> Add New Row
                 </button>
             </div>
             <div class="p-3">
@@ -296,8 +296,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="mt-3">
-                    <button type="button" class="btn btn-info btn-sm font-weight-bold" onclick="addCardRow()">
-                        <i class="fas fa-plus mr-1"></i> Add Card Sale Row
+                    <button type="button" class="btn btn-primary btn-sm font-weight-bold" onclick="addCardRow()">
+                        <i class="fas fa-plus mr-1"></i> Add New Row
                     </button>
                 </div>
 
@@ -341,7 +341,23 @@ $(document).ready(function() {
         addCardRow();
     }
     calculateCardTotal();
+
+    // Auto-append next row when typing or selecting in the current last row
+    $('#cardSalesBody').on('input change', 'tr:last-child input, tr:last-child select', function() {
+        var $tr = $(this).closest('tr');
+        if ($tr.is(':last-child') && isCardRowActive($tr)) {
+            addCardRow();
+        }
+    });
 });
+
+function isCardRowActive($tr) {
+    if (!$tr || $tr.length === 0) return false;
+    var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
+    var machineId = $tr.find('select[name="card_machine_id[]"]').val() || '';
+    var batch = ($tr.find('input[name="card_batch_no[]"]').val() || '').trim();
+    return (amt > 0 || machineId !== '' || batch !== '');
+}
 
 function addCardRow() {
     addCardRowWithData(null);
@@ -371,12 +387,12 @@ function addCardRowWithData(data) {
 
     var rowHtml = '<tr id="card_row_' + rowId + '">' +
         '<td>' +
-            '<select name="card_nozzle_id[]" class="form-control form-control-sm" required>' +
+            '<select name="card_nozzle_id[]" class="form-control form-control-sm">' +
                 nozzleOptions +
             '</select>' +
         '</td>' +
         '<td>' +
-            '<select name="card_machine_id[]" class="form-control form-control-sm" required>' +
+            '<select name="card_machine_id[]" class="form-control form-control-sm">' +
                 machineOptions +
             '</select>' +
         '</td>' +
@@ -387,7 +403,7 @@ function addCardRowWithData(data) {
             '<input type="number" min="1" name="card_no_of_cards[]" class="form-control form-control-sm text-center" value="' + cardsVal + '" oninput="calculateCardTotal()">' +
         '</td>' +
         '<td>' +
-            '<input type="number" step="0.01" min="0" name="card_amount[]" class="form-control form-control-sm card-amount-field font-weight-bold text-primary" value="' + amountVal + '" oninput="calculateCardTotal()" required>' +
+            '<input type="number" step="0.01" min="0" name="card_amount[]" class="form-control form-control-sm card-amount-field font-weight-bold text-primary" value="' + amountVal + '" oninput="calculateCardTotal()">' +
         '</td>' +
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCardRow(this)"><i class="fas fa-trash-alt"></i></button></td>' +
         '</tr>';
@@ -414,6 +430,56 @@ function calculateCardTotal() {
 
     $('#lblTotalCards').text(totCards + ' Cards');
     $('#lblTotalGross').text('Rs. ' + totAmount.toFixed(2));
+}
+
+function validateAndCleanCardForm() {
+    // 1. Automatically prune trailing blank/untouched rows
+    while ($('#cardSalesBody tr').length > 1) {
+        var $lastRow = $('#cardSalesBody tr:last-child');
+        if (!isCardRowActive($lastRow)) {
+            $lastRow.remove();
+        } else {
+            break;
+        }
+    }
+    calculateCardTotal();
+
+    // 2. Validate that at least one active row exists
+    var $rows = $('#cardSalesBody tr');
+    if ($rows.length === 0 || !isCardRowActive($rows.first())) {
+        alert('Please enter at least one card sale transaction before saving.');
+        return false;
+    }
+
+    // 3. Enforce mandatory inputs on all retained rows
+    var isValid = true;
+    $rows.each(function(idx) {
+        var rowNum = idx + 1;
+        var noz = $(this).find('select[name="card_nozzle_id[]"]').val();
+        var mach = $(this).find('select[name="card_machine_id[]"]').val();
+        var amt = parseFloat($(this).find('.card-amount-field').val()) || 0;
+
+        if (!noz) {
+            alert('Please select a Nozzle on row #' + rowNum);
+            $(this).find('select[name="card_nozzle_id[]"]').focus();
+            isValid = false;
+            return false;
+        }
+        if (!mach) {
+            alert('Please select a Card Machine on row #' + rowNum);
+            $(this).find('select[name="card_machine_id[]"]').focus();
+            isValid = false;
+            return false;
+        }
+        if (amt <= 0) {
+            alert('Please enter a valid Card Amount greater than 0 on row #' + rowNum);
+            $(this).find('.card-amount-field').focus();
+            isValid = false;
+            return false;
+        }
+    });
+
+    return isValid;
 }
 </script>
 </body>
