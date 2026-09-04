@@ -75,6 +75,7 @@ CREATE TABLE `tbl_card_machines` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
   `charges_percentage` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `revenue_charge` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `contact_person_name` varchar(128) NOT NULL,
   `contact_person_number` varchar(32) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

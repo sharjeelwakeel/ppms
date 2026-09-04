@@ -16,6 +16,12 @@ if ($chk_del && mysqli_num_rows($chk_del) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN deleted_at DATETIME DEFAULT NULL");
 }
 mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN charges_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+$chk_rev = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_machines LIKE 'revenue_charge'");
+if ($chk_rev && mysqli_num_rows($chk_rev) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN revenue_charge DECIMAL(8,4) NOT NULL DEFAULT 0.0000 AFTER charges_percentage");
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN revenue_charge DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+}
 
 $canAdd    = has_permission('card_machines', 'add');
 $canEdit   = has_permission('card_machines', 'edit');
@@ -72,6 +78,7 @@ $canDelete = has_permission('card_machines', 'delete');
 							<th>ID</th>
 							<th>Machine Name</th>
 							<th>Charges %</th>
+							<th>Revenue Charge %</th>
 							<th>Contact Person</th>
 							<th>Contact Number</th>
                             <?php if ($canDelete): ?>
@@ -93,6 +100,7 @@ $canDelete = has_permission('card_machines', 'delete');
 										<td>'.$row['id'].'</td>
 										<td>'.$machineNameDisplay.'</td>
 										<td>'.number_format($row['charges_percentage'], 4).'%</td>
+										<td>'.number_format(floatval($row['revenue_charge'] ?? 0), 4).'%</td>
 										<td>'.htmlspecialchars($row['contact_person_name']).'</td>
 										<td>'.htmlspecialchars($row['contact_person_number']).'</td>';
                                 if ($canDelete) {

@@ -15,6 +15,12 @@ if ($chk_del && mysqli_num_rows($chk_del) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN deleted_at DATETIME DEFAULT NULL");
 }
 mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN charges_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+$chk_rev = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_machines LIKE 'revenue_charge'");
+if ($chk_rev && mysqli_num_rows($chk_rev) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines ADD COLUMN revenue_charge DECIMAL(8,4) NOT NULL DEFAULT 0.0000 AFTER charges_percentage");
+} else {
+    mysqli_query($connection, "ALTER TABLE tbl_card_machines MODIFY COLUMN revenue_charge DECIMAL(8,4) NOT NULL DEFAULT 0.0000");
+}
 
 $message = '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -23,10 +29,11 @@ if (isset($_POST['id'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $charges_percentage = floatval($_POST['charges_percentage']);
+    $revenue_charge = isset($_POST['revenue_charge']) ? floatval($_POST['revenue_charge']) : 0.00;
     $contact_person_name = mysqli_real_escape_string($connection, $_POST['contact_person_name']);
     $contact_person_number = mysqli_real_escape_string($connection, $_POST['contact_person_number']);
 
-    $query = "UPDATE tbl_card_machines SET name='$name', charges_percentage='$charges_percentage', contact_person_name='$contact_person_name', contact_person_number='$contact_person_number' WHERE id='$id'";
+    $query = "UPDATE tbl_card_machines SET name='$name', charges_percentage='$charges_percentage', revenue_charge='$revenue_charge', contact_person_name='$contact_person_name', contact_person_number='$contact_person_number' WHERE id='$id'";
     
     if (mysqli_query($connection, $query)) {
         header('Location: card-machines-list.php');
@@ -98,6 +105,16 @@ if (!$machine) {
 										<label class="col-lg-5 col-md-6 col-sm-4 col-form-label">Service Charges (%)</label>
 										<div class="col-lg-7 col-md-6 col-sm-8">
 											<input type="number" step="0.0001" min="0" max="100" name="charges_percentage" class="form-control" placeholder="e.g. 0.3456" value="<?php echo htmlspecialchars($machine['charges_percentage']); ?>" required>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-3">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Revenue Charge (%)</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="number" step="0.0001" min="0" max="100" name="revenue_charge" class="form-control" placeholder="e.g. 0.0000" value="<?php echo htmlspecialchars(isset($machine['revenue_charge']) ? $machine['revenue_charge'] : '0.0000'); ?>" required>
 										</div>
 									</div>
 								</div>

@@ -1,7 +1,7 @@
 # Card Machines Module Complete Documentation (`markdown/card_machines.md`)
 
 ## 1. Overview
-The **Card Machines** module manages Point of Sale (POS) card processing terminals (`tbl_card_machines`) provided by commercial banks (e.g., Meezan Bank, HBL, MCB). It tracks machine names, associated contact personnel, contact numbers, and bank service commission charges (`charges_percentage`).
+The **Card Machines** module manages Point of Sale (POS) card processing terminals (`tbl_card_machines`) provided by commercial banks (e.g., Meezan Bank, HBL, MCB). It tracks machine names, associated contact personnel, contact numbers, bank service commission charges (`charges_percentage`), and revenue charges in percentage (`revenue_charge`, default `0.0000%`).
 
 ---
 
@@ -11,7 +11,8 @@ The **Card Machines** module manages Point of Sale (POS) card processing termina
 CREATE TABLE IF NOT EXISTS `tbl_card_machines` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(128) NOT NULL,
-  `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,   -- 4 decimal places precision (e.g. 0.3456%)
+  `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,   -- Bank service fee percentage (4 decimal places precision, e.g. 0.3456%)
+  `revenue_charge` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,       -- Revenue charge percentage (4 decimal places precision, default: 0.0000%)
   `contact_person_name` VARCHAR(128) NOT NULL,
   `contact_person_number` VARCHAR(32) NOT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
@@ -24,9 +25,9 @@ CREATE TABLE IF NOT EXISTS `tbl_card_machines` (
 
 ---
 
-## 3. Service Charges Specification (4 Decimal Places)
+## 3. Fee & Revenue Charge Specifications
 
-### 1. High-Precision Fee Tracking
+### 1. High-Precision Service Fee Tracking (4 Decimal Places)
 - Bank POS merchant discount rates (MDR) and card swipe service fees often require micro-percentage precision (e.g., `0.3456%`, `1.2500%`, `0.0023%`).
 - Both Create (`card-machines/add-card-machine.php`) and Edit (`card-machines/edit-card-machine.php`) forms utilize:
   ```html
@@ -34,8 +35,18 @@ CREATE TABLE IF NOT EXISTS `tbl_card_machines` (
   ```
 - **Step Increment**: `0.0001` allowing input of exact fractional percentages with 4 decimal digits.
 
-### 2. Service Charge Calculation Formula
-When recording card transactions in daily meter readings (`meter-readings/add-meter-reading.php`):
+### 2. Revenue Charge Percentage (`revenue_charge`)
+- **Purpose**: Tracks baseline or operational revenue charges in percentage levied on card machine settlements.
+- **Precision**: 4 decimal places (`DECIMAL(8,4)`), allowing fractional percentages (e.g. `0.2500%`, `0.0500%`).
+- **Default Value**: `0.0000%` (`0` / `0.0000`).
+- **Form Input** (in both Add and Edit forms):
+  ```html
+  <input type="number" step="0.0001" min="0" max="100" name="revenue_charge" class="form-control" placeholder="e.g. 0.0000" value="0.0000" required>
+  ```
+- **List Display**: Displayed in the main data table (`card-machines/card-machines-list.php`) under the dedicated **Revenue Charge %** column formatted to 4 decimal places with `%` suffix (`number_format($row['revenue_charge'], 4) . '%'`).
+
+### 3. Service Charge Calculation Formula
+When recording card transactions in daily meter readings (`meter-readings/add-meter-reading.php`) or card sales (`card-sales/add-card-sale.php`):
 $$\text{Service Charges} = \text{Card Amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
 $$\text{Net Bank Receivable} = \text{Card Amount} - \text{Service Charges}$$
 
@@ -51,9 +62,9 @@ $$\text{Net Bank Receivable} = \text{Card Amount} - \text{Service Charges}$$
 
 | File Path | Description |
 |---|---|
-| `card-machines/card-machines-list.php` | List of all card machines showing name, 4-decimal charges %, contact person, and status |
-| `card-machines/add-card-machine.php` | Form to register a new card machine with 4-decimal `charges_percentage` input |
-| `card-machines/edit-card-machine.php` | Form to edit machine name, 4-decimal fee percentage, and contact details |
+| `card-machines/card-machines-list.php` | List of all card machines showing name, Charges %, Revenue Charge %, contact details, and actions |
+| `card-machines/add-card-machine.php` | Form to register a new card machine with 4-decimal `charges_percentage` and `revenue_charge` % |
+| `card-machines/edit-card-machine.php` | Form to edit machine details including 4-decimal `charges_percentage` and `revenue_charge` % |
 | `include/deletecardmachine.php` | Backend AJAX handler for soft-deleting card machines (`deleted_at = NOW()`) |
 | `meter-readings/add-meter-reading.php` | Integrates card machines to calculate per-swipe bank service charges and net amounts |
 | `markdown/card_machines.md` | Module specification and complete documentation (this file) |
@@ -72,3 +83,4 @@ $$\text{Net Bank Receivable} = \text{Card Amount} - \text{Service Charges}$$
   - Save Machine: `<i class="fas fa-save mr-1"></i> Save Machine`
   - Cancel: `<i class="fas fa-times mr-1"></i> Cancel`
   - Delete Machine: `<i class="fas fa-trash-alt text-danger"></i>`
+
