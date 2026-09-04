@@ -106,6 +106,11 @@ if ($res_slips) {
         }
         #creditSalesTable tbody tr:hover { background: var(--primary-light); }
         #creditSalesTable td { vertical-align:middle; font-size:13px; }
+        .col-date {
+            min-width: 145px !important;
+            width: 145px !important;
+            white-space: nowrap !important;
+        }
         .btn-new {
             background: var(--primary-gradient);
             color:#fff!important; border:none;
@@ -172,7 +177,7 @@ if ($res_slips) {
                     <thead>
                         <tr>
                             <th style="width: 50px;">#</th>
-                            <th>Date</th>
+                            <th class="col-date">Date</th>
                             <th>Shift</th>
                             <th>Total Slips</th>
                             <th>Total Dispensed (Ltr)</th>
@@ -195,13 +200,13 @@ if ($res_slips) {
                         ?>
                         <tr>
                             <td class="font-weight-bold text-muted"><?php echo $counter++; ?></td>
-                            <td>
+                            <td class="col-date text-nowrap">
                                 <?php if (has_permission('credit_sales', 'edit')): ?>
-                                    <a href="edit-credit-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" class="font-weight-bold" style="color:var(--primary-color); text-decoration:underline; font-size: 13.5px;" title="Click to Edit Credit Slips for <?php echo $displayDate; ?> (<?php echo htmlspecialchars($shiftName); ?>)">
+                                    <a href="edit-credit-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" class="font-weight-bold text-nowrap" style="color:var(--primary-color); text-decoration:underline; font-size: 13.5px;" title="Click to Edit Credit Slips for <?php echo $displayDate; ?> (<?php echo htmlspecialchars($shiftName); ?>)">
                                         <i class="fas fa-calendar-day mr-1 text-muted"></i><?php echo $displayDate; ?>
                                     </a>
                                 <?php else: ?>
-                                    <strong class="text-primary font-weight-bold" style="font-size: 13.5px;">
+                                    <strong class="text-primary font-weight-bold text-nowrap" style="font-size: 13.5px;">
                                         <i class="fas fa-calendar-day mr-1 text-muted"></i><?php echo $displayDate; ?>
                                     </strong>
                                 <?php endif; ?>
@@ -333,6 +338,10 @@ $(document).ready(function() {
     $('#creditSalesTable').DataTable({
         "order": [[ 0, "asc" ]],
         "pageLength": 15,
+        "autoWidth": false,
+        "columnDefs": [
+            { "targets": 1, "width": "145px", "className": "col-date text-nowrap" }
+        ],
         "language": {
             "emptyTable": "No credit sales recorded yet."
         }

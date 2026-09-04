@@ -101,6 +101,11 @@ if ($res_cards) {
         }
         #cardSalesTable tbody tr:hover { background: var(--primary-light); }
         #cardSalesTable td { vertical-align:middle; font-size:13px; }
+        .col-date {
+            min-width: 145px !important;
+            width: 145px !important;
+            white-space: nowrap !important;
+        }
         .btn-new {
             background: var(--primary-gradient);
             color:#fff!important; border:none;
@@ -167,7 +172,7 @@ if ($res_cards) {
                     <thead>
                         <tr>
                             <th style="width: 50px;">#</th>
-                            <th>Date</th>
+                            <th class="col-date">Date</th>
                             <th>Shift</th>
                             <th>Batches / Entries</th>
                             <th>Total Swipes (Cards)</th>
@@ -189,13 +194,13 @@ if ($res_cards) {
                         ?>
                         <tr>
                             <td class="font-weight-bold text-muted"><?php echo $counter++; ?></td>
-                            <td>
+                            <td class="col-date text-nowrap">
                                 <?php if (has_permission('card_sales', 'edit')): ?>
-                                    <a href="edit-card-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" class="font-weight-bold" style="color:var(--primary-color); text-decoration:underline; font-size: 13.5px;" title="Click to Edit Card Sales for <?php echo $displayDate; ?> (<?php echo htmlspecialchars($shiftName); ?>)">
+                                    <a href="edit-card-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" class="font-weight-bold text-nowrap" style="color:var(--primary-color); text-decoration:underline; font-size: 13.5px;" title="Click to Edit Card Sales for <?php echo $displayDate; ?> (<?php echo htmlspecialchars($shiftName); ?>)">
                                         <i class="fas fa-calendar-day mr-1 text-muted"></i><?php echo $displayDate; ?>
                                     </a>
                                 <?php else: ?>
-                                    <strong class="text-primary font-weight-bold" style="font-size: 13.5px;">
+                                    <strong class="text-primary font-weight-bold text-nowrap" style="font-size: 13.5px;">
                                         <i class="fas fa-calendar-day mr-1 text-muted"></i><?php echo $displayDate; ?>
                                     </strong>
                                 <?php endif; ?>
@@ -312,6 +317,10 @@ $(document).ready(function() {
     $('#cardSalesTable').DataTable({
         "order": [[ 0, "asc" ]],
         "pageLength": 15,
+        "autoWidth": false,
+        "columnDefs": [
+            { "targets": 1, "width": "145px", "className": "col-date text-nowrap" }
+        ],
         "language": {
             "emptyTable": "No card sales recorded yet."
         }
