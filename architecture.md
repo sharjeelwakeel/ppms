@@ -1,6 +1,6 @@
 # PPMS System Architecture & Engineering Standards
 
-> **Engineering Philosophy**: Low cognitive load, pragmatic DRY (Don't Repeat Yourself), self-documenting code, and zero unexpected side-effects. Code written for PPMS must be readable at a glance by any engineer with 5+ years of experience.
+> **Engineering Philosophy**: Low cognitive load, KISS (Keep It Simple, Straightforward), pragmatic DRY (Don't Repeat Yourself), self-documenting code, and zero unexpected side-effects. Code written for PPMS must be readable at a glance by any engineer with 5+ years of experience.
 
 ---
 
@@ -223,23 +223,29 @@ stateDiagram-v2
 
 ---
 
-## 4. Senior Developer Guidelines (Low Cognitive Load & DRY)
+## 4. Senior Developer Guidelines (Low Cognitive Load, DRY & KISS)
 
-### 1. Don't Repeat Yourself (DRY)
+### 1. Keep It Simple, Straightforward (KISS)
+- **No Over-Engineering**: Solve today's concrete business requirement directly and cleanly. Do not invent speculative abstractions, multi-layered inheritance chains, or unnecessary external dependencies for workflows that straightforward native PHP and standard SQL queries solve reliably.
+- **Obvious Over Clever**: Code should be readable in 10 seconds. Avoid clever one-liners, deeply nested ternary expressions, or obscure magic tricks. If a simple `if` condition communicates intent better than a complex regex or nested ternary, use the simple `if`.
+- **Single Responsibility**: Each controller and helper function must have one clear reason to change. Page controllers handle presentation and input routing; helpers in `include/` execute specialized domain logic.
+- **Pragmatic Architecture**: Prefer proven, native, low-complexity solutions over heavy abstractions.
+
+### 2. Don't Repeat Yourself (DRY)
 - **Centralize Helpers**: If a query or calculation is used in more than one place, extract it into an `include/*.php` helper (e.g. `include/nozzle_daily_sync.php`).
 - **Standard AJAX Delete**: All delete requests route to `include/delete<module>.php` with consistent parameter naming (`id` or `date`).
 
-### 2. Low Cognitive Load Code Style
+### 3. Low Cognitive Load Code Style
 - **Flat Over Nested**: Prefer early returns (`guard clauses`) over deeply nested `if/else` ladders.
 - **Explicit Variable Names**: Use `$nozzle_id`, `$slip_date`, `$unit_rate` instead of `$n`, `$d`, `$r`.
 - **Page Length Budget**: Keep controller files under 350 lines. Move heavy SQL queries or reusable UI templates into modular components.
 
-### 3. Error Handling & Feedback
+### 4. Error Handling & Feedback
 - Always return clean user feedback:
   - Synchronous forms: Toast / Alert messages styled with alert-danger or alert-success.
   - AJAX endpoints: JSON format `{ "status": "success"|"error", "message": "..." }` or plain text status strings handled by SweetAlert / Bootstrap Modals.
 
-### 4. Living Documentation Rule
+### 5. Living Documentation Rule
 Whenever a schema column, CRUD endpoint, or business workflow changes:
 - Update the corresponding document in `markdown/<module>.md`.
 - Keep documentation concise, focused on business logic, database tables, and API contracts.

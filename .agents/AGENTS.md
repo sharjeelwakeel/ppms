@@ -34,7 +34,7 @@
 Do not duplicate the detailed technical specifications from [`architecture.md`](../architecture.md). Always follow these governing principles:
 
 1. **Read Before Writing**: Always consult [`architecture.md`](../architecture.md) and the relevant module document in `markdown/` before proposing or making changes.
-2. **Low Cognitive Load & Senior DRY Code**: Follow the flat-over-nested rule (guard clauses), keep controllers under 350 lines, and extract shared logic into `include/` helpers.
+2. **Low Cognitive Load, DRY & KISS Code**: Follow Keep It Simple, Straightforward (no over-engineering or unnecessary cleverness), the flat-over-nested rule (guard clauses), keep controllers under 350 lines, and extract shared logic into `include/` helpers.
 3. **Security & RBAC Gate**: Every controller and AJAX endpoint must enforce session authentication and `check_access($module_slug, $action)`.
 4. **Data & Schema Integrity**: Use explicit numeric casting (`intval`, `floatval`), atomic transactions for multi-table writes, and soft deletes (`deleted_at = NOW()`) for all transactional records.
 5. **Nozzle Meter Synchronization**: Ensure physical nozzle counters in `tbl_nozzles` and day-to-day snapshots in `tbl_daily_nozzle_readings` are kept synchronized on add, edit, and delete.
