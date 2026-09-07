@@ -349,12 +349,15 @@ function viewDayCards(rawDate, shiftId, formattedDate, shiftName) {
             totCards += cards; totGross += gross; totFee += fee; totNet += net;
             
             var feePct = c.charges_percentage ? parseFloat(c.charges_percentage).toFixed(4) + '%' : '—';
+            var rateBadge = (c.rate_type === 'Credit') 
+                ? ' <span class="badge badge-warning ml-1" style="font-size:10px;"><i class="fas fa-file-invoice-dollar mr-1"></i>Credit Rate</span>' 
+                : ' <span class="badge badge-light border ml-1" style="font-size:10px;"><i class="fas fa-money-bill-wave mr-1 text-success"></i>Cash Rate</span>';
 
             html += '<tr>' +
                 '<td>' + (i + 1) + '</td>' +
                 '<td><strong class="text-primary">' + (c.machine_name || 'Machine #' + c.card_machine_id) + '</strong></td>' +
                 '<td class="font-weight-bold text-monospace">' + (c.batch_no || '—') + '</td>' +
-                '<td>' + (c.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (c.item_name || 'Fuel') + ')</small></td>' +
+                '<td>' + (c.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (c.item_name || 'Fuel') + ')</small>' + rateBadge + '</td>' +
                 '<td><span class="badge badge-info">' + cards + '</span></td>' +
                 '<td class="font-weight-bold">Rs. ' + gross.toFixed(2) + '</td>' +
                 '<td class="text-muted small">' + feePct + '</td>' +

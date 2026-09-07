@@ -58,8 +58,11 @@ For each card transaction entry:
 
 ### 4. Automatic Petrol Quantity Calculation & Nozzle Synchronization
 - **Dispensed Petrol Volume (Litres)**:
-  $$\text{quantity (Litres)} = \frac{\text{amount (Rs.)}}{\text{fuel\_rate (Rs./Ltr)}}$$
-  Where `fuel_rate` is retrieved from `tbl_items.cash_rate` for the selected nozzle's attached product.
+  $$\text{quantity (Litres)} = \frac{\text{amount (Rs.)}}{\text{sale\_rate (Rs./Ltr)}}$$
+  Where `sale_rate` is determined by the transaction rate type or attached customer's `fuel_rate`:
+  - If **Credit** (customer contracted rate): `sale_rate` is retrieved from `tbl_items.credit_rate`.
+  - If **Cash** (retail walk-in rate): `sale_rate` is retrieved from `tbl_items.cash_rate`.
+  - The dispensed volume (Litres) is calculated from the gross swipe amount divided by this applicable sale rate.
 - **Nozzle Running Meter Update (`tbl_nozzles`)**:
   - **On Add**: Automatically advances the nozzle's running meter reading:
     ```sql

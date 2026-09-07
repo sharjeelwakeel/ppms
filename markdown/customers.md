@@ -42,7 +42,28 @@ CREATE TABLE IF NOT EXISTS `tbl_customers` (
 
 ---
 
-## 4. Role-Based Permissions Integration
+## 4. Rate Tier Classification & Transaction Rules (`fuel_rate` & `other_rate`)
+
+In PPMS, registered customers can be billed under different pricing models depending on their commercial agreements:
+
+### 1. Fuel Rate (`fuel_rate`)
+- **Applies To**: All fuel products / items (`tbl_items`), such as Super Petrol, High Speed Diesel.
+- **Values**:
+  - **`Cash`**: The customer is charged the item's standard retail cash price (`tbl_items.cash_rate`).
+  - **`Credit`**: The customer is charged the item's contracted credit selling price (`tbl_items.credit_rate`).
+- **Transaction Enforcement**:
+  - **Card Sales (`card-sales/`)**: When a transaction is marked with a customer or credit term, the fuel rate used to calculate sale volume and revenue is the item's **Credit Rate** (`sale_rate = credit_rate`). If cash terms, the sale rate is the item's **Cash Rate** (`sale_rate = cash_rate`).
+  - **Credit Sales (`credit-sales/`)**: When a registered vehicle is entered, the system resolves the customer. If the customer's `fuel_rate == 'Credit'`, the slip rate automatically defaults to `item.credit_rate`. If `fuel_rate == 'Cash'`, it defaults to `item.cash_rate`.
+
+### 2. Other Rate (`other_rate`)
+- **Applies To**: Non-fuel items, including packaged lubricants, engine oils, and station accessories (`tbl_lubricant_products` / `tbl_products`).
+- **Values**:
+  - **`Cash`**: Non-fuel items are billed at the retail cash price.
+  - **`Credit`**: Non-fuel items are billed at credit tier rates.
+
+---
+
+## 5. Role-Based Permissions Integration
 
 The Customer Master is fully integrated with the PPMS RBAC permission framework (`include/permissions.php`):
 - **Module Slug**: `'customers'`

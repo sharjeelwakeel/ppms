@@ -48,6 +48,7 @@ $tot_charge = 0;
 $tot_giving_qty = 0;
 $tot_giving_charge = 0;
 $tot_received_qty = 0;
+$tot_wasoli = 0;
 
 if ($res) {
     while ($r = mysqli_fetch_assoc($res)) {
@@ -58,9 +59,11 @@ if ($res) {
         $q = floatval($r['quantity']);
         $a = floatval($r['amount']);
         $c = floatval($r['charge_amount']);
+        $w = floatval($r['wasoli']);
         $tot_qty += $q;
         $tot_amt += $a;
         $tot_charge += $c;
+        $tot_wasoli += $w;
 
         if ($r['slip_type'] === 'Temporary Slip') {
             if (intval($r['is_returned']) === 1) {
@@ -234,6 +237,7 @@ if ($res) {
     </table>
 
     <!-- Metrics Cards -->
+    <!-- Metrics Cards -->
     <div class="metric-cards">
         <div class="metric-cell">
             <div class="lbl">Total Fuel Volume</div>
@@ -248,8 +252,8 @@ if ($res) {
             <div class="val" style="color: #b91c1c;">Rs. <?php echo number_format($tot_charge, 2); ?></div>
         </div>
         <div class="metric-cell" style="background: #fffdf5; border-color: #fde68a;">
-            <div class="lbl" style="color: #b45309;">Giving Loan Fuel</div>
-            <div class="val" style="color: #b45309;"><?php echo number_format($tot_giving_qty, 2); ?> Ltr</div>
+            <div class="lbl" style="color: #b45309;">Temp. Receive (Settled)</div>
+            <div class="val" style="color: #b45309;"><?php echo number_format($tot_wasoli, 2); ?> Ltr</div>
         </div>
     </div>
 
@@ -264,11 +268,12 @@ if ($res) {
                 <th>Customer Account &amp; Name</th>
                 <th style="width: 75px;">Vehicle No</th>
                 <th style="width: 80px;">Nozzle / Item</th>
-                <th style="width: 48px;">Qty</th>
-                <th style="width: 48px;">Rate</th>
-                <th style="width: 60px;">Fuel Rs.</th>
+                <th style="width: 45px;">Qty</th>
+                <th style="width: 45px;">Rate</th>
+                <th style="width: 55px;">Fuel Rs.</th>
+                <th style="width: 55px;">Tmp. Rec</th>
                 <th style="width: 65px;">Charge Rs.</th>
-                <th style="width: 80px;">Status</th>
+                <th style="width: 75px;">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -276,7 +281,7 @@ if ($res) {
             if (empty($slips)): 
             ?>
             <tr>
-                <td colspan="12" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
+                <td colspan="13" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
             </tr>
             <?php 
             else: 
@@ -286,6 +291,12 @@ if ($res) {
                     $rate = floatval($s['rate']);
                     $amt = floatval($s['amount']);
                     $charge = floatval($s['charge_amount']);
+                    $wasoli = floatval($s['wasoli']);
+
+                    $typeText = htmlspecialchars($s['slip_type'] ?? '');
+                    if ($s['slip_type'] === 'Balanced Slip' && !empty($s['ref_slip_no'])) {
+                        $typeText .= '<br><span style="font-size:7.5px; color:#0284c7;">From #' . htmlspecialchars($s['ref_slip_no']) . '</span>';
+                    }
 
                     $statusHtml = '';
                     if ($s['slip_type'] === 'Temporary Slip') {
@@ -304,7 +315,7 @@ if ($res) {
                 <td style="text-align: center;"><?php echo $c++; ?></td>
                 <td style="text-align: center; font-family: monospace; font-weight: bold;"><?php echo htmlspecialchars($s['slip_no'] ?? ''); ?></td>
                 <td style="text-align: center; white-space: nowrap; font-size: 8.5px;"><?php echo !empty($s['slip_date']) ? date('d-m-Y', strtotime($s['slip_date'])) : '—'; ?></td>
-                <td style="text-align: center; font-size: 9px; font-weight: bold;"><?php echo htmlspecialchars($s['slip_type'] ?? ''); ?></td>
+                <td style="text-align: center; font-size: 8.5px; font-weight: bold;"><?php echo $typeText; ?></td>
                 <td>
                     <strong><?php echo htmlspecialchars($s['customer_name'] ?? 'Account #' . $s['account_number']); ?></strong>
                     <span style="font-size: 8.5px; color: #64748b;">(#<?php echo htmlspecialchars($s['account_number']); ?>)</span>
@@ -314,6 +325,7 @@ if ($res) {
                 <td style="text-align: right; font-weight: bold;"><?php echo number_format($qty, 2); ?></td>
                 <td style="text-align: right;"><?php echo number_format($rate, 2); ?></td>
                 <td style="text-align: right;"><?php echo number_format($amt, 2); ?></td>
+                <td style="text-align: right; font-weight: bold; color: #b45309;"><?php echo ($wasoli > 0) ? number_format($wasoli, 2) : '—'; ?></td>
                 <td style="text-align: right; font-weight: bold; color: #b91c1c;"><?php echo number_format($charge, 2); ?></td>
                 <td style="text-align: center;"><?php echo $statusHtml; ?></td>
             </tr>
@@ -323,6 +335,7 @@ if ($res) {
                 <td style="text-align: right; color: #04204e; font-size: 10.5px;"><?php echo number_format($tot_qty, 2); ?></td>
                 <td style="text-align: right;">—</td>
                 <td style="text-align: right; font-size: 10.5px;">Rs. <?php echo number_format($tot_amt, 2); ?></td>
+                <td style="text-align: right; font-size: 10.5px; color: #b45309;"><?php echo ($tot_wasoli > 0) ? number_format($tot_wasoli, 2) : '—'; ?></td>
                 <td style="text-align: right; font-size: 11px; color: #b91c1c;">Rs. <?php echo number_format($tot_charge, 2); ?></td>
                 <td></td>
             </tr>

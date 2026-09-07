@@ -35,7 +35,7 @@ $sql_daily = "SELECT
                     END) AS total_charge,
                 SUM(CASE WHEN mrcs.slip_type = 'Temporary Slip' AND mrcs.is_returned = 0 THEN mrcs.quantity ELSE 0 END) AS giving_loan_qty,
                 SUM(CASE WHEN mrcs.slip_type = 'Temporary Slip' AND mrcs.is_returned = 0 THEN mrcs.charge_amount ELSE 0 END) AS giving_loan_charge,
-                SUM(CASE WHEN mrcs.slip_type = 'Temporary Slip' AND mrcs.is_returned = 1 THEN mrcs.quantity ELSE 0 END) AS received_loan_qty
+                SUM(mrcs.wasoli) AS total_temp_receive
               FROM tbl_meter_reading_credit_sales mrcs
               LEFT JOIN tbl_shifts sh ON (mrcs.shift_id = sh.id)
               WHERE $where
@@ -184,7 +184,7 @@ if ($res_slips) {
                             <th>Fuel Amount (Rs.)</th>
                             <th>Total Billable Charge (Rs.)</th>
                             <th>Giving Loan (Ltr)</th>
-                            <th>Received (Ltr)</th>
+                            <th>Temp. Receive (Ltr)</th>
                             <th style="width: 140px;">Actions</th>
                         </tr>
                     </thead>
@@ -242,9 +242,9 @@ if ($res_slips) {
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if ($row['received_loan_qty'] > 0): ?>
-                                    <span class="badge badge-success px-2 py-1 font-weight-bold text-white">
-                                        <i class="fas fa-check-circle mr-1"></i><?php echo number_format($row['received_loan_qty'], 2); ?> Ltr
+                                <?php if ($row['total_temp_receive'] > 0): ?>
+                                    <span class="badge badge-success px-2 py-1 font-weight-bold text-white" title="Temp. Receive (Settled Loan Fuel)">
+                                        <i class="fas fa-link mr-1"></i><?php echo number_format($row['total_temp_receive'], 2); ?> Ltr
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">—</span>
@@ -304,6 +304,7 @@ if ($res_slips) {
                                 <th>Qty (Ltr)</th>
                                 <th>Rate (Rs.)</th>
                                 <th>Amount (Rs.)</th>
+                                <th>Temp. Receive</th>
                                 <th>Charge (Rs.)</th>
                                 <th>Status</th>
                             </tr>
@@ -359,19 +360,23 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
     var html = '';
     
     if (slips.length === 0) {
-        html = '<tr><td colspan="11" class="text-muted py-3">No slip details available.</td></tr>';
+        html = '<tr><td colspan="13" class="text-muted py-3">No slip details available.</td></tr>';
     } else {
-        var totQty = 0, totAmt = 0, totChg = 0;
+        var totQty = 0, totAmt = 0, totChg = 0, totWasoli = 0;
         for (var i = 0; i < slips.length; i++) {
             var s = slips[i];
             var q = parseFloat(s.quantity) || 0;
             var a = parseFloat(s.amount) || 0;
             var c = parseFloat(s.charge_amount) || 0;
-            totQty += q; totAmt += a; totChg += c;
+            var w = parseFloat(s.wasoli) || 0;
+            totQty += q; totAmt += a; totChg += c; totWasoli += w;
             
             var typeBadge = '<span class="badge badge-primary">Permanent</span>';
             if (s.slip_type === 'Balanced Slip') {
                 typeBadge = '<span class="badge badge-info">Balanced</span>';
+                if (s.ref_slip_no) {
+                    typeBadge += '<br><small class="text-info font-weight-bold">From #' + s.ref_slip_no + '</small>';
+                }
             } else if (s.slip_type === 'Temporary Slip') {
                 typeBadge = '<span class="badge badge-warning text-dark">Temporary</span>';
             }
@@ -388,6 +393,14 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
             } else {
                 statusBadge = '<span class="badge badge-secondary">Billed</span>';
             }
+
+            var wasoliCell = '—';
+            if (w > 0) {
+                wasoliCell = '<span class="badge badge-warning text-dark font-weight-bold">' + w.toFixed(2) + ' Ltr</span>';
+                if (s.temp_slip_no) {
+                    wasoliCell += '<br><small class="text-muted">#' + s.temp_slip_no + '</small>';
+                }
+            }
             
             html += '<tr>' +
                 '<td>' + (i + 1) + '</td>' +
@@ -400,6 +413,7 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
                 '<td class="font-weight-bold">' + q.toFixed(2) + '</td>' +
                 '<td>' + (parseFloat(s.rate) || 0).toFixed(2) + '</td>' +
                 '<td>Rs. ' + a.toFixed(2) + '</td>' +
+                '<td>' + wasoliCell + '</td>' +
                 '<td class="font-weight-bold text-danger">Rs. ' + c.toFixed(2) + '</td>' +
                 '<td>' + statusBadge + '</td>' +
             '</tr>';
@@ -410,6 +424,7 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
             '<td class="text-primary">' + totQty.toFixed(2) + ' Ltr</td>' +
             '<td>—</td>' +
             '<td>Rs. ' + totAmt.toFixed(2) + '</td>' +
+            '<td class="text-warning">' + (totWasoli > 0 ? totWasoli.toFixed(2) + ' Ltr' : '—') + '</td>' +
             '<td class="text-danger">Rs. ' + totChg.toFixed(2) + '</td>' +
             '<td></td>' +
         '</tr>';

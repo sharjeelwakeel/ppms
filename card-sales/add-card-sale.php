@@ -7,9 +7,15 @@ require_once '../include/nozzle_daily_sync.php';
 
 check_access('card_sales', 'add');
 
+// Ensure rate_type column exists (self-healing migration)
+$chk_col = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'rate_type'");
+if ($chk_col && mysqli_num_rows($chk_col) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN rate_type ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash' AFTER item_id");
+}
+
 // Fetch Nozzles with attached items
 $nozzles = [];
-$q_noz = mysqli_query($connection, "SELECT n.id, n.name, n.item_id, i.name AS item_name, i.cash_rate
+$q_noz = mysqli_query($connection, "SELECT n.id, n.name, n.item_id, i.name AS item_name, i.cash_rate, i.credit_rate
                                     FROM tbl_nozzles n
                                     LEFT JOIN tbl_items i ON n.item_id = i.id
                                     WHERE n.deleted_at IS NULL AND n.status = 'Active'
@@ -49,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $nozzle_ids    = $_POST['card_nozzle_id'] ?? [];
     $machine_ids   = $_POST['card_machine_id'] ?? [];
+    $rate_types    = $_POST['card_rate_type'] ?? [];
     $batch_nos     = $_POST['card_batch_no'] ?? [];
     $card_counts   = $_POST['card_no_of_cards'] ?? [];
     $amounts       = $_POST['card_amount'] ?? [];
@@ -61,11 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_begin_transaction($connection);
         try {
             for ($i = 0; $i < count($machine_ids); $i++) {
-                $m_id     = intval($machine_ids[$i]);
-                $noz_id   = intval($nozzle_ids[$i] ?? 0);
-                $batch_no = mysqli_real_escape_string($connection, trim($batch_nos[$i] ?? ''));
-                $cards    = intval($card_counts[$i] ?? 1);
-                $amt      = floatval($amounts[$i] ?? 0);
+                $m_id      = intval($machine_ids[$i]);
+                $noz_id    = intval($nozzle_ids[$i] ?? 0);
+                $rate_type = (isset($rate_types[$i]) && $rate_types[$i] === 'Credit') ? 'Credit' : 'Cash';
+                $batch_no  = mysqli_real_escape_string($connection, trim($batch_nos[$i] ?? ''));
+                $cards     = intval($card_counts[$i] ?? 1);
+                $amt       = floatval($amounts[$i] ?? 0);
 
                 // Calculate fee and net amount automatically from card machine settings
                 $fee_pct = 0.00;
@@ -78,25 +86,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $schg = round($amt * ($fee_pct / 100), 2);
                 $net  = round($amt - $schg, 2);
 
-                // Look up attached item_id and cash_rate from nozzle
+                // Look up attached item_id and cash/credit rate from nozzle
                 $item_id   = 0;
-                $fuel_rate = 0.00;
+                $cash_rate = 0.00;
+                $cred_rate = 0.00;
                 foreach ($nozzles as $nz) {
                     if ($nz['id'] == $noz_id) {
                         $item_id   = intval($nz['item_id']);
-                        $fuel_rate = floatval($nz['cash_rate'] ?? 0);
+                        $cash_rate = floatval($nz['cash_rate'] ?? 0);
+                        $cred_rate = floatval($nz['credit_rate'] ?? 0);
                         break;
                     }
                 }
+                $fuel_rate = ($rate_type === 'Credit' && $cred_rate > 0) ? $cred_rate : $cash_rate;
 
                 // Calculate dispensed petrol volume (Litres)
                 $qty = ($fuel_rate > 0) ? round($amt / $fuel_rate, 2) : 0.00;
 
                 $ins_sql = "INSERT INTO tbl_meter_reading_card_sales 
-                            (meter_reading_id, sale_date, shift_id, staff_id, card_machine_id, item_id, 
+                            (meter_reading_id, sale_date, shift_id, staff_id, card_machine_id, item_id, rate_type, 
                              quantity, rate, amount, batch_no, service_charges, net_amount, nozzle_id, no_of_cards)
                             VALUES 
-                            (0, '$sale_date', '$shift_id', 0, '$m_id', '$item_id', 
+                            (0, '$sale_date', '$shift_id', 0, '$m_id', '$item_id', '$rate_type', 
                              '$qty', '$fuel_rate', '$amt', '$batch_no', '$schg', '$net', '$noz_id', '$cards')";
                 if (!mysqli_query($connection, $ins_sql)) {
                     throw new Exception("Error saving card transaction: " . mysqli_error($connection));
@@ -229,10 +240,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <table class="table table-bordered table-striped table-sm text-center mb-0" id="cardSalesTable" style="font-size: 13px;">
                         <thead>
                             <tr style="background: var(--primary-color); color: #fff;">
-                                <th style="width: 25%;">Nozzle <span class="text-danger">*</span></th>
-                                <th style="width: 25%;">Card Machine <span class="text-danger">*</span></th>
-                                <th style="width: 20%;">Batch No</th>
-                                <th style="width: 12%;">No of Cards</th>
+                                <th style="width: 22%;">Nozzle <span class="text-danger">*</span></th>
+                                <th style="width: 20%;">Card Machine <span class="text-danger">*</span></th>
+                                <th style="width: 14%;">Rate Type</th>
+                                <th style="width: 16%;">Batch No</th>
+                                <th style="width: 10%;">Cards</th>
                                 <th style="width: 18%;">Amount (Rs.) <span class="text-danger">*</span></th>
                                 <th style="width: 50px;">Action</th>
                             </tr>
@@ -323,6 +335,12 @@ function addCardRow() {
         '<td>' +
             '<select name="card_machine_id[]" class="form-control form-control-sm">' +
                 machineOptions +
+            '</select>' +
+        '</td>' +
+        '<td>' +
+            '<select name="card_rate_type[]" class="form-control form-control-sm font-weight-bold">' +
+                '<option value="Cash" selected>Cash Rate</option>' +
+                '<option value="Credit">Credit Rate</option>' +
             '</select>' +
         '</td>' +
         '<td>' +

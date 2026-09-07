@@ -277,3 +277,50 @@ if (!function_exists('get_active_price')) {
     }
 }
 
+if (!function_exists('get_price_for_date')) {
+    /**
+     * Retrieve the effective price record for an entity on a specific date.
+     * If $target_date >= today: returns currently active price.
+     * If $target_date < today: queries the price effective on or immediately prior to that date.
+     *
+     * @param mysqli $connection
+     * @param string $table_name
+     * @param int $table_id
+     * @param string $target_date YYYY-MM-DD
+     * @return array|null
+     */
+    function get_price_for_date($connection, $table_name, $table_id, $target_date = '') {
+        $table_name  = mysqli_real_escape_string($connection, trim($table_name));
+        $table_id    = intval($table_id);
+        $today       = date('Y-m-d');
+        $target_date = !empty($target_date) ? mysqli_real_escape_string($connection, trim($target_date)) : $today;
+
+        if (empty($table_name) || $table_id <= 0) {
+            return null;
+        }
+
+        // If today or in the future: return active price
+        if ($target_date >= $today) {
+            return get_active_price($connection, $table_name, $table_id);
+        }
+
+        // If backdated: find the price that was effective on or immediately before $target_date
+        $q = mysqli_query($connection, "
+            SELECT * FROM tbl_prices 
+            WHERE table_name = '$table_name' 
+              AND table_id = '$table_id'
+              AND effective_date <= '$target_date'
+              AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+            ORDER BY effective_date DESC, id DESC
+            LIMIT 1
+        ");
+
+        if ($q && $row = mysqli_fetch_assoc($q)) {
+            return $row;
+        }
+
+        // Fallback to active price if no earlier record exists
+        return get_active_price($connection, $table_name, $table_id);
+    }
+}
+
