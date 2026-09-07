@@ -394,7 +394,7 @@ if ($isSearched) {
                             <option value="">-- All Customers --</option>
                             <?php foreach ($all_customers as $cust): ?>
                                 <option value="<?php echo $cust['id']; ?>" <?php echo ($customerId == $cust['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($cust['name']) . ' (' . htmlspecialchars($cust['fuel_rate'] ?: 'Credit') . ')'; ?>
+                                    <?php echo htmlspecialchars($cust['name']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
