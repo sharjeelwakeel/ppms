@@ -1,121 +1,147 @@
 # Customer Credit & Fuel Ledger Report Module
 
-The **Customer Credit & Fuel Ledger Report** (`reports/customer-report.php`) provides itemized credit slip tracking, quota balance settlement, debit/credit financial accounting, and PDF statement generation for the Petrol Pump Management System (PPMS).
+The **Customer Credit & Fuel Ledger Report** (`reports/customer-report.php`) and its PDF companion (`reports/generate-pdf-customer-report.php`) provide comprehensive audit-grade tracking of customer credit slips, fuel quotas, loan chits, and financial receivables.
+
+This module strictly implements the business logic defined in [`credit_sales.md`](credit_sales.md), ensuring an unambiguous separation between **Financial Receivables (Rupees)** and **Fuel Quota Obligations (Litres)** with 100% anti-double-counting guarantees.
 
 ---
 
-## 1. Core Objectives & Business Rules
+## 1. Core Architecture & Two Ledger Dimensions
 
-### Two-Tier Financial Calculation (`amount` vs `charge_amount`)
-1. **`amount` (Nominal Fuel Value)**:
-   - Tracks the gross market value of the fuel volume that physically leaves the pump nozzle ($\text{Quantity} \times \text{Sale Rate}$).
-   - Ensures tank inventory and nozzle throughput match financial records.
-2. **`charge_amount` (Customer Billable / Receivable Amount)**:
-   - Tracks the exact amount the customer must pay to avoid double-billing.
+The report bifurcates every transaction into two independent but correlated dimensions:
 
-### Slip Type Business Logic (Calculations Depend on QTY)
-- **Calculation Rule**:
-  - All fuel volume, charge amount, and ledger balances **always calculate on Qty** (`quantity`):
-    $$\text{Charge Amount} = \text{Qty} \times \text{Sale Rate}$$
-  - Fallback logic: if `quantity` is 0 or empty, falls back to `issue_quantity` or `wasoli`.
-- **Permanent Slip (`Permanent Slip`)**:
-  - Customer receives fuel on a new invoice.
-  - Billed on **Qty**:
-    $$\text{charge\_amount} = \text{Qty} \times \text{Sale Rate}$$
-  - Quota balance (`balance_1 + balance_2`) is credited as fuel owed to the customer.
-- **Balanced Slip (`Balanced Slip`)**:
-  - Customer collects fuel from a previously remaining balance on an already-billed permanent slip.
-  - **`charge_amount = Rs. 0.00`** (Free / Pre-charged).
-  - Physical dispensed fuel (`quantity`) is deducted from the customer's balance quota.
-- **Temporary Slip (`Temporary Slip` / `Tmp. Receive`) & Return Workflow**:
-  - Customer took loan fuel on a temporary voucher chit and **did NOT pay on the spot**.
-  - **Initial State (Pending Loan / Unpaid)**:
-    - Customer owes money for this fuel.
-    - **This is unpaid fuel that we MUST collect from the customer**:
-      $$\text{Amount to Collect (Debit)} = \text{Tmp. Receive (wasoli)} \times \text{Sale Rate}$$
-    - Added directly into the customer's total debit receivables (Must Collect).
-  - **Settled State (Received Check Ticked)**:
-    - When the customer returns / pays for the loan petrol, the operator checks **`[x] Received`** in Meter Reading Add/Edit, or clicks **"Mark Received"** directly in `customer-report.php`.
-    - Status changes to **`Received`** (`is_returned = 1`, `returned_at = NOW()`).
-    - The outstanding receivable drops to **`Rs. 0.00`** because the pump already collected the money/fuel!
-    - In Card 2, it is credited under **Received Tmp. Receive (Loan Petrol Received / Settled)**.
+```mermaid
+graph TD
+    A[Customer Credit Transaction] --> B[Dimension 1: Financial Ledger]
+    A --> C[Dimension 2: Fuel Quota Ledger]
+    B --> D[Permanent Slips: Billed Receivables]
+    B --> E[Temporary Slips: Settled in Perm or Open Loan]
+    B --> F[Balanced Slips: Free / Pre-paid Rs. 0.00]
+    C --> G[Quota Created: +balance_1 + balance_2]
+    C --> H[Quota Claimed: -dispensed litres on Balanced Slips]
+    C --> I[Net Fuel Pump Must Deliver: Max 0, Quota - Claimed]
+```
 
----
+### Dimension 1: Financial Ledger (Rupees)
+- **Goal**: Answer *"How much money does this customer owe the petrol pump?"*
+- Calculates the true billed receivable:
+  $$\text{Total Invoiced Receivable} = \sum \text{Permanent Slip Charge Amounts}$$
+- **Anti-Double-Counting Guarantee**:
+  - When a Permanent Slip settles a Temporary Slip (Scenario 2), the loan petrol charge $(\text{wasoli} \times \text{temp\_rate})$ is billed directly on that Permanent Slip.
+  - The settled Temporary Slip's own line item displays `Settled in Slip #<id>` with **Rs. 0.00** charge. The customer is never double-billed for the same petrol.
+- **Balanced Slips** represent previously paid fuel claims and always carry **Rs. 0.00** charge.
+- **Open Temporary Slips** represent physical loan petrol awaiting a permanent slip. They display **Rs. 0.00** in current billed receivables and are surfaced in an executive alert box as pending loan liabilities.
 
-## 2. Card 2: Financial Debit / Credit Settlement (Accounting Manner)
-
-At the bottom of each customer's slip ledger, a **Double-Entry Debit / Credit Settlement Card** summarizes the customer's exact financial position and remaining fuel delivery obligation:
-
-| Transaction Classification | Debit (Receivable to Collect) | Credit (Pre-Paid / Settled) |
-|---|---|---|
-| **Permanent Slips (Billed Fuel)** | $\sum(\text{Permanent Qty} \times \text{Rate})$ | — |
-| **Balanced Slips (Claimed Fuel)** | — | **Rs. 0.00 (Settled / Free)** |
-| **Not Received Tmp. Receive (Unpaid Loan Fuel — Must Collect)** | $\sum(\text{Tmp. Receive} \times \text{Rate})$ *(Unchecked / Not Received Slips)* | — |
-| **Received Tmp. Receive (Loan Petrol Received / Settled)** | — | **$\sum(\text{Tmp. Receive} \times \text{Rate})$ (Collected)** |
-| **👉 TOTAL AMOUNT WE NEED TO GET (MUST COLLECT)** | $\mathbf{Rs.\;(\text{Permanent Billed} + \text{Not Received Tmp. Receive})}$ | |
-| **⛽ PETROL VOLUME WE MUST GIVE CUSTOMER** | $\mathbf{\max(0,\; \text{Permanent Quota} - \text{Balanced Slips Claimed})\text{ Ltr}}$ | |
+### Dimension 2: Fuel Quota Ledger (Litres)
+- **Goal**: Answer *"How many litres of pre-billed petrol does the pump still owe the vehicle?"*
+- When a customer purchases a voucher with remaining quota (e.g. 56 Ltr voucher with 30 Ltr pumped into tank and 26 Ltr stamped on the slip as balance):
+  - **Quota Created**: $+(\text{balance\_1} + \text{balance\_2})\text{ Ltr}$ recorded on Permanent Slips.
+  - **Quota Claimed**: $-(\text{quantity})\text{ Ltr}$ drawn against the quota on subsequent Balanced Slips.
+  - **Net Fuel Pump Must Deliver**:
+    $$\text{Remaining Balance} = \max(0, \sum \text{Quota Created} - \sum \text{Quota Claimed})$$
+  - If the customer over-draws quota, an overdraw warning is displayed rather than allowing negative delivery liability.
 
 ---
 
-## 3. 10 Critical Edge Cases Handled
+## 2. Four Operational Scenarios in Action
 
-1. **Over-draw of Fuel Balance**:
-   - *Scenario*: Customer had 26 Ltr balance, but draws 30 Ltr on Balanced Slips.
-   - *Handling*: Remaining balance is clamped with $\max(0,\; \text{Permanent Balances} - \text{Balanced Drawn})$. Overdraw volume is calculated and flagged with an alert badge: `⚠️ Quota Over-drawn by 4.00 Ltr`.
-2. **Multiple Vehicles on Single Account**:
-   - *Scenario*: Account has multiple vehicles (e.g. Car `LE-1234` and Truck `LES-5678`).
-   - *Handling*: Ledger aggregates strictly by `account_number` (Customer ID). Each row displays its specific vehicle registration plate.
-3. **Orphan Balanced Slip**:
-   - *Scenario*: Operator issues a Balanced Slip without a preceding Permanent Slip balance quota.
-   - *Handling*: Remaining fuel owed stays `0.00 Ltr` (no negative balance). The table indicates fuel claimed with `Rs. 0.00` charge.
-4. **Temporary Slip Missing `wasoli`**:
-   - *Scenario*: Operator selected Temporary Slip but left `wasoli` empty or zero.
-   - *Handling*: Fallback logic: $\text{dispensed\_qty} = \text{wasoli} > 0 \;?\; \text{wasoli} : \text{quantity}$. If both 0, charges `Rs. 0.00` safely without PHP warnings.
-5. **Fuel Price Fluctuations Across Slips**:
-   - *Scenario*: Slip 1 rate = Rs. 280, Slip 2 rate = Rs. 290.
-   - *Handling*: Every slip computes its exact financial receivable at its **historical transaction rate**: $\sum(\text{slip\_rate} \times \text{charge\_qty})$. Balanced slips stay Rs. 0.00.
-6. **Permanent Slip Missing `issue_quantity`**:
-   - *Scenario*: Operator filled `quantity = 56` and left `issue_quantity` empty.
-   - *Handling*: Fallback logic: $\text{Charge Qty} = \text{issue\_quantity} > 0 \;?\; \text{issue\_quantity} : \text{quantity}$ ensures the customer is never under-charged.
-7. **Split Balance Fields (`balance_1` and `balance_2`)**:
-   - *Scenario*: Operator splits 26 into 20 and 6, or leaves one `NULL`.
-   - *Handling*: Explicit float casting: `floatval(balance_1) + floatval(balance_2)` safely sums single, split, or `NULL` entries.
-8. **Customer with Only Temporary Slips**:
-   - *Scenario*: No permanent slips exist for the customer yet.
-   - *Handling*: Petrol owed displays `0.00 Ltr`. Financial ledger shows only `[DEBIT] Under Tmp. Receive: Rs. X`.
-9. **Full Balance Return (Zero Remaining)**:
-   - *Scenario*: Customer had 26 Ltr balance and claimed all 26 Ltr.
-   - *Handling*: Displays a clean green confirmation badge: `✅ 0.00 Ltr (All Quota Delivered)`.
-10. **Mixed Fuels on Single Customer**:
-    - *Scenario*: Customer purchased Super Petrol on Slip 1 and High Speed Diesel on Slip 2.
-    - *Handling*: Ledger table displays the specific fuel grade and nozzle on each line. Financial Debit/Credit calculates total Rupees, while volumes reflect dispensed fuel.
+The report handles all 4 transaction types identified in [`credit_sales.md`](credit_sales.md):
 
----
+### Scenario 1: Standard Permanent Slip (Normal Credit Sale)
+- **Description**: Customer arrives with a fresh voucher, fills fuel, and is invoiced.
+- **Ledger Impact**:
+  - **Issued (Ltr)**: Voucher capacity (or pumped volume if no split balance).
+  - **Pumped (Ltr)**: Volume dispensed into tank (`quantity`).
+  - **Balance Quota**: If voucher is not fully pumped, shows badge `+X.XX Ltr Quota`.
+  - **Must Pay**: Full slip charge $\text{charge\_amount} = \text{issue\_quantity} \times \text{sale\_rate}$.
 
-## 4. Search-Driven Interface & PDF Export
+### Scenario 2: Permanent Slip Settling a Temporary Slip (Wasoli)
+- **Description**: Customer arrives with a permanent slip that settles an earlier loan chit (e.g. wasoli of 10.53 Ltr from Slip #4010).
+- **Ledger Impact**:
+  - **Settling Permanent Slip**:
+    - Displays green link badge: `🔗 Settles Temp #4010 (10.53 Ltr @ Rs. 285.00)`.
+    - **Must Pay**: Includes the settled loan charge $(\text{wasoli} \times \text{temp\_rate})$ in its `charge_amount`.
+  - **Settled Temporary Slip**:
+    - Displays status badge: `✅ Settled in Slip #<id>`.
+    - **Must Pay**: Shows `Rs. 0.00` with subtext `Billed on Slip #<id>` to prevent double charging.
 
-- **Two Focused Filters Only**:
-  - **Customer**: Dropdown of active customer accounts.
-  - **Vehicle No**: Search input for vehicle registration plates.
-  - **On-Demand Search**: The report does not query data until the user clicks **Search**.
-- **PDF Export ([`reports/generate-pdf-customer-report.php`](generate-pdf-customer-report.php))**:
-  - Dedicated print-ready document formatted for A4 portrait with petrol pump letterhead.
-  - Itemized slips table with rates, issue quantities, quota credits/debits, and charge amounts.
-  - Card 2 Financial Debit / Credit Settlement table.
-  - Formal signature verification blocks (*Prepared By*, *Verified By*, *Customer Signature*).
-  - Automatically invokes browser print-to-PDF on load.
+### Scenario 3: Balanced Slip (Quota Claim)
+- **Description**: Vehicle returns to collect fuel from a balance stamped on an earlier Permanent Slip.
+- **Ledger Impact**:
+  - **Slip Type Badge**: `Balanced Slip` (Info / Cyan badge).
+  - **Pumped (Ltr)**: Volume pumped into the vehicle tank.
+  - **Balance Quota**: Shows red reduction badge `-X.XX Ltr Claimed`.
+  - **Must Pay**: **`Rs. 0.00`** with subtext `Pre-paid Quota Claim`.
+
+### Scenario 4: Open Temporary Slip (Pending Loan Chit)
+- **Description**: Driver took loan fuel on a temporary chit and the permanent voucher has not yet been processed.
+- **Ledger Impact**:
+  - **Slip Type Badge**: `Temporary Slip` (Warning badge).
+  - **Temp. Receive Status**: `⏳ Open Loan Chit`.
+  - **Must Pay**: **`Rs. 0.00`** in current ledger column with subtext `Pending Voucher`.
+  - **Executive Alert Box**: Flashed at the top of the customer's ledger detailing the exact pending volume and estimated Rupees awaiting invoicing.
 
 ---
 
-## 5. File Architecture
+## 3. Ledger Table Columns Specification
 
-| File Path | Description |
-|---|---|
-| `reports/customer-report.php` | Main Customer Credit & Fuel Ledger Report page with Card 2 settlement |
-| `reports/generate-pdf-customer-report.php` | Print-ready PDF statement generator with signature blocks |
-| `meter-readings/add-meter-reading.php` | Meter reading entry with slip type dynamic rules and charge calculation |
-| `meter-readings/view-meter-reading.php` | Meter reading detail view with nominal amount and charge amount |
-| `meter-readings/generate-pdf-meter-reading.php` | PDF export for shift meter readings |
-| `include/navbar.php` | Navigation bar with Reports dropdown |
-| `include/permissions.php` | RBAC module catalog with `'reports'` module |
-| `markdown/customer_report.md` | Technical and operational specification (this file) |
+The itemized report table renders 13 standardized columns:
+
+| # | Column Name | Source Field / Formula | Description |
+|---|---|---|---|
+| 1 | `#` | Row counter | Sequential row index |
+| 2 | `Slip Date` | `slip_date` | Date printed on the credit voucher |
+| 3 | `Reading #` | `meter_reading_id` | Shift reading reference ID |
+| 4 | `Slip No` | `slip_number` | Physical paper slip number |
+| 5 | `Slip Type` | `slip_type` | `Permanent Slip`, `Balanced Slip`, or `Temporary Slip` with settlement tags |
+| 6 | `Vehicle No` | `vehicle_number` | Registration plate (e.g. `LE-1234`, `LES-5678`) |
+| 7 | `Nozzle / Fuel` | `fuel_name` & `nozzle_name` | Fuel grade (Super / Diesel) and physical nozzle |
+| 8 | `Rate` | `sale_rate` | Historical unit price per litre |
+| 9 | `Issued (Ltr)` | `issue_quantity` | Capacity printed on voucher |
+| 10 | `Pumped (Ltr)` | `quantity` | Physical volume dispensed through nozzle |
+| 11 | `Balance Quota` | `balance_1 + balance_2` or `-quantity` | Quota generated (`+`) or quota claimed (`-`) |
+| 12 | `Temp. Receive` | `wasoli` & settlement status | Loan volume and whether settled or open |
+| 13 | `Must Pay (Rs.)` | `charge_amount` | Invoiced receivable billed to customer |
+
+---
+
+## 4. Card 2: Two-Panel Reconciliation Summary
+
+Directly beneath each customer's itemized slips table, **Card 2** displays two synchronized audit panels:
+
+### Panel A: Financial Statement (Rupees)
+Audits the exact billed receivables and collections:
+- **Permanent Slips (Billed Invoices)**: Total billed charges across all permanent vouchers (including settled loans).
+- **Balanced Slips (Claimed Fuel Quota)**: `Rs. 0.00 (Pre-paid)`.
+- **Settled Temporary Slips**: `Rs. 0.00 (Billed in Permanent Slips)`.
+- **Open Temporary Slips**: Flagged as pending (Estimated Rs.) if any exist.
+- **👉 TOTAL INVOICED RECEIVABLE (MUST COLLECT)**:
+  $$\mathbf{Rs.\; \text{Permanent Charges}}$$
+
+### Panel B: Fuel Quota Reconciliation (Litres)
+Reconciles physical fuel balance owed to the customer:
+- **Total Quota Recorded**: Sum of `balance_1 + balance_2` from permanent vouchers.
+- **Quota Claimed**: Sum of fuel dispensed on `Balanced Slips`.
+- **⛽ NET PETROL VOLUME PUMP MUST DELIVER**:
+  $$\mathbf{\max(0,\; \text{Quota Recorded} - \text{Quota Claimed})\text{ Ltr}}$$
+- **Overdraw Detection**: If claimed litres exceed recorded quota, flags an explicit overdraw badge: `⚠️ Quota Overdrawn: X.XX Ltr`.
+
+---
+
+## 5. PDF Statement Generator Parity
+
+The print-ready PDF generator (`reports/generate-pdf-customer-report.php`) shares 100% computational and stylistic parity with the web interface:
+- **Strict Theme Adherence**: Deep navy primary headers (`#04204e`), clean borders, and monospace numeric alignments.
+- **Signature Section**: Includes 3 formal sign-off boxes at the footer:
+  1. *Prepared By (Pump Manager)*
+  2. *Verified By (Accounts)*
+  3. *Customer Signature*
+- **Auto-Print Trigger**: Automatically invokes `window.print()` upon document load for one-click printing or PDF saving.
+
+---
+
+## 6. Verification and Integration Rules
+
+1. **RBAC Protection**: Both `customer-report.php` and `generate-pdf-customer-report.php` enforce `check_access('reports', 'view')`.
+2. **Auxiliary Column Auto-Migration**: If older database schemas lack `settled_in_slip_id` or `temp_rate`, the report auto-executes idempotent `ALTER TABLE` checks to prevent SQL failures.
+3. **Multi-Vehicle Aggregation**: Customers with fleets (multiple vehicle numbers) are grouped by `customer_id`. Subtotals and ledgers reflect the customer's aggregate balance while identifying each vehicle per line.

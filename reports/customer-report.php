@@ -15,18 +15,22 @@ if (!has_permission('reports', 'show') && !has_permission('customers', 'show') &
     exit;
 }
 
-// Auto-migrate charge_amount column if not yet present
-$chk_ca = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE 'charge_amount'");
-if ($chk_ca && mysqli_num_rows($chk_ca) == 0) {
-    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN charge_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount");
-    mysqli_query($connection, "UPDATE tbl_meter_reading_credit_sales SET charge_amount = IF(slip_type = 'Balanced Slip', 0.00, amount)");
-}
-
-// Auto-migrate is_returned and returned_at columns if not yet present
-$chk_ret = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE 'is_returned'");
-if ($chk_ret && mysqli_num_rows($chk_ret) == 0) {
-    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN is_returned TINYINT(1) NOT NULL DEFAULT 0 AFTER wasoli");
-    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN returned_at DATETIME DEFAULT NULL AFTER is_returned");
+// Ensure auxiliary columns exist (self-healing migration)
+$chk_aux = [
+    'charge_amount'      => "DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount",
+    'is_returned'        => "TINYINT(1) NOT NULL DEFAULT 0 AFTER wasoli",
+    'returned_at'        => "DATETIME DEFAULT NULL AFTER is_returned",
+    'settled_in_slip_id' => "INT(11) DEFAULT NULL AFTER returned_at",
+    'temp_slip_id'       => "INT(11) DEFAULT NULL AFTER settled_in_slip_id",
+    'temp_slip_no'       => "VARCHAR(64) DEFAULT NULL AFTER temp_slip_id",
+    'temp_rate'          => "DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER temp_slip_no",
+    'ref_slip_no'        => "VARCHAR(128) DEFAULT NULL AFTER temp_rate"
+];
+foreach ($chk_aux as $col => $def) {
+    $q = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_credit_sales LIKE '$col'");
+    if ($q && mysqli_num_rows($q) == 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN $col $def");
+    }
 }
 
 // Only Two Filters: Customer and Vehicle No
@@ -72,18 +76,20 @@ if ($isSearched) {
 
     $where_sql = implode(' AND ', $where_clauses);
 
-    // Fetch credit sales records
+    // Fetch credit sales records with joined settling slip information
     $report_sql = "SELECT mrcs.*,
                           c.id AS cust_id,
                           c.name AS customer_name,
                           c.phone AS customer_phone,
                           c.fuel_rate AS customer_rate_tier,
                           n.name AS nozzle_name,
-                          i.name AS item_name
+                          i.name AS item_name,
+                          settled_by.slip_no AS settling_slip_no
                    FROM tbl_meter_reading_credit_sales mrcs
                    LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
                    LEFT JOIN tbl_nozzles n ON (mrcs.nozzle_id = n.id)
                    LEFT JOIN tbl_items i ON (n.item_id = i.id)
+                   LEFT JOIN tbl_meter_reading_credit_sales settled_by ON (mrcs.settled_in_slip_id = settled_by.id)
                    WHERE $where_sql AND (mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')
                    ORDER BY COALESCE(c.name, 'ZZZ') ASC, mrcs.slip_date DESC, mrcs.id DESC";
 
@@ -91,10 +97,10 @@ if ($isSearched) {
 
     if ($report_res) {
         while ($row = mysqli_fetch_assoc($report_res)) {
-            $accNo = !empty($row['account_number']) ? $row['account_number'] : 'unassigned';
-            $custName = !empty($row['customer_name']) ? $row['customer_name'] : 'Account #' . $accNo;
+            $accNo     = !empty($row['account_number']) ? $row['account_number'] : 'unassigned';
+            $custName  = !empty($row['customer_name']) ? $row['customer_name'] : 'Account #' . $accNo;
             $custPhone = !empty($row['customer_phone']) ? $row['customer_phone'] : '—';
-            $rateTier = !empty($row['customer_rate_tier']) ? $row['customer_rate_tier'] : 'Credit';
+            $rateTier  = !empty($row['customer_rate_tier']) ? $row['customer_rate_tier'] : 'Credit';
 
             if (!isset($customers_ledger[$accNo])) {
                 $customers_ledger[$accNo] = [
@@ -104,93 +110,107 @@ if ($isSearched) {
                     'rate_tier'                 => $rateTier,
                     'vehicles'                  => [],
                     'slips'                     => [],
-                    'total_fuel'                => 0,
+                    'total_fuel'                => 0, // All physical litres pumped into vehicles
                     'permanent_fuel'            => 0,
                     'balanced_fuel'             => 0,
                     'temporary_fuel'            => 0,
-                    'temporary_fuel_pending'    => 0,
-                    'temporary_fuel_returned'   => 0,
-                    'permanent_balance'         => 0, // Sum of balance_1 + balance_2 from Permanent slips
-                    'balanced_drawn'            => 0, // Sum of fuel drawn from Balanced slips (subtracts from balance)
+                    'temporary_fuel_pending'    => 0, // Open loan fuel litres
+                    'temporary_fuel_returned'   => 0, // Settled loan fuel litres
+                    'permanent_balance'         => 0, // Sum of balance_1 + balance_2 quota generated
+                    'balanced_drawn'            => 0, // Sum of fuel drawn on Balanced slips
                     'remaining_balance'         => 0, // permanent_balance - balanced_drawn
                     'overdraw_amount'           => 0,
-                    'permanent_charge'          => 0, // Amount to collect on Permanent slips
-                    'temporary_charge'          => 0, // Total value of all Temporary slips
-                    'temporary_charge_pending'  => 0, // Unpaid loan fuel -> MUST COLLECT
-                    'temporary_charge_returned' => 0, // Paid / returned loan fuel -> ALREADY RECEIVED
-                    'total_to_collect'          => 0  // permanent_charge + temporary_charge_pending
+                    'permanent_charge'          => 0, // Total money billed on Permanent slips
+                    'temporary_charge_pending'  => 0, // Est. value of open loan chits
+                    'temporary_charge_returned' => 0, // Value of settled loan fuel
+                    'total_to_collect'          => 0  // Net billed receivable (= permanent_charge)
                 ];
             }
 
-            $st      = $row['slip_type'] ?: 'Permanent Slip';
-            $rate    = floatval($row['rate']);
-            $baseQty = floatval($row['quantity']);
-            $issueQty= floatval($row['issue_quantity']);
-            $wasoli  = floatval($row['wasoli']);
-            $bal     = floatval($row['balance_1']) + floatval($row['balance_2']);
-            $nomAmt  = floatval($row['amount']);
-            $isReturned = intval($row['is_returned'] ?? 0);
+            $st             = $row['slip_type'] ?: 'Permanent Slip';
+            $rate           = floatval($row['rate']);
+            $baseQty        = floatval($row['quantity']);
+            $issueQty       = floatval($row['issue_quantity']);
+            $wasoli         = floatval($row['wasoli']);
+            $tempRate       = floatval($row['temp_rate']) > 0 ? floatval($row['temp_rate']) : $rate;
+            $tempSlipNo     = trim($row['temp_slip_no'] ?? '');
+            $refSlipNo      = trim($row['ref_slip_no'] ?? '');
+            $bal            = floatval($row['balance_1']) + floatval($row['balance_2']);
+            $isReturned     = intval($row['is_returned'] ?? 0);
+            $settlingSlipNo = trim($row['settling_slip_no'] ?? '');
 
             if ($st === 'Temporary Slip') {
-                // Temporary slip represents loan fuel under Tmp. Receive
-                $tempQty = $wasoli > 0 ? $wasoli : ($baseQty > 0 ? $baseQty : $issueQty);
-                $tempCharge = $tempQty * $rate;
+                // Physical fuel dispensed as open or settled loan chit
+                $loanQty = ($baseQty > 0) ? $baseQty : (($issueQty > 0) ? $issueQty : $wasoli);
+                $loanVal = round($loanQty * $rate, 2);
 
-                $customers_ledger[$accNo]['temporary_fuel']   += $tempQty;
-                $customers_ledger[$accNo]['temporary_charge'] += $tempCharge;
-                $customers_ledger[$accNo]['total_fuel']       += $tempQty;
+                $customers_ledger[$accNo]['temporary_fuel'] += $loanQty;
+                $customers_ledger[$accNo]['total_fuel']     += $loanQty;
 
                 if ($isReturned === 1) {
-                    // Customer returned / paid for this temporary slip -> ALREADY RECEIVED
-                    $customers_ledger[$accNo]['temporary_fuel_returned']   += $tempQty;
-                    $customers_ledger[$accNo]['temporary_charge_returned'] += $tempCharge;
-                    $chgAmt = 0.00; // Paid, does not owe anymore
+                    // Settled on a Permanent Slip (Scenario 2) -> already billed on that permanent voucher!
+                    $customers_ledger[$accNo]['temporary_fuel_returned']   += $loanQty;
+                    $customers_ledger[$accNo]['temporary_charge_returned'] += $loanVal;
+                    $chgAmt = 0.00; // Zero additional charge to prevent double-billing
                 } else {
-                    // Pending loan petrol -> Customer owes money, we must collect!
-                    $customers_ledger[$accNo]['temporary_fuel_pending']   += $tempQty;
-                    $customers_ledger[$accNo]['temporary_charge_pending'] += $tempCharge;
-                    $customers_ledger[$accNo]['total_to_collect']         += $tempCharge;
-                    $chgAmt = $tempCharge;
+                    // Open loan chit awaiting permanent voucher
+                    $customers_ledger[$accNo]['temporary_fuel_pending']   += $loanQty;
+                    $customers_ledger[$accNo]['temporary_charge_pending'] += $loanVal;
+                    $chgAmt = 0.00; // Customer charge is deferred until permanent voucher settles it
                 }
 
-                $qty = $tempQty;
+                $dispensedQty = $loanQty;
+                $row['effective_charge'] = $chgAmt;
+                $row['loan_value'] = $loanVal;
             } elseif ($st === 'Balanced Slip') {
-                $balQty = $baseQty > 0 ? $baseQty : $issueQty;
+                // Fuel drawn against pre-paid balance quota
+                $balQty = ($baseQty > 0) ? $baseQty : $issueQty;
 
                 $customers_ledger[$accNo]['balanced_fuel']  += $balQty;
                 $customers_ledger[$accNo]['balanced_drawn'] += $balQty;
                 $customers_ledger[$accNo]['total_fuel']     += $balQty;
 
-                $qty    = $balQty;
-                $chgAmt = 0.00;
+                $dispensedQty = $balQty;
+                $chgAmt = 0.00; // Pre-paid on original voucher
+                $row['effective_charge'] = 0.00;
             } else { // Permanent Slip
-                $permQty = $baseQty > 0 ? $baseQty : $issueQty;
-                $permCharge = $permQty * $rate;
+                $dispensedQty = $baseQty;
+                $effIssue     = ($issueQty > 0) ? $issueQty : $baseQty;
 
-                $customers_ledger[$accNo]['permanent_fuel']    += $permQty;
+                // Direct charge amount from db (or fallback)
+                $chgAmt = floatval($row['charge_amount']);
+                if ($chgAmt <= 0) {
+                    $chgAmt = round(($effIssue * $rate) + ($wasoli * $tempRate), 2);
+                }
+                // Auto-compute balance if balance fields were 0 but effIssue > baseQty
+                if ($bal <= 0 && $effIssue > $baseQty) {
+                    $bal = max(0.00, round($effIssue - $baseQty, 2));
+                }
+
+                $customers_ledger[$accNo]['permanent_fuel']    += $dispensedQty;
                 $customers_ledger[$accNo]['permanent_balance'] += $bal;
-                $customers_ledger[$accNo]['permanent_charge']  += $permCharge;
-                $customers_ledger[$accNo]['total_fuel']        += $permQty;
-                $customers_ledger[$accNo]['total_to_collect']  += $permCharge;
+                $customers_ledger[$accNo]['permanent_charge']  += $chgAmt;
+                $customers_ledger[$accNo]['total_fuel']        += $dispensedQty;
+                $customers_ledger[$accNo]['total_to_collect']  += $chgAmt;
 
-                $qty    = $permQty;
-                $chgAmt = $permCharge;
+                $row['effective_charge'] = $chgAmt;
             }
 
             if (!empty($row['vehicle_number']) && !in_array($row['vehicle_number'], $customers_ledger[$accNo]['vehicles'])) {
                 $customers_ledger[$accNo]['vehicles'][] = $row['vehicle_number'];
             }
 
-            $row['dispensed_qty']    = $qty;
+            $row['dispensed_qty']    = $dispensedQty;
             $row['slip_balance']     = $bal;
-            $row['effective_charge'] = $chgAmt;
-            $row['temp_charge']      = ($st === 'Temporary Slip') ? ($qty * $rate) : 0;
-            $row['is_returned']      = $isReturned;
+            $row['temp_slip_no']     = $tempSlipNo;
+            $row['temp_rate']        = $tempRate;
+            $row['ref_slip_no']      = $refSlipNo;
+            $row['settling_slip_no'] = $settlingSlipNo;
             $customers_ledger[$accNo]['slips'][] = $row;
         }
     }
 
-    // Calculate remaining balance per customer and grand totals
+    // Calculate remaining quota balance per customer and grand totals
     foreach ($customers_ledger as $cId => &$cItem) {
         $cItem['remaining_balance'] = max(0, $cItem['permanent_balance'] - $cItem['balanced_drawn']);
         $cItem['overdraw_amount']   = max(0, $cItem['balanced_drawn'] - $cItem['permanent_balance']);
@@ -441,20 +461,20 @@ if ($isSearched) {
 
                         <!-- Direct Itemized Slips Table -->
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped table-hover table-sm mb-0 ledger-table">
-                                <thead>
+                            <table class="table table-bordered table-striped table-hover table-sm mb-0 ledger-table">                                <thead>
                                     <tr>
                                         <th style="width: 35px;">#</th>
-                                        <th style="width: 90px;">Slip Date</th>
-                                        <th style="width: 80px;">Reading #</th>
-                                        <th style="width: 100px;">Slip No</th>
-                                        <th style="width: 130px;">Slip Type</th>
-                                        <th style="width: 110px;">Vehicle No</th>
+                                        <th style="width: 85px;">Slip Date</th>
+                                        <th style="width: 75px;">Reading #</th>
+                                        <th style="width: 90px;">Slip No</th>
+                                        <th style="width: 110px;">Slip Type</th>
+                                        <th style="width: 100px;">Vehicle No</th>
                                         <th>Nozzle / Fuel</th>
-                                        <th style="width: 80px;" class="text-right">Rate</th>
-                                        <th style="width: 100px;" class="text-right text-primary">QTY (Ltr)</th>
-                                        <th style="width: 90px;" class="text-right">Balance (Ltr)</th>
-                                        <th style="width: 100px;" class="text-right text-warning">Tmp. Receive</th>
+                                        <th style="width: 75px;" class="text-right">Rate</th>
+                                        <th style="width: 85px;" class="text-right">Issued (Ltr)</th>
+                                        <th style="width: 85px;" class="text-right text-primary">Pumped (Ltr)</th>
+                                        <th style="width: 95px;" class="text-right">Balance Quota</th>
+                                        <th style="width: 155px;" class="text-left text-warning">Temp. Receive</th>
                                         <th style="width: 120px;" class="text-right bg-light text-danger">Must Pay (Rs.)</th>
                                     </tr>
                                 </thead>
@@ -469,6 +489,9 @@ if ($isSearched) {
                                         } elseif ($st === 'Temporary Slip') {
                                             $badgeClass = 'slip-badge-temp';
                                         }
+                                        $issVal = floatval($slip['issue_quantity']);
+                                        $dispVal = floatval($slip['dispensed_qty']);
+                                        $displayIssue = ($issVal > 0) ? $issVal : $dispVal;
                                     ?>
                                     <tr>
                                         <td class="text-center font-weight-bold text-muted"><?php echo $sn++; ?></td>
@@ -496,33 +519,45 @@ if ($isSearched) {
                                             <small class="text-muted">(<?php echo htmlspecialchars($slip['item_name'] ?: 'Fuel'); ?>)</small>
                                         </td>
                                         <td class="text-right"><?php echo number_format($slip['rate'], 2); ?></td>
+                                        <td class="text-right font-weight-bold text-muted">
+                                            <?php echo number_format($displayIssue, 2); ?>
+                                        </td>
                                         <td class="text-right font-weight-bold text-primary">
-                                            <?php echo number_format($slip['dispensed_qty'], 2); ?>
+                                            <?php echo number_format($dispVal, 2); ?>
                                         </td>
                                         <td class="text-right">
                                             <?php if ($st === 'Permanent Slip' && $slip['slip_balance'] > 0): ?>
-                                                 <span class="badge badge-info px-2 py-0.5">+<?php echo number_format($slip['slip_balance'], 2); ?></span>
+                                                 <span class="badge badge-info px-2 py-0.5 font-weight-bold" title="Uncollected balance credited to customer">+<?php echo number_format($slip['slip_balance'], 2); ?> Ltr</span>
                                             <?php elseif ($st === 'Balanced Slip'): ?>
-                                                <span class="badge badge-secondary px-2 py-0.5 text-muted">-<?php echo number_format($slip['dispensed_qty'], 2); ?></span>
+                                                <span class="badge badge-secondary px-2 py-0.5 text-muted font-weight-bold" title="Claimed from prior balance quota">-<?php echo number_format($dispVal, 2); ?> Ltr</span>
+                                                <?php if (!empty($slip['ref_slip_no'])): ?>
+                                                    <small class="text-muted d-block text-monospace" style="font-size:9.5px;">(from #<?php echo htmlspecialchars($slip['ref_slip_no']); ?>)</small>
+                                                <?php endif; ?>
                                             <?php else: ?>
                                                 <span class="text-muted">0.00</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="text-right">
-                                            <?php if ($st === 'Temporary Slip'): ?>
-                                                <?php if (!empty($slip['is_returned'])): ?>
-                                                    <span class="badge badge-success px-2 py-0.5 text-white font-weight-bold" style="font-size:11px;">
-                                                        <i class="fas fa-check-circle mr-1"></i><?php echo number_format($slip['dispensed_qty'], 2); ?> (Received)
+                                        <td class="text-left">
+                                            <?php if ($st === 'Permanent Slip'): ?>
+                                                <?php if (!empty($slip['wasoli']) && floatval($slip['wasoli']) > 0): ?>
+                                                    <span class="badge badge-success px-2 py-0.5 text-white font-weight-bold" style="font-size:10.5px;" title="Settled Loan Chit">
+                                                        <i class="fas fa-check-circle mr-1"></i>Settling #<?php echo htmlspecialchars($slip['temp_slip_no'] ?: 'Temp'); ?> (<?php echo number_format($slip['wasoli'], 0); ?>L @ Rs. <?php echo number_format($slip['temp_rate'], 0); ?>)
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="badge badge-warning px-2 py-0.5 text-dark font-weight-bold" style="font-size:11px;">
-                                                        <i class="fas fa-hand-holding mr-1"></i><?php echo number_format($slip['dispensed_qty'], 2); ?> (Giving Loan)
+                                                    <span class="text-muted">—</span>
+                                                <?php endif; ?>
+                                            <?php elseif ($st === 'Temporary Slip'): ?>
+                                                <?php if (!empty($slip['is_returned'])): ?>
+                                                    <span class="badge badge-success px-2 py-0.5 text-white font-weight-bold" style="font-size:10.5px;">
+                                                        <i class="fas fa-check-circle mr-1"></i>Settled<?php echo !empty($slip['settling_slip_no']) ? ' (in #' . htmlspecialchars($slip['settling_slip_no']) . ')' : ''; ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-warning px-2 py-0.5 text-dark font-weight-bold" style="font-size:10.5px;">
+                                                        <i class="fas fa-clock mr-1"></i>Loan Chit (Open)
                                                     </span>
                                                 <?php endif; ?>
-                                            <?php elseif ($slip['wasoli'] > 0): ?>
-                                                <span class="badge badge-warning px-2 py-0.5 text-dark font-weight-bold"><?php echo number_format($slip['wasoli'], 2); ?></span>
                                             <?php else: ?>
-                                                <span class="text-muted">0.00</span>
+                                                <span class="text-muted">—</span>
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-right font-weight-bold <?php echo ($st === 'Balanced Slip') ? 'text-muted' : ''; ?>" style="font-size:13px; background-color:#fffdfd;">
@@ -531,21 +566,17 @@ if ($isSearched) {
                                             <?php elseif ($st === 'Temporary Slip'): ?>
                                                 <?php if (!empty($slip['is_returned'])): ?>
                                                     <span class="text-success font-weight-bold">Rs. 0.00</span>
-                                                    <small class="text-success d-block font-weight-bold" style="font-size: 10px;">
-                                                        <i class="fas fa-check-circle mr-1"></i>(Received / Settled)
+                                                    <small class="text-muted d-block font-weight-bold" style="font-size: 10px;">
+                                                        <i class="fas fa-check-circle mr-1"></i>(Billed in #<?php echo htmlspecialchars($slip['settling_slip_no'] ?: 'Perm'); ?>)
                                                     </small>
-                                                    <button type="button" class="btn btn-outline-secondary py-0 px-1 mt-1 d-print-none" style="font-size:10px;" onclick="toggleSlipReturn(<?php echo $slip['id']; ?>, 0)" title="Revert to Giving">
-                                                        <i class="fas fa-undo mr-1"></i> Undo
-                                                    </button>
                                                 <?php else: ?>
-                                                    <span class="text-danger font-weight-bold">Rs. <?php echo number_format($slip['temp_charge'], 2); ?></span>
-                                                    <small class="text-danger d-block font-weight-bold" style="font-size: 10px;">(Giving &mdash; To Collect)</small>
-                                                    <button type="button" class="btn btn-success py-0 px-2 mt-1 font-weight-bold d-print-none" style="font-size:11px;" onclick="toggleSlipReturn(<?php echo $slip['id']; ?>, 1)">
-                                                        <i class="fas fa-check mr-1"></i> Mark Received
-                                                    </button>
+                                                    <span class="text-muted font-weight-bold">Rs. 0.00</span>
+                                                    <small class="text-warning d-block font-weight-bold" style="font-size: 10px; color:#b07800 !important;">
+                                                        (Loan Chit &mdash; Pending Voucher)
+                                                    </small>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <span class="text-danger">Rs. <?php echo number_format($slip['effective_charge'], 2); ?></span>
+                                                <span class="text-danger font-weight-bold">Rs. <?php echo number_format($slip['effective_charge'], 2); ?></span>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -554,93 +585,125 @@ if ($isSearched) {
                             </table>
                         </div>
 
-                        <!-- Card 2: Financial Debit / Credit Settlement -->
+                        <!-- Card 2: Financial Debit / Credit Settlement & Petrol Quota Reconciliation -->
                         <div class="p-3 bg-light border-top">
-                            <div class="card border-0 shadow-sm" style="border-radius:10px; overflow:hidden; border:1px solid #cbd5e1 !important;">
-                                <div class="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center">
-                                    <strong style="font-size: 13px;"><i class="fas fa-balance-scale mr-2 text-warning"></i>Financial Debit / Credit Settlement (What We Must Collect &amp; Petrol to Deliver)</strong>
-                                    <span class="badge badge-warning text-dark font-weight-bold">Account #<?php echo htmlspecialchars($cdata['cust_id']); ?></span>
-                                </div>
-                                <div class="card-body p-0">
-                                    <table class="table table-bordered table-sm mb-0 text-center" style="font-size: 12.5px;">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th class="text-left pl-3" style="width: 50%;">Transaction Classification</th>
-                                                <th class="text-right pr-3" style="width: 25%; color: #b91c1c;">Debit (Receivable from Customer)</th>
-                                                <th class="text-right pr-3" style="width: 25%; color: #047857;">Credit (Pre-Paid / Settled)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td class="text-left pl-3">
-                                                    <strong>Permanent Slips (Billed Fuel)</strong>
-                                                    <br><small class="text-muted"><?php echo number_format($cdata['permanent_fuel'], 2); ?> Ltr issued across permanent chits</small>
-                                                </td>
-                                                <td class="text-right pr-3 font-weight-bold text-danger">Rs. <?php echo number_format($cdata['permanent_charge'], 2); ?></td>
-                                                <td class="text-right pr-3 text-muted">—</td>
-                                            </tr>
-                                            <tr>
-                                                <td class="text-left pl-3">
-                                                    <strong>Balanced Slips (Claimed Fuel)</strong>
-                                                    <br><small class="text-muted"><?php echo number_format($cdata['balanced_fuel'], 2); ?> Ltr claimed against previous balance quota</small>
-                                                </td>
-                                                <td class="text-right pr-3 text-muted">—</td>
-                                                <td class="text-right pr-3 font-weight-bold text-success">Rs. 0.00 <span class="badge badge-light border text-muted">Settled</span></td>
-                                            </tr>
-                                            <tr style="background-color: #fffdf5;">
-                                                <td class="text-left pl-3">
-                                                    <strong class="text-danger"><i class="fas fa-hand-holding mr-1 text-warning"></i> Giving Tmp. Receive (Loan Petrol Given &mdash; Must Collect)</strong>
-                                                    <br><small class="text-danger font-weight-bold"><?php echo number_format($cdata['temporary_fuel_pending'], 2); ?> Ltr loan petrol given &mdash; We need to collect this money</small>
-                                                </td>
-                                                <td class="text-right pr-3 font-weight-bold text-danger" style="font-size:13.5px;">Rs. <?php echo number_format($cdata['temporary_charge_pending'], 2); ?></td>
-                                                <td class="text-right pr-3 text-muted">—</td>
-                                            </tr>
-                                            <?php if ($cdata['temporary_charge_returned'] > 0): ?>
-                                            <tr style="background-color: #f0fdf4;">
-                                                <td class="text-left pl-3">
-                                                    <strong class="text-success"><i class="fas fa-check-circle mr-1 text-success"></i> Received Tmp. Receive (Loan Petrol Received / Settled)</strong>
-                                                    <br><small class="text-muted"><?php echo number_format($cdata['temporary_fuel_returned'], 2); ?> Ltr loan petrol has been received &amp; settled</small>
-                                                </td>
-                                                <td class="text-right pr-3 text-muted">—</td>
-                                                <td class="text-right pr-3 font-weight-bold text-success" style="font-size:13.5px;">
-                                                    Rs. <?php echo number_format($cdata['temporary_charge_returned'], 2); ?> <span class="badge badge-success">Received</span>
-                                                </td>
-                                            </tr>
+                            <div class="row">
+                                <!-- Panel A: Financial Statement (Money Receivable) -->
+                                <div class="col-lg-6 mb-3 mb-lg-0">
+                                    <div class="card border-0 shadow-sm h-100" style="border-radius:10px; overflow:hidden; border:1px solid #cbd5e1 !important;">
+                                        <div class="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center">
+                                            <strong style="font-size: 13px;"><i class="fas fa-file-invoice-dollar mr-2 text-warning"></i>1. Financial Statement (Money Receivable)</strong>
+                                            <span class="badge badge-warning text-dark font-weight-bold">Account #<?php echo htmlspecialchars($cdata['cust_id']); ?></span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <table class="table table-bordered table-sm mb-0" style="font-size: 12.5px;">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-left pl-3" style="width:60%;">Transaction Classification</th>
+                                                        <th class="text-right pr-3" style="width:40%; color:#b91c1c;">Invoiced Receivable</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Permanent Slips (Billed Fuel &amp; Settled Loans)</strong>
+                                                            <br><small class="text-muted"><?php echo number_format($cdata['permanent_fuel'], 2); ?> Ltr pumped across permanent vouchers</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-danger">Rs. <?php echo number_format($cdata['permanent_charge'], 2); ?></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Balanced Slips (Claimed Fuel Quota)</strong>
+                                                            <br><small class="text-muted"><?php echo number_format($cdata['balanced_fuel'], 2); ?> Ltr drawn against prepaid quota</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-success">Rs. 0.00 <span class="badge badge-light border text-muted">Pre-paid</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Settled Temporary Slips</strong>
+                                                            <br><small class="text-muted"><?php echo number_format($cdata['temporary_fuel_returned'], 2); ?> Ltr loan petrol billed on permanent vouchers</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-success">Rs. 0.00 <span class="badge badge-success">Billed in Permanent</span></td>
+                                                    </tr>
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr style="background-color: #fff5f5;">
+                                                        <th class="text-left pl-3 text-danger font-weight-bold" style="font-size: 13px;">👉 TOTAL INVOICED RECEIVABLE (MUST COLLECT):</th>
+                                                        <th class="text-right pr-3 text-danger font-weight-bold" style="font-size: 16px;">Rs. <?php echo number_format($cdata['total_to_collect'], 2); ?></th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                            <?php if ($cdata['temporary_charge_pending'] > 0): ?>
+                                            <div class="p-2 bg-warning text-dark font-weight-bold small border-top" style="font-size:11px;">
+                                                <i class="fas fa-exclamation-circle mr-1 text-danger"></i> <strong>Open Loan Alert:</strong> Customer holds <?php echo number_format($cdata['temporary_fuel_pending'], 2); ?> Ltr on open loan chits (Est. Rs. <?php echo number_format($cdata['temporary_charge_pending'], 2); ?>) awaiting permanent voucher submission.
+                                            </div>
                                             <?php endif; ?>
-                                        </tbody>
-                                        <tfoot>
-                                            <tr style="background-color: #fff5f5;">
-                                                <th class="text-left pl-3 text-danger font-weight-bold" style="font-size: 13px;">👉 TOTAL AMOUNT WE NEED TO GET (MUST COLLECT):</th>
-                                                <th colspan="2" class="text-right pr-3 text-danger font-weight-bold" style="font-size: 16px;">Rs. <?php echo number_format($cdata['total_to_collect'], 2); ?></th>
-                                            </tr>
-                                            <tr style="background-color: #f0fdf4;">
-                                                <th class="text-left pl-3 text-success font-weight-bold" style="font-size: 13px;">
-                                                    ⛽ PETROL VOLUME WE MUST GIVE CUSTOMER:
-                                                    <small class="text-muted font-weight-normal d-block">
-                                                        (Total Quota Recorded: +<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr &nbsp;|&nbsp; Claimed on Balanced Slips: -<?php echo number_format($cdata['balanced_drawn'], 2); ?> Ltr)
-                                                    </small>
-                                                </th>
-                                                <th colspan="2" class="text-right pr-3 text-success font-weight-bold" style="font-size: 16px;">
-                                                    <?php if ($cdata['remaining_balance'] > 0): ?>
-                                                        <span class="badge badge-success px-3 py-1" style="font-size: 13.5px;">
-                                                            <i class="fas fa-gas-pump mr-1"></i> <?php echo number_format($cdata['remaining_balance'], 2); ?> Ltr (Pending Return)
-                                                        </span>
-                                                    <?php else: ?>
-                                                        <span class="badge badge-secondary px-3 py-1" style="font-size: 12px;">
-                                                            <i class="fas fa-check-circle mr-1"></i> 0.00 Ltr (All Quota Delivered)
-                                                        </span>
-                                                    <?php endif; ?>
-                                                    <?php if ($cdata['overdraw_amount'] > 0): ?>
-                                                        <div class="mt-1">
-                                                            <span class="badge badge-warning text-dark px-2 py-1" style="font-size: 11px;">
-                                                                <i class="fas fa-exclamation-triangle mr-1"></i> Quota Over-drawn by <?php echo number_format($cdata['overdraw_amount'], 2); ?> Ltr
-                                                            </span>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Panel B: Petrol Quota Reconciliation (Physical Litres) -->
+                                <div class="col-lg-6">
+                                    <div class="card border-0 shadow-sm h-100" style="border-radius:10px; overflow:hidden; border:1px solid #cbd5e1 !important;">
+                                        <div class="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center">
+                                            <strong style="font-size: 13px;"><i class="fas fa-gas-pump mr-2 text-info"></i>2. Fuel Quota Statement (Physical Petrol Owed)</strong>
+                                            <span class="badge badge-info font-weight-bold">Volume Ledger</span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <table class="table table-bordered table-sm mb-0" style="font-size: 12.5px;">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-left pl-3" style="width:60%;">Quota Movement Description</th>
+                                                        <th class="text-right pr-3" style="width:40%; color:#047857;">Fuel Volume</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Total Quota Created (Permanent Slips)</strong>
+                                                            <br><small class="text-muted">Uncollected voucher litres (Issue Qty &gt; Pumped Qty)</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-primary">+<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Total Quota Claimed (Balanced Slips)</strong>
+                                                            <br><small class="text-muted">Fuel delivered on price-adjusted balanced slips</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-info">-<?php echo number_format($cdata['balanced_drawn'], 2); ?> Ltr</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Total Physical Petrol Pumped</strong>
+                                                            <br><small class="text-muted">Direct permanent + balanced + temporary loan</small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold text-dark"><?php echo number_format($cdata['total_fuel'], 2); ?> Ltr</td>
+                                                    </tr>
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr style="background-color: #f0fdf4;">
+                                                        <th class="text-left pl-3 text-success font-weight-bold" style="font-size: 13px;">⛽ PETROL VOLUME WE MUST GIVE CUSTOMER:</th>
+                                                        <th class="text-right pr-3 text-success font-weight-bold" style="font-size: 16px;">
+                                                            <?php if ($cdata['remaining_balance'] > 0): ?>
+                                                                <span class="badge badge-success px-3 py-1" style="font-size: 13.5px;">
+                                                                    <i class="fas fa-gas-pump mr-1"></i> <?php echo number_format($cdata['remaining_balance'], 2); ?> Ltr
+                                                                </span>
+                                                            <?php else: ?>
+                                                                <span class="badge badge-secondary px-3 py-1" style="font-size: 12px;">
+                                                                    <i class="fas fa-check-circle mr-1"></i> 0.00 Ltr (All Quota Delivered)
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        </th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                            <?php if ($cdata['overdraw_amount'] > 0): ?>
+                                            <div class="p-2 bg-warning text-dark font-weight-bold small border-top" style="font-size:11px;">
+                                                <i class="fas fa-exclamation-triangle mr-1 text-danger"></i> <strong>Quota Overdraw:</strong> Customer has drawn <?php echo number_format($cdata['overdraw_amount'], 2); ?> Ltr more than recorded balance quota.
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -670,14 +733,14 @@ if ($isSearched) {
                                     <small class="text-muted">(<?php echo number_format($grand_permanent_bal, 1); ?> - <?php echo number_format($grand_balanced_drawn, 1); ?> Ltr)</small>
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
-                                    <div class="small text-muted font-weight-bold text-uppercase">Under Tmp. Receive</div>
+                                    <div class="small text-muted font-weight-bold text-uppercase">Open Loan Fuel</div>
                                     <div class="h4 font-weight-bold text-warning mb-0" style="color:#b07800 !important;">Rs. <?php echo number_format($grand_temp_collect, 2); ?></div>
                                     <small class="text-muted"><?php echo number_format($grand_temporary_fuel, 1); ?> Ltr pending</small>
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
-                                    <div class="small text-danger font-weight-bold text-uppercase">Total Amount To Collect</div>
+                                    <div class="small text-danger font-weight-bold text-uppercase">Total Invoiced To Collect</div>
                                     <div class="h3 font-weight-bold text-danger mb-0">Rs. <?php echo number_format($grand_total_collect, 2); ?></div>
-                                    <small class="text-muted">Perm: Rs. <?php echo number_format($grand_perm_collect, 0); ?></small>
+                                    <small class="text-muted">Billed on permanent vouchers</small>
                                 </div>
                             </div>
                         </div>
@@ -692,30 +755,5 @@ if ($isSearched) {
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-    <script>
-    function toggleSlipReturn(slipId, status) {
-        var actionText = status === 1 
-            ? 'mark this Temporary Slip as RETURNED / RECEIVED (fuel/money collected)?' 
-            : 'revert this slip back to PENDING (unpaid loan)?';
-        if (confirm('Are you sure you want to ' + actionText)) {
-            $.ajax({
-                type: "POST",
-                url: "../include/returntemporaryslip.php",
-                data: { slip_id: slipId, status: status },
-                dataType: "json",
-                success: function(resp) {
-                    if (resp.status === 'success') {
-                        window.location.reload();
-                    } else {
-                        alert(resp.message || 'Error occurred while updating slip.');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    alert('Server error: ' + error);
-                }
-            });
-        }
-    }
-    </script>
 </body>
 </html>
