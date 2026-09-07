@@ -258,16 +258,17 @@ if ($res) {
         <thead>
             <tr>
                 <th style="width: 25px;">#</th>
-                <th style="width: 55px;">Slip #</th>
-                <th style="width: 70px;">Slip Type</th>
+                <th style="width: 50px;">Slip #</th>
+                <th style="width: 58px;">Date</th>
+                <th style="width: 65px;">Slip Type</th>
                 <th>Customer Account &amp; Name</th>
-                <th style="width: 80px;">Vehicle No</th>
-                <th style="width: 85px;">Nozzle / Item</th>
-                <th style="width: 50px;">Qty</th>
-                <th style="width: 50px;">Rate</th>
-                <th style="width: 65px;">Fuel Rs.</th>
-                <th style="width: 70px;">Charge Rs.</th>
-                <th style="width: 85px;">Status</th>
+                <th style="width: 75px;">Vehicle No</th>
+                <th style="width: 80px;">Nozzle / Item</th>
+                <th style="width: 48px;">Qty</th>
+                <th style="width: 48px;">Rate</th>
+                <th style="width: 60px;">Fuel Rs.</th>
+                <th style="width: 65px;">Charge Rs.</th>
+                <th style="width: 80px;">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -275,7 +276,7 @@ if ($res) {
             if (empty($slips)): 
             ?>
             <tr>
-                <td colspan="11" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
+                <td colspan="12" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
             </tr>
             <?php 
             else: 
@@ -302,6 +303,7 @@ if ($res) {
             <tr>
                 <td style="text-align: center;"><?php echo $c++; ?></td>
                 <td style="text-align: center; font-family: monospace; font-weight: bold;"><?php echo htmlspecialchars($s['slip_no'] ?? ''); ?></td>
+                <td style="text-align: center; white-space: nowrap; font-size: 8.5px;"><?php echo !empty($s['slip_date']) ? date('d-m-Y', strtotime($s['slip_date'])) : '—'; ?></td>
                 <td style="text-align: center; font-size: 9px; font-weight: bold;"><?php echo htmlspecialchars($s['slip_type'] ?? ''); ?></td>
                 <td>
                     <strong><?php echo htmlspecialchars($s['customer_name'] ?? 'Account #' . $s['account_number']); ?></strong>
@@ -317,7 +319,7 @@ if ($res) {
             </tr>
             <?php endforeach; ?>
             <tr style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #04204e;">
-                <td colspan="6" style="text-align: right; font-size: 10.5px;">TOTALS:</td>
+                <td colspan="7" style="text-align: right; font-size: 10.5px;">TOTALS:</td>
                 <td style="text-align: right; color: #04204e; font-size: 10.5px;"><?php echo number_format($tot_qty, 2); ?></td>
                 <td style="text-align: right;">—</td>
                 <td style="text-align: right; font-size: 10.5px;">Rs. <?php echo number_format($tot_amt, 2); ?></td>

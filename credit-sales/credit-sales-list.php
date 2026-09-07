@@ -296,6 +296,7 @@ if ($res_slips) {
                             <tr>
                                 <th>#</th>
                                 <th>Slip No</th>
+                                <th>Slip Date</th>
                                 <th>Slip Type</th>
                                 <th>Customer Account</th>
                                 <th>Vehicle No</th>
@@ -391,6 +392,7 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
             html += '<tr>' +
                 '<td>' + (i + 1) + '</td>' +
                 '<td class="font-weight-bold text-monospace">' + (s.slip_no || '—') + '</td>' +
+                '<td class="text-nowrap">' + (s.slip_date || '—') + '</td>' +
                 '<td>' + typeBadge + '</td>' +
                 '<td>' + (s.customer_name ? ('<strong>' + s.customer_name + '</strong> <small class="text-muted">(#' + s.account_number + ')</small>') : ('#' + s.account_number)) + '</td>' +
                 '<td class="font-weight-bold text-monospace">' + (s.vehicle_number || '—') + '</td>' +
@@ -404,7 +406,7 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
         }
         
         html += '<tr class="bg-light font-weight-bold" style="font-size:13px;">' +
-            '<td colspan="6" class="text-right">SHIFT TOTALS:</td>' +
+            '<td colspan="7" class="text-right">SHIFT TOTALS:</td>' +
             '<td class="text-primary">' + totQty.toFixed(2) + ' Ltr</td>' +
             '<td>—</td>' +
             '<td>Rs. ' + totAmt.toFixed(2) + '</td>' +

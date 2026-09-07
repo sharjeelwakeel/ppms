@@ -102,6 +102,16 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   - If a user finishes entering transactions and leaves the automatically spawned next row blank/untouched, clicking **Save Credit Sales** or **Update Credit Sales** automatically prunes the trailing blank row before validation and database insertion.
   - Prevents validation blocks or saving empty dummy rows.
 
+### 6. Row-Level Slip Date (`credit_slip_date[]`)
+- Every credit slip row in `add-credit-sale.php` and `edit-credit-sale.php` features an independent **Slip Date** input field (`credit_slip_date[]`).
+- **Default Inheritance**: Defaults automatically to the master transaction date (`#sale_date`) selected at the top of the form, allowing rapid entry without manual date re-entry for same-day slips.
+- **Cross-Date & Backdated Slips**: Operators can adjust the date of individual slips whenever backdated vouchers or customer receipts from previous shifts are recorded together.
+- **Strict Validation**: All active rows require a valid slip date before form submission (`validateCreditForm()`).
+- **Transparent Display & Audit**:
+  - Saved directly into `tbl_meter_reading_credit_sales.slip_date`.
+  - Displayed in the daily slip breakdown modal (`credit-sales/credit-sales-list.php`).
+  - Printed on the A4 printable statement (`credit-sales/generate-pdf-credit-sale.php`).
+
 ---
 
 ## 4. CRUD Workflow & Navigation

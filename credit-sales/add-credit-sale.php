@@ -51,28 +51,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sale_date = mysqli_real_escape_string($connection, $_POST['sale_date'] ?? date('Y-m-d'));
     $shift_id  = intval($_POST['shift_id'] ?? 0);
     
-    $nozzles_arr   = $_POST['credit_nozzle_id'] ?? [];
-    $slip_nos      = $_POST['credit_slip_no'] ?? [];
-    $slip_types    = $_POST['credit_slip_type'] ?? [];
-    $vehicles_arr  = $_POST['credit_vehicle_number'] ?? [];
-    $accounts_arr  = $_POST['credit_account_number'] ?? [];
-    $qtys_arr      = $_POST['credit_quantity'] ?? [];
-    $rates_arr     = $_POST['credit_rate'] ?? [];
-    $amounts_arr   = $_POST['credit_amount'] ?? [];
-    $charges_arr   = $_POST['credit_charge_amount'] ?? [];
-    $cash_rates    = $_POST['credit_cash_rate'] ?? [];
-    $issue_qtys    = $_POST['credit_issue_quantity'] ?? [];
-    $bal1_arr      = $_POST['credit_balance_1'] ?? [];
-    $bal2_arr      = $_POST['credit_balance_2'] ?? [];
-    $wasoli_arr    = $_POST['credit_wasoli'] ?? [];
-    $returned_arr  = $_POST['credit_is_returned'] ?? [];
+    $nozzles_arr    = $_POST['credit_nozzle_id'] ?? [];
+    $slip_dates_arr = $_POST['credit_slip_date'] ?? [];
+    $slip_nos       = $_POST['credit_slip_no'] ?? [];
+    $slip_types     = $_POST['credit_slip_type'] ?? [];
+    $vehicles_arr   = $_POST['credit_vehicle_number'] ?? [];
+    $accounts_arr   = $_POST['credit_account_number'] ?? [];
+    $qtys_arr       = $_POST['credit_quantity'] ?? [];
+    $rates_arr      = $_POST['credit_rate'] ?? [];
+    $amounts_arr    = $_POST['credit_amount'] ?? [];
+    $charges_arr    = $_POST['credit_charge_amount'] ?? [];
+    $cash_rates     = $_POST['credit_cash_rate'] ?? [];
+    $issue_qtys     = $_POST['credit_issue_quantity'] ?? [];
+    $bal1_arr       = $_POST['credit_balance_1'] ?? [];
+    $bal2_arr       = $_POST['credit_balance_2'] ?? [];
+    $wasoli_arr     = $_POST['credit_wasoli'] ?? [];
+    $returned_arr   = $_POST['credit_is_returned'] ?? [];
 
     if (empty($shift_id)) {
         $error_msg = 'Please select a Shift before saving.';
     } elseif (empty($nozzles_arr)) {
         $error_msg = 'Please add at least one credit sale row before saving.';
     } else {
-        // Validate slip numbers
+        // Validate slip numbers and slip dates
         $valid = true;
         for ($i = 0; $i < count($nozzles_arr); $i++) {
             if (empty(trim($slip_nos[$i] ?? ''))) {
@@ -86,28 +87,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_begin_transaction($connection);
             try {
                 for ($i = 0; $i < count($nozzles_arr); $i++) {
-                    $noz_id     = intval($nozzles_arr[$i]);
-                    $slip_no    = mysqli_real_escape_string($connection, trim($slip_nos[$i]));
-                    $slip_type  = mysqli_real_escape_string($connection, trim($slip_types[$i] ?? 'Permanent Slip'));
-                    $veh_num    = mysqli_real_escape_string($connection, trim($vehicles_arr[$i] ?? ''));
-                    $acc_num    = mysqli_real_escape_string($connection, trim($accounts_arr[$i] ?? ''));
-                    $qty        = floatval($qtys_arr[$i] ?? 0);
-                    $rate       = floatval($rates_arr[$i] ?? 0);
-                    $amount     = floatval($amounts_arr[$i] ?? 0);
-                    $charge_amt = floatval($charges_arr[$i] ?? 0);
-                    $cash_rate  = floatval($cash_rates[$i] ?? 0);
-                    $issue_qty  = floatval($issue_qtys[$i] ?? 0);
-                    $bal1       = floatval($bal1_arr[$i] ?? 0);
-                    $bal2       = floatval($bal2_arr[$i] ?? 0);
-                    $wasoli     = floatval($wasoli_arr[$i] ?? 0);
-                    $is_ret     = intval($returned_arr[$i] ?? 0);
-                    $ret_at     = ($is_ret === 1) ? "NOW()" : "NULL";
+                    $noz_id        = intval($nozzles_arr[$i]);
+                    $row_slip_date = !empty(trim($slip_dates_arr[$i] ?? '')) ? mysqli_real_escape_string($connection, trim($slip_dates_arr[$i])) : $sale_date;
+                    $slip_no       = mysqli_real_escape_string($connection, trim($slip_nos[$i]));
+                    $slip_type     = mysqli_real_escape_string($connection, trim($slip_types[$i] ?? 'Permanent Slip'));
+                    $veh_num       = mysqli_real_escape_string($connection, trim($vehicles_arr[$i] ?? ''));
+                    $acc_num       = mysqli_real_escape_string($connection, trim($accounts_arr[$i] ?? ''));
+                    $qty           = floatval($qtys_arr[$i] ?? 0);
+                    $rate          = floatval($rates_arr[$i] ?? 0);
+                    $amount        = floatval($amounts_arr[$i] ?? 0);
+                    $charge_amt    = floatval($charges_arr[$i] ?? 0);
+                    $cash_rate     = floatval($cash_rates[$i] ?? 0);
+                    $issue_qty     = floatval($issue_qtys[$i] ?? 0);
+                    $bal1          = floatval($bal1_arr[$i] ?? 0);
+                    $bal2          = floatval($bal2_arr[$i] ?? 0);
+                    $wasoli        = floatval($wasoli_arr[$i] ?? 0);
+                    $is_ret        = intval($returned_arr[$i] ?? 0);
+                    $ret_at        = ($is_ret === 1) ? "NOW()" : "NULL";
 
                     $ins_sql = "INSERT INTO tbl_meter_reading_credit_sales 
                                 (meter_reading_id, nozzle_id, slip_date, shift_id, slip_no, slip_type, account_number, vehicle_number,
                                  quantity, rate, amount, charge_amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli, is_returned, returned_at)
                                 VALUES 
-                                (0, '$noz_id', '$sale_date', '$shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
+                                (0, '$noz_id', '$row_slip_date', '$shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
                                  '$qty', '$rate', '$amount', '$charge_amt', '$cash_rate', '$issue_qty', '$bal1', '$bal2', '$wasoli', '$is_ret', $ret_at)";
                     if (!mysqli_query($connection, $ins_sql)) {
                         throw new Exception("Error saving slip #$slip_no: " . mysqli_error($connection));
@@ -116,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Advance nozzle meter reading and sync daily ledger
                     if ($noz_id > 0 && $qty > 0) {
                         mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = start_reading + $qty WHERE id = '$noz_id'");
-                        sync_nozzle_daily_card_sale_delta($connection, $sale_date, $shift_id, $noz_id, $qty);
+                        sync_nozzle_daily_card_sale_delta($connection, $row_slip_date, $shift_id, $noz_id, $qty);
                     }
                 }
                 mysqli_commit($connection);
@@ -256,11 +258,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="p-3">
                 <div class="table-responsive">
-                    <table class="table table-bordered table-sm text-center mb-0" id="creditSalesTable" style="min-width: 1960px;">
+                    <table class="table table-bordered table-sm text-center mb-0" id="creditSalesTable" style="min-width: 2100px;">
                         <thead>
                             <tr style="background: var(--primary-color); color: #fff;">
                                 <th style="width: 180px; min-width: 180px;">Nozzle</th>
                                 <th style="width: 200px; min-width: 200px;">Slip Type</th>
+                                <th style="width: 140px; min-width: 140px;">Slip Date <span class="text-danger">*</span></th>
                                 <th style="width: 130px; min-width: 130px;">Slip No *</th>
                                 <th style="width: 175px; min-width: 175px;">Vehicle No</th>
                                 <th style="width: 125px; min-width: 125px;">Account No</th>
@@ -356,6 +359,7 @@ function isCreditRowActive($tr) {
 
 function addCreditRow() {
     var rowId = creditRowIdx++;
+    var defaultSlipDate = $('#sale_date').val() || '<?php echo date('Y-m-d'); ?>';
     var nozzleOptionsHtml = '';
     for (var i = 0; i < nozzlesData.length; i++) {
         var nz = nozzlesData[i];
@@ -396,6 +400,9 @@ function addCreditRow() {
                 '</div>' +
             '</div>' +
             '<input type="hidden" name="credit_slip_type[]" class="credit-slip-type-val" value="Permanent Slip">' +
+        '</td>' +
+        '<td>' +
+            '<input type="date" name="credit_slip_date[]" class="form-control form-control-sm credit-slip-date font-weight-bold" value="' + defaultSlipDate + '">' +
         '</td>' +
         '<td>' +
             '<input type="text" name="credit_slip_no[]" class="form-control form-control-sm credit-slip-no font-weight-bold text-monospace" placeholder="Slip #">' +
@@ -592,11 +599,18 @@ function validateCreditForm() {
     var valid = true;
     $rows.each(function(idx) {
         var rowNum = idx + 1;
+        var slipDate = $(this).find('.credit-slip-date').val().trim();
         var slipNo = $(this).find('.credit-slip-no').val().trim();
         var vehicle = $(this).find('.credit-vehicle-number').val().trim();
         var account = $(this).find('.credit-account-number').val().trim();
         var qty = parseFloat($(this).find('.credit-qty').val()) || 0;
 
+        if (!slipDate) {
+            alert('Please select Slip Date on row #' + rowNum);
+            $(this).find('.credit-slip-date').focus();
+            valid = false;
+            return false;
+        }
         if (!slipNo) {
             alert('Please enter Slip No on row #' + rowNum);
             $(this).find('.credit-slip-no').focus();
