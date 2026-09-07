@@ -37,8 +37,8 @@ if (
     }
 }
 
-// Fetch items
-$items_sql = "SELECT id, name FROM tbl_items ORDER BY name ASC";
+// Fetch active items
+$items_sql = "SELECT id, name FROM tbl_items WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
 $items_result = mysqli_query($connection, $items_sql);
 ?>
 <!DOCTYPE html>

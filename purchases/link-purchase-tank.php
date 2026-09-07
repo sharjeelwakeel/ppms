@@ -77,8 +77,8 @@ if (isset($_POST['add_tank_link'])) {
     }
 }
 
-// Fetch Tanks for Dropdown
-$tanks_sql = "SELECT id, tank_name FROM tbl_tanks ORDER BY tank_name ASC";
+// Fetch Active Tanks for Dropdown
+$tanks_sql = "SELECT id, tank_name FROM tbl_tanks WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY tank_name ASC";
 $tanks_result = mysqli_query($connection, $tanks_sql);
 
 // Fetch Existing Tank Allocations

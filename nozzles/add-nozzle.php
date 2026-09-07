@@ -41,12 +41,12 @@ if (isset($_POST['name']) && isset($_POST['tank_id']) && isset($_POST['item_id']
     }
 }
 
-// Fetch tanks
-$tanks_sql = "SELECT id, tank_name, item_id FROM tbl_tanks ORDER BY tank_name ASC";
+// Fetch active tanks
+$tanks_sql = "SELECT id, tank_name, item_id FROM tbl_tanks WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY tank_name ASC";
 $tanks_result = mysqli_query($connection, $tanks_sql);
 
-// Fetch items
-$items_sql = "SELECT id, name FROM tbl_items ORDER BY name ASC";
+// Fetch active items
+$items_sql = "SELECT id, name FROM tbl_items WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
 $items_result = mysqli_query($connection, $items_sql);
 ?>
 <!DOCTYPE html>

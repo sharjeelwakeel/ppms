@@ -145,8 +145,8 @@ if (!$purchase) {
 $banks_sql = "SELECT id, name, account_number FROM tbl_banks WHERE deleted_at IS NULL ORDER BY name ASC";
 $banks_result = mysqli_query($connection, $banks_sql);
 
-// Fetch items for details dropdown
-$items_sql = "SELECT id, name FROM tbl_items ORDER BY name ASC";
+// Fetch active items for details dropdown
+$items_sql = "SELECT id, name FROM tbl_items WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
 $items_result = mysqli_query($connection, $items_sql);
 
 // Fetch Payment History

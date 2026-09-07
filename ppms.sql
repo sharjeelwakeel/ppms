@@ -5083,6 +5083,34 @@ INSERT INTO `tbl_items` (`id`, `name`, `cash_rate`, `credit_rate`, `purchase_rat
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_prices`
+--
+
+CREATE TABLE `tbl_prices` (
+  `id` int(11) NOT NULL,
+  `table_name` varchar(64) NOT NULL,
+  `table_id` int(11) NOT NULL,
+  `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `effective_date` date NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_prices`
+--
+
+INSERT INTO `tbl_prices` (`id`, `table_name`, `table_id`, `cash_rate`, `credit_rate`, `purchase_rate`, `effective_date`, `is_active`, `notes`, `created_by`, `created_at`, `deleted_at`) VALUES
+(1, 'tbl_items', 1, 200.00, 205.00, 195.00, '2026-08-25', 1, 'Initial baseline rate', NULL, '2026-08-25 12:00:09', NULL);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_leave_setup`
 --
 
@@ -5768,6 +5796,16 @@ ALTER TABLE `tbl_items`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `tbl_prices`
+--
+ALTER TABLE `tbl_prices`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_table_entity` (`table_name`, `table_id`),
+  ADD KEY `idx_active_lookup` (`table_name`, `table_id`, `is_active`),
+  ADD KEY `idx_effective_date` (`effective_date`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
+
+--
 -- Indexes for table `tbl_leave_setup`
 --
 ALTER TABLE `tbl_leave_setup`
@@ -5982,6 +6020,12 @@ ALTER TABLE `tbl_expense_types`
 -- AUTO_INCREMENT for table `tbl_items`
 --
 ALTER TABLE `tbl_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_prices`
+--
+ALTER TABLE `tbl_prices`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --

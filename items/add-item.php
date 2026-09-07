@@ -5,22 +5,31 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/price_helper.php';
 
 // Enforce access check for adding items
 check_access('items', 'add');
 
+// Ensure tbl_prices exists and is initialized
+init_prices_table($connection);
+
 $message = '';
 if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_rate']) && isset($_POST['purchase_rate']) && isset($_POST['unit'])) {
-    $name = mysqli_real_escape_string($connection, $_POST['name']);
-    $cash_rate = mysqli_real_escape_string($connection, $_POST['cash_rate']);
-    $credit_rate = mysqli_real_escape_string($connection, $_POST['credit_rate']);
-    $purchase_rate = mysqli_real_escape_string($connection, $_POST['purchase_rate']);
-    $unit = mysqli_real_escape_string($connection, $_POST['unit']);
+    $name = mysqli_real_escape_string($connection, trim($_POST['name']));
+    $cash_rate = floatval($_POST['cash_rate']);
+    $credit_rate = floatval($_POST['credit_rate']);
+    $purchase_rate = floatval($_POST['purchase_rate']);
+    $unit = mysqli_real_escape_string($connection, trim($_POST['unit']));
+    $effective_date = !empty($_POST['effective_date']) ? mysqli_real_escape_string($connection, trim($_POST['effective_date'])) : date('Y-m-d');
+    $notes = !empty($_POST['notes']) ? mysqli_real_escape_string($connection, trim($_POST['notes'])) : 'Initial base price';
+    $user_id = intval($_SESSION['loggedInUser'] ?? 0);
 
     $query = "INSERT INTO tbl_items (name, cash_rate, credit_rate, purchase_rate, unit) 
               VALUES ('$name', '$cash_rate', '$credit_rate', '$purchase_rate', '$unit')";
     
     if (mysqli_query($connection, $query)) {
+        $item_id = mysqli_insert_id($connection);
+        set_active_price($connection, 'tbl_items', $item_id, $cash_rate, $credit_rate, $purchase_rate, $effective_date, $notes, $user_id);
         header('Location: items-list.php');
         exit;
     } else {
@@ -79,6 +88,19 @@ if (isset($_POST['name']) && isset($_POST['cash_rate']) && isset($_POST['credit_
 											<select name="unit" class="form-control" required>
 												<option value="Ltr" selected>Ltr</option>
 											</select>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Effective Date</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="date" name="effective_date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+											<small class="form-text text-muted">Date from which this initial rate takes effect.</small>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-form-label">Notes</label>
+										<div class="col-lg-8 col-md-7">
+											<input type="text" name="notes" class="form-control" placeholder="e.g. Initial base price announcement">
 										</div>
 									</div>
 								</div>
