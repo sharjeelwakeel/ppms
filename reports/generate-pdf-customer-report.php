@@ -17,6 +17,8 @@ if (!has_permission('reports', 'show') && !has_permission('customers', 'show') &
 
 $customerId = intval($_GET['customer_id'] ?? 0);
 $vehicleNum = trim($_GET['vehicle_number'] ?? '');
+$fromDate   = trim($_GET['from_date'] ?? '');
+$toDate     = trim($_GET['to_date'] ?? '');
 
 $where_clauses = ["1=1"];
 if ($customerId > 0) {
@@ -26,9 +28,19 @@ if (!empty($vehicleNum)) {
     $v_safe = mysqli_real_escape_string($connection, $vehicleNum);
     $where_clauses[] = "mrcs.vehicle_number LIKE '%$v_safe%'";
 }
+if (!empty($fromDate) && !empty($toDate)) {
+    $from_safe = mysqli_real_escape_string($connection, $fromDate);
+    $to_safe   = mysqli_real_escape_string($connection, $toDate);
+    $where_clauses[] = "mrcs.slip_date BETWEEN '$from_safe' AND '$to_safe'";
+} elseif (!empty($fromDate)) {
+    $from_safe = mysqli_real_escape_string($connection, $fromDate);
+    $where_clauses[] = "mrcs.slip_date >= '$from_safe'";
+} elseif (!empty($toDate)) {
+    $to_safe = mysqli_real_escape_string($connection, $toDate);
+    $where_clauses[] = "mrcs.slip_date <= '$to_safe'";
+}
 $where_sql = implode(' AND ', $where_clauses);
 
-// Fetch slips
 // Fetch slips with settling slip join
 $report_sql = "SELECT mrcs.*,
                       c.id AS cust_id,
@@ -338,7 +350,12 @@ if ($report_res) {
                 <div class="header-box">
                     <h2>Petrol Pump Management System</h2>
                     <h4>Customer Credit &amp; Fuel Ledger Statement</h4>
-                    <p>Generated: <?php echo date('d-m-Y h:i A'); ?> &nbsp;|&nbsp; PPMS Audit Ledger</p>
+                    <p>
+                        <?php if (!empty($fromDate) || !empty($toDate)): ?>
+                            <strong>Date Filter:</strong> <?php echo !empty($fromDate) ? date('d-m-Y', strtotime($fromDate)) : 'Start'; ?> to <?php echo !empty($toDate) ? date('d-m-Y', strtotime($toDate)) : 'Till Date'; ?> &nbsp;|&nbsp; 
+                        <?php endif; ?>
+                        Generated: <?php echo date('d-m-Y h:i A'); ?> &nbsp;|&nbsp; PPMS Audit Ledger
+                    </p>
                 </div>
 
                 <!-- Customer Details -->
@@ -526,6 +543,14 @@ if ($report_res) {
                                 <td style="text-align: right; color: #b07800;">Open Loan: <?php echo number_format($cdata['temporary_fuel_pending'], 2); ?> Ltr</td>
                             </tr>
                             <?php endif; ?>
+                            <tr style="background-color: #f1f5f9; font-weight: bold;">
+                                <td>
+                                    <strong>Total Physical Petrol Pumped</strong>
+                                    <div style="font-size: 9px; color: #666">Permanent issued + balanced drawn + temporary chit petrol</div>
+                                </td>
+                                <td style="text-align: right; color: #666;">—</td>
+                                <td style="text-align: right; font-size: 11px; color: #04204e;"><?php echo number_format($cdata['total_fuel'], 2); ?> Ltr</td>
+                            </tr>
                         </tbody>
                         <tfoot>
                             <tr style="background: #fff5f5; font-weight: bold;">
@@ -538,7 +563,7 @@ if ($report_res) {
                                 <td style="color: #047857; font-size: 11px;">
                                     ⛽ NET PETROL VOLUME PUMP MUST DELIVER:
                                     <div style="font-size: 8.5px; color: #555; font-weight: normal;">
-                                        (Total Quota Recorded: +<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr &nbsp;|&nbsp; Quota Settled on Balanced Slips: -<?php echo number_format($cdata['balanced_quota_settled'], 2); ?> Ltr)
+                                        (Total Prepaid Quota: +<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr &nbsp;|&nbsp; Settled By Car: -<?php echo number_format($cdata['balanced_quota_settled'], 2); ?> Ltr)
                                     </div>
                                 </td>
                                 <td colspan="2" style="text-align: right; font-size: 13px; color: #047857;">

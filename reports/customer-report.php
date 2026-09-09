@@ -33,10 +33,14 @@ foreach ($chk_aux as $col => $def) {
     }
 }
 
-// Only Two Filters: Customer and Vehicle No
+// Filters: Customer, Vehicle No, From Date, To Date
 $customerId = intval($_GET['customer_id'] ?? 0);
 $vehicleNum = trim($_GET['vehicle_number'] ?? '');
-$isSearched = (isset($_GET['customer_id']) || isset($_GET['vehicle_number'])) && ($customerId > 0 || !empty($vehicleNum));
+$fromDate   = trim($_GET['from_date'] ?? '');
+$toDate     = trim($_GET['to_date'] ?? '');
+
+$isSearched = (isset($_GET['customer_id']) || isset($_GET['vehicle_number']) || isset($_GET['from_date']) || isset($_GET['to_date'])) && 
+              ($customerId > 0 || !empty($vehicleNum) || !empty($fromDate) || !empty($toDate));
 
 // Fetch all active customers for filter dropdown
 $customers_res = mysqli_query($connection, "SELECT id, name, phone, fuel_rate FROM tbl_customers WHERE deleted_at IS NULL ORDER BY name ASC");
@@ -51,16 +55,16 @@ if ($customers_res) {
 $customers_ledger = [];
 
 // Grand totals across all customers
-$grand_total_fuel       = 0;
-$grand_permanent_fuel   = 0;
-$grand_balanced_fuel    = 0;
-$grand_temporary_fuel   = 0;
-$grand_permanent_bal    = 0;
-$grand_balanced_drawn   = 0;
-$grand_remaining_bal    = 0;
-$grand_perm_collect     = 0;
-$grand_temp_collect     = 0;
-$grand_total_collect    = 0;
+$grand_total_fuel     = 0;
+$grand_permanent_fuel = 0;
+$grand_balanced_fuel  = 0;
+$grand_temporary_fuel = 0;
+$grand_permanent_bal  = 0;
+$grand_balanced_drawn = 0;
+$grand_remaining_bal  = 0;
+$grand_perm_collect   = 0;
+$grand_temp_collect   = 0;
+$grand_total_collect  = 0;
 
 // ONLY query when user has searched
 if ($isSearched) {
@@ -73,8 +77,19 @@ if ($isSearched) {
         $v_safe = mysqli_real_escape_string($connection, $vehicleNum);
         $where_clauses[] = "mrcs.vehicle_number LIKE '%$v_safe%'";
     }
+    if (!empty($fromDate) && !empty($toDate)) {
+        $from_safe = mysqli_real_escape_string($connection, $fromDate);
+        $to_safe   = mysqli_real_escape_string($connection, $toDate);
+        $where_clauses[] = "mrcs.slip_date BETWEEN '$from_safe' AND '$to_safe'";
+    } elseif (!empty($fromDate)) {
+        $from_safe = mysqli_real_escape_string($connection, $fromDate);
+        $where_clauses[] = "mrcs.slip_date >= '$from_safe'";
+    } elseif (!empty($toDate)) {
+        $to_safe = mysqli_real_escape_string($connection, $toDate);
+        $where_clauses[] = "mrcs.slip_date <= '$to_safe'";
+    }
 
-    $where_sql = implode(' AND ', $where_clauses);
+    $where_sql = !empty($where_clauses) ? implode(' AND ', $where_clauses) : '1=1';
 
     // Fetch credit sales records with joined settling slip information
     $report_sql = "SELECT mrcs.*,
@@ -241,17 +256,17 @@ if ($isSearched) {
     foreach ($customers_ledger as $cId => &$cItem) {
         $cItem['remaining_balance'] = max(0, round($cItem['permanent_balance'] - $cItem['balanced_quota_settled'], 2));
         $cItem['overdraw_amount']   = max(0, round($cItem['balanced_quota_settled'] - $cItem['permanent_balance'], 2));
-        
-        $grand_total_fuel      += $cItem['total_fuel'];
-        $grand_permanent_fuel  += $cItem['permanent_fuel'];
-        $grand_balanced_fuel   += $cItem['balanced_fuel'];
-        $grand_temporary_fuel  += $cItem['temporary_fuel'];
-        $grand_permanent_bal   += $cItem['permanent_balance'];
-        $grand_balanced_drawn  += $cItem['balanced_drawn'];
-        $grand_remaining_bal   += $cItem['remaining_balance'];
-        $grand_perm_collect    += $cItem['permanent_charge'];
-        $grand_temp_collect    += $cItem['temporary_charge_pending'];
-        $grand_total_collect   += $cItem['total_to_collect'];
+
+        $grand_total_fuel     += $cItem['total_fuel'];
+        $grand_permanent_fuel += $cItem['permanent_fuel'];
+        $grand_balanced_fuel  += $cItem['balanced_fuel'];
+        $grand_temporary_fuel += $cItem['temporary_fuel'];
+        $grand_permanent_bal  += $cItem['permanent_balance'];
+        $grand_balanced_drawn += $cItem['balanced_drawn'];
+        $grand_remaining_bal  += $cItem['remaining_balance'];
+        $grand_perm_collect   += $cItem['permanent_charge'];
+        $grand_temp_collect   += $cItem['temporary_charge_pending'];
+        $grand_total_collect  += $cItem['total_to_collect'];
     }
     unset($cItem);
 }
@@ -384,8 +399,17 @@ if ($isSearched) {
             <!-- Print Header -->
             <div class="print-header text-center">
                 <h3 class="font-weight-bold mb-1" style="color:#04204e;">PETROL PUMP MANAGEMENT SYSTEM</h3>
-                <h5 class="font-weight-bold mb-1">All Customers - Credit &amp; Fuel Ledger Report</h5>
-                <p class="text-muted small mb-2">Generated On: <strong><?php echo date('d-m-Y H:i A'); ?></strong></p>
+                <h5 class="font-weight-bold mb-1">Customer Credit &amp; Fuel Ledger Report</h5>
+                <p class="text-muted small mb-2">
+                    Generated On: <strong><?php echo date('d-m-Y H:i A'); ?></strong>
+                    <?php if (!empty($fromDate) && !empty($toDate)): ?>
+                        &nbsp;|&nbsp; Filter Period: <strong><?php echo date('d-m-Y', strtotime($fromDate)); ?> to <?php echo date('d-m-Y', strtotime($toDate)); ?></strong>
+                    <?php elseif (!empty($fromDate)): ?>
+                        &nbsp;|&nbsp; From Date: <strong><?php echo date('d-m-Y', strtotime($fromDate)); ?></strong>
+                    <?php elseif (!empty($toDate)): ?>
+                        &nbsp;|&nbsp; Till Date: <strong><?php echo date('d-m-Y', strtotime($toDate)); ?></strong>
+                    <?php endif; ?>
+                </p>
                 <hr style="border-top:2px solid #04204e;">
             </div>
 
@@ -399,7 +423,7 @@ if ($isSearched) {
                 </div>
                 <div class="col-md-5 text-right">
                     <?php if ($isSearched && !empty($customers_ledger)): ?>
-                    <a href="generate-pdf-customer-report.php?customer_id=<?php echo urlencode($customerId); ?>&vehicle_number=<?php echo urlencode($vehicleNum); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
+                    <a href="generate-pdf-customer-report.php?customer_id=<?php echo urlencode($customerId); ?>&vehicle_number=<?php echo urlencode($vehicleNum); ?>&from_date=<?php echo urlencode($fromDate); ?>&to_date=<?php echo urlencode($toDate); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
                         <i class="fas fa-file-pdf mr-1"></i> Export PDF
                     </a>
                     <?php endif; ?>
@@ -412,10 +436,19 @@ if ($isSearched) {
                 </div>
             </div>
 
-            <!-- Two Filters Only: Customer & Vehicle -->
+            <!-- Filter Card: Customer, Vehicle & Date Range -->
+            <!-- Filter Card: Date Range, Customer & Vehicle -->
             <div class="card p-3 mb-4 shadow-sm border-0 d-print-none" style="border-radius:10px; background:#fff;">
                 <form action="customer-report.php" method="GET" class="form-row align-items-end">
-                    <div class="col-md-5 col-sm-6 mb-2 mb-md-0">
+                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                        <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-calendar-alt mr-1 text-primary"></i> From Date</label>
+                        <input type="date" name="from_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($fromDate); ?>">
+                    </div>
+                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                        <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-calendar-check mr-1 text-primary"></i> To Date</label>
+                        <input type="date" name="to_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($toDate); ?>">
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-user mr-1 text-primary"></i> Customer</label>
                         <select name="customer_id" class="form-control form-control-sm font-weight-bold">
                             <option value="">-- All Customers --</option>
@@ -426,11 +459,11 @@ if ($isSearched) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4 col-sm-6 mb-2 mb-md-0">
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-truck mr-1 text-primary"></i> Vehicle No</label>
-                        <input type="text" name="vehicle_number" class="form-control form-control-sm font-weight-bold" placeholder="e.g. LE-1234" value="<?php echo htmlspecialchars($vehicleNum); ?>">
+                        <input type="text" name="vehicle_number" class="form-control form-control-sm font-weight-bold text-monospace" placeholder="e.g. LE-1234" value="<?php echo htmlspecialchars($vehicleNum); ?>">
                     </div>
-                    <div class="col-md-3 col-sm-12">
+                    <div class="col-xl-2 col-lg-2 col-md-12 col-sm-12">
                         <div class="btn-group btn-block">
                             <button type="submit" class="btn btn-primary btn-sm font-weight-bold shadow-sm">
                                 <i class="fas fa-search mr-1"></i> Search
@@ -446,14 +479,14 @@ if ($isSearched) {
             <?php if (!$isSearched): ?>
                 <div class="card p-5 text-center shadow-sm border-0 d-print-none" style="border-radius:12px; background:#fff;">
                     <i class="fas fa-search text-muted mb-3" style="font-size: 48px; opacity:0.4;"></i>
-                    <h5 class="font-weight-bold" style="color:#04204e;">Search by Customer or Vehicle to View Report</h5>
-                    <p class="text-muted mb-0">Please select a customer from the dropdown or enter a vehicle number above, then click <strong>Search</strong> to load the ledger.</p>
+                    <h5 class="font-weight-bold" style="color:#04204e;">Search by Customer, Vehicle, or Date Range to View Report</h5>
+                    <p class="text-muted mb-0">Select a customer, vehicle number, or date range above, then click <strong>Search</strong> to load the ledger.</p>
                 </div>
             <?php elseif (empty($customers_ledger)): ?>
                 <div class="card p-5 text-center shadow-sm border-0 d-print-none" style="border-radius:12px; background:#fff;">
                     <i class="fas fa-receipt text-muted mb-3" style="font-size: 48px; opacity:0.4;"></i>
                     <h5 class="font-weight-bold text-muted">No Credit Sales Slips Found</h5>
-                    <p class="text-muted mb-0">No credit sales records match the selected customer or vehicle number.</p>
+                    <p class="text-muted mb-0">No credit sales records match the selected customer, vehicle, or date parameters.</p>
                 </div>
             <?php else: ?>
 
@@ -488,7 +521,8 @@ if ($isSearched) {
 
                         <!-- Direct Itemized Slips Table -->
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped table-hover table-sm mb-0 ledger-table">                                <thead>
+                            <table class="table table-bordered table-striped table-hover table-sm mb-0 ledger-table">
+                                <thead>
                                     <tr>
                                         <th style="width: 35px;">#</th>
                                         <th style="width: 95px;">Slip Date</th>
@@ -776,22 +810,18 @@ if ($isSearched) {
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Total Fuel Dispensed</div>
                                     <div class="h4 font-weight-bold text-primary mb-0"><?php echo number_format($grand_total_fuel, 2); ?> <small>Ltr</small></div>
-                                    <!--<small class="text-muted">Perm: <?php //echo number_format($grand_permanent_fuel, 1); ?> | Bal: <?php //echo number_format($grand_balanced_fuel, 1); ?></small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Total Balance Left</div>
                                     <div class="h4 font-weight-bold text-info mb-0"><?php echo number_format($grand_remaining_bal, 2); ?> <small>Ltr</small></div>
-                                    <!-- <small class="text-muted">(<?php //echo number_format($grand_permanent_bal, 1); ?> - <?php //echo number_format($grand_balanced_drawn, 1); ?> Ltr)</small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Open Loan Fuel</div>
                                     <div class="h4 font-weight-bold text-warning mb-0" style="color:#b07800 !important;">Rs. <?php echo number_format($grand_temp_collect, 2); ?></div>
-                                    <!-- <small class="text-muted"><?php //echo number_format($grand_temporary_fuel, 1); ?> Ltr pending</small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-danger font-weight-bold text-uppercase">Total Invoiced To Collect</div>
                                     <div class="h3 font-weight-bold text-danger mb-0">Rs. <?php echo number_format($grand_total_collect, 2); ?></div>
-                                    <!-- <small class="text-muted">Billed on permanent vouchers</small> -->
                                 </div>
                             </div>
                         </div>

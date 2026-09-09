@@ -43,7 +43,27 @@ graph TD
 
 ---
 
-## 2. Four Operational Scenarios in Action
+## 2. Granular Filtering & Streamlined Filter Sequence
+
+The report form provides intuitive, sequential filtering arranged logically from broad period to specific account:
+
+1. **1st: Date Range (`from_date` & `to_date`)**: Limits records based on the physical credit slip date (`mrcs.slip_date`).
+2. **2nd: Customer (`customer_id`)**: Selects a specific customer account or views all customers.
+3. **3rd: Vehicle No (`vehicle_number`)**: Filters for a specific vehicle registration plate (e.g. `LEA-1234`).
+4. **Action Buttons**: Instant search submission and filter reset.
+
+```mermaid
+graph LR
+    A["1. Date Range (From/To Date)"] --> B["2. Customer Account"]
+    B --> C["3. Vehicle Number"]
+    C --> D["Clean Filtered Ledger View"]
+```
+
+When filtered, the slips table and customer reconciliation cards compute seamlessly over the specified criteria without unnecessary overhead or over-engineering.
+
+---
+
+## 3. Four Operational Scenarios in Action
 
 The report handles all 4 transaction types identified in [`credit_sales.md`](credit_sales.md):
 
@@ -83,7 +103,7 @@ The report handles all 4 transaction types identified in [`credit_sales.md`](cre
 
 ---
 
-## 3. Ledger Table Columns Specification
+## 4. Ledger Table Columns Specification
 
 The itemized report table renders 12 standardized columns:
 
@@ -104,7 +124,7 @@ The itemized report table renders 12 standardized columns:
 
 ---
 
-## 4. Card 2: Two-Panel Reconciliation Summary
+## 5. Two-Panel Reconciliation Summary & Grand Totals
 
 Directly beneath each customer's itemized slips table, **Card 2** displays two synchronized audit panels:
 
@@ -113,24 +133,36 @@ Audits the exact billed receivables and collections:
 - **Permanent Slips (Billed Invoices)**: Total billed charges across all permanent vouchers (including settled loans).
 - **Balanced Slips (Claimed Fuel Quota)**: `Rs. 0.00 (Pre-paid)`.
 - **Settled Temporary Slips**: `Rs. 0.00 (Billed in Permanent Slips)`.
-- **Open Temporary Slips**: Flagged as pending (Estimated Rs.) if any exist.
+- **Open Temporary Slips**: Flagged as pending loan liability (Estimated Rs.) if any exist.
 - **👉 TOTAL INVOICED RECEIVABLE (MUST COLLECT)**:
   $$\mathbf{Rs.\; \text{Permanent Charges}}$$
 
 ### Panel B: Fuel Quota Reconciliation (Litres)
 Reconciles physical fuel balance owed to the customer:
-- **Total Quota Recorded**: Sum of `balance_1 + balance_2` from permanent vouchers.
-- **Quota Claimed**: Sum of fuel dispensed on `Balanced Slips`.
+- **Permanent Slips**: Quota created ($+ \text{balance\_1} + \text{balance\_2}$).
+- **Balanced Slips**: Quota settled ($- \text{dispensed quantity}$).
+- **Price Fluctuation Impact**: Litres adjusted if rate changed.
+- **Total Physical Petrol Pumped**: Direct permanent + balanced delivered + temporary loan.
 - **⛽ NET PETROL VOLUME PUMP MUST DELIVER**:
-  $$\mathbf{\max(0,\; \text{Quota Recorded} - \text{Quota Claimed})\text{ Ltr}}$$
+  $$\mathbf{\max(0,\; \text{Quota Created} - \text{Quota Settled})\text{ Ltr}}$$
 - **Overdraw Detection**: If claimed litres exceed recorded quota, flags an explicit overdraw badge: `⚠️ Quota Overdrawn: X.XX Ltr`.
+
+### Grand Summary Across All Customers
+At the bottom of the report, an executive summary card aggregates:
+1. **Total Fuel Dispensed**: Sum of all physical litres pumped.
+2. **Total Balance Left**: Total quota litres pump must deliver across all accounts.
+3. **Open Loan Fuel**: Total temporary loan litres awaiting permanent vouchers.
+4. **Total Invoiced To Collect**: Total cash/bank receivables across all accounts.
 
 ---
 
-## 5. PDF Statement Generator Parity
+## 6. PDF Statement Generator Parity
 
 The print-ready PDF generator (`reports/generate-pdf-customer-report.php`) shares 100% computational and stylistic parity with the web interface:
 - **Strict Theme Adherence**: Deep navy primary headers (`#04204e`), clean borders, and monospace numeric alignments.
+- **Filter Date Range Subtitle**: Displays `Date Filter: DD-MM-YYYY to DD-MM-YYYY` in the letterhead when active.
+- **Slips Table Parity**: Identical 12-column itemized breakdown.
+- **Settlement Statement Parity**: Financial receivables and fuel quota volume reconciliation.
 - **Signature Section**: Includes 3 formal sign-off boxes at the footer:
   1. *Prepared By (Pump Manager)*
   2. *Verified By (Accounts)*
@@ -139,8 +171,9 @@ The print-ready PDF generator (`reports/generate-pdf-customer-report.php`) share
 
 ---
 
-## 6. Verification and Integration Rules
+## 7. Verification and Integration Rules
 
 1. **RBAC Protection**: Both `customer-report.php` and `generate-pdf-customer-report.php` enforce `check_access('reports', 'view')`.
 2. **Auxiliary Column Auto-Migration**: If older database schemas lack `settled_in_slip_id` or `temp_rate`, the report auto-executes idempotent `ALTER TABLE` checks to prevent SQL failures.
 3. **Multi-Vehicle Aggregation**: Customers with fleets (multiple vehicle numbers) are grouped by `customer_id`. Subtotals and ledgers reflect the customer's aggregate balance while identifying each vehicle per line.
+
