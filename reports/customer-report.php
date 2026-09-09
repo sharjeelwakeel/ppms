@@ -491,9 +491,8 @@ if ($isSearched) {
                             <table class="table table-bordered table-striped table-hover table-sm mb-0 ledger-table">                                <thead>
                                     <tr>
                                         <th style="width: 35px;">#</th>
-                                        <th style="width: 85px;">Slip Date</th>
-                                        <th style="width: 75px;">Reading #</th>
-                                        <th style="width: 90px;">Slip No</th>
+                                        <th style="width: 95px;">Slip Date</th>
+                                        <th style="width: 100px;">Slip No</th>
                                         <th style="width: 110px;">Slip Type</th>
                                         <th style="width: 100px;">Vehicle No</th>
                                         <th>Nozzle / Fuel</th>
@@ -523,17 +522,6 @@ if ($isSearched) {
                                     <tr>
                                         <td class="text-center font-weight-bold text-muted"><?php echo $sn++; ?></td>
                                         <td class="text-center"><?php echo date('d-m-Y', strtotime($slip['slip_date'])); ?></td>
-                                        <td class="text-center">
-                                            <?php if (!empty($slip['meter_reading_id']) && $slip['meter_reading_id'] > 0): ?>
-                                                <a href="../meter-readings/view-meter-reading.php?id=<?php echo $slip['meter_reading_id']; ?>" target="_blank" class="font-weight-bold text-primary">
-                                                    #<?php echo $slip['meter_reading_id']; ?>
-                                                </a>
-                                            <?php else: ?>
-                                                <a href="../credit-sales/credit-sales-list.php?from_date=<?php echo $slip['slip_date']; ?>&to_date=<?php echo $slip['slip_date']; ?>" target="_blank" class="badge badge-info" title="View in Credit Sales">
-                                                    <i class="fas fa-file-invoice-dollar mr-1"></i>Slip
-                                                </a>
-                                            <?php endif; ?>
-                                        </td>
                                         <td class="text-center font-weight-bold"><?php echo htmlspecialchars($slip['slip_no']); ?></td>
                                         <td class="text-center">
                                             <span class="badge px-2 py-1 <?php echo $badgeClass; ?>">

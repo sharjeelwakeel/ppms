@@ -7,12 +7,11 @@ The **Credit Sale Reading** module in the Petrol Pump Management System (PPMS) m
 
 ## 2. Database Schema (`tbl_meter_reading_credit_sales`)
 
-All credit transactions are stored in `tbl_meter_reading_credit_sales`, supporting standalone day entries (`meter_reading_id = 0`) and legacy shift entries:
+All credit transactions are stored in `tbl_meter_reading_credit_sales`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
-  `meter_reading_id` INT(11) NOT NULL DEFAULT 0,
   `nozzle_id` INT(11) NOT NULL,                        -- Attached nozzle ID (tbl_nozzles)
   `slip_date` DATE NOT NULL,                           -- Voucher date (supports backdated pricing)
   `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Station shift ID (tbl_shifts)
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_meter_reading_id` (`meter_reading_id`),
   KEY `idx_slip_date` (`slip_date`),
   KEY `idx_shift_id` (`shift_id`),
   KEY `idx_slip_no` (`slip_no`),

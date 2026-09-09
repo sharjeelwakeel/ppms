@@ -85,23 +85,22 @@ The report handles all 4 transaction types identified in [`credit_sales.md`](cre
 
 ## 3. Ledger Table Columns Specification
 
-The itemized report table renders 13 standardized columns:
+The itemized report table renders 12 standardized columns:
 
 | # | Column Name | Source Field / Formula | Description |
 |---|---|---|---|
 | 1 | `#` | Row counter | Sequential row index |
 | 2 | `Slip Date` | `slip_date` | Date printed on the credit voucher |
-| 3 | `Reading #` | `meter_reading_id` | Shift reading reference ID |
-| 4 | `Slip No` | `slip_number` | Physical paper slip number |
-| 5 | `Slip Type` | `slip_type` | `Permanent Slip`, `Balanced Slip`, or `Temporary Slip` with settlement tags |
-| 6 | `Vehicle No` | `vehicle_number` | Registration plate (e.g. `LE-1234`, `LES-5678`) |
-| 7 | `Nozzle / Fuel` | `fuel_name` & `nozzle_name` | Fuel grade (Super / Diesel) and physical nozzle |
-| 8 | `Rate` | `sale_rate` | Historical unit price per litre |
-| 9 | `Issued (Ltr)` | `issue_quantity` | Capacity printed on voucher |
-| 10 | `Pumped (Ltr)` | `quantity` | Physical volume dispensed through nozzle |
-| 11 | `Balance Quota` | `balance_1 + balance_2` or `-quantity` | Quota generated (`+`) or quota claimed (`-`) |
-| 12 | `Temp. Receive` | `wasoli` & settlement status | Loan volume and whether settled or open |
-| 13 | `Must Pay (Rs.)` | `charge_amount` | Invoiced receivable billed to customer |
+| 3 | `Slip No` | `slip_number` | Physical paper slip number |
+| 4 | `Slip Type` | `slip_type` | `Permanent Slip`, `Balanced Slip`, or `Temporary Slip` with settlement tags |
+| 5 | `Vehicle No` | `vehicle_number` | Registration plate (e.g. `LE-1234`, `LES-5678`) |
+| 6 | `Nozzle / Fuel` | `fuel_name` & `nozzle_name` | Fuel grade (Super / Diesel) and physical nozzle |
+| 7 | `Rate` | `sale_rate` | Historical unit price per litre |
+| 8 | `Issued (Ltr)` | `issue_quantity` | Capacity printed on voucher |
+| 9 | `Pumped (Ltr)` | `quantity` | Physical volume dispensed through nozzle |
+| 10 | `Balance Quota` | `balance_1 + balance_2` or `-quantity` | Quota generated (`+`) or quota claimed (`-`) |
+| 11 | `Temp. Receive` | `wasoli` & settlement status | Loan volume and whether settled or open |
+| 12 | `Must Pay (Rs.)` | `charge_amount` | Invoiced receivable billed to customer |
 
 ---
 

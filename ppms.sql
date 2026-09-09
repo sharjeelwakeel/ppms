@@ -5235,7 +5235,6 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
 
 CREATE TABLE `tbl_meter_reading_credit_sales` (
   `id` int(11) NOT NULL,
-  `meter_reading_id` int(11) NOT NULL DEFAULT 0,
   `nozzle_id` int(11) NOT NULL,
   `slip_date` date NOT NULL,
   `shift_id` int(11) NOT NULL DEFAULT 0,
@@ -5859,8 +5858,7 @@ ALTER TABLE `tbl_meter_reading_card_sales`
 -- Indexes for table `tbl_meter_reading_credit_sales`
 --
 ALTER TABLE `tbl_meter_reading_credit_sales`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_meter_reading_id` (`meter_reading_id`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `tbl_meter_reading_details`

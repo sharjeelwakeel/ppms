@@ -289,11 +289,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     $ins_sql = "INSERT INTO tbl_meter_reading_credit_sales 
-                                (meter_reading_id, nozzle_id, slip_date, shift_id, slip_no, slip_type, account_number, vehicle_number,
+                                (nozzle_id, slip_date, shift_id, slip_no, slip_type, account_number, vehicle_number,
                                  quantity, rate, amount, charge_amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli,
                                  temp_slip_id, temp_slip_no, temp_slip_date, temp_rate, ref_slip_no, ref_slip_date, is_returned, returned_at)
                                 VALUES 
-                                (0, '$noz_id', '$row_slip_date', '$new_shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
+                                ('$noz_id', '$row_slip_date', '$new_shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
                                  '$qty', '$rate', '$amount', '$charge_amt', '$cash_rate', '$issue_qty', '$bal1', '$bal2', '$wasoli',
                                  " . ($temp_id > 0 ? "'$temp_id'" : "NULL") . ", '$temp_no', $temp_date_sql, '$temp_rate', '$ref_no', $ref_date_sql, '$is_ret', $ret_at)";
                     if (!mysqli_query($connection, $ins_sql)) {
@@ -580,7 +580,7 @@ function addCreditRow() {
 function addCreditRowWithData(data) {
     var rowId = creditRowIdx++;
     var selectedNozzleId = data ? data.nozzle_id : '';
-    var slipDateVal      = (data && data.slip_date) ? data.slip_date : ($('#sale_date').val() || '<?php echo htmlspecialchars($target_date); ?>');
+    var slipDateVal      = (data && data.slip_date) ? data.slip_date : '';
     var slipNoVal        = data ? data.slip_no : '';
     var slipTypeVal      = data ? data.slip_type : 'Permanent Slip';
     var vehicleVal       = data ? data.vehicle_number : '';
@@ -786,7 +786,7 @@ function resolveCreditRowRate($row, callback) {
         return;
     }
 
-    var slipDate = $row.find('.credit-slip-date').val() || $('#sale_date').val() || '';
+    var slipDate = $row.find('.credit-slip-date').val() || '';
     var nzId = $row.find('.credit-nozzle-select').val();
     var nz = nozzlesData.find(function(n) { return n.id == nzId; });
     var policy = $row.data('customer-fuel-rate') || 'Credit';

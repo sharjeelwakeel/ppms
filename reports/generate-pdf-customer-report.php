@@ -364,11 +364,10 @@ if ($report_res) {
                     <thead>
                         <tr>
                             <th style="width: 25px;">#</th>
-                            <th style="width: 65px;">Slip Date</th>
-                            <th style="width: 45px;">Reading #</th>
-                            <th style="width: 55px;">Slip No</th>
-                            <th style="width: 75px;">Slip Type</th>
-                            <th style="width: 65px;">Vehicle No</th>
+                            <th style="width: 70px;">Slip Date</th>
+                            <th style="width: 65px;">Slip No</th>
+                            <th style="width: 80px;">Slip Type</th>
+                            <th style="width: 70px;">Vehicle No</th>
                             <th>Nozzle / Fuel</th>
                             <th style="width: 45px; text-align: right;">Rate</th>
                             <th style="width: 50px; text-align: right;">Issued</th>
@@ -390,7 +389,6 @@ if ($report_res) {
                         <tr>
                             <td style="text-align: center;"><?php echo $sn++; ?></td>
                             <td style="text-align: center;"><?php echo date('d-m-Y', strtotime($slip['slip_date'])); ?></td>
-                            <td style="text-align: center;">#<?php echo $slip['meter_reading_id']; ?></td>
                             <td style="text-align: center; font-weight: bold;"><?php echo htmlspecialchars($slip['slip_no']); ?></td>
                             <td style="text-align: center;"><?php echo htmlspecialchars($st); ?></td>
                             <td style="text-align: center;"><?php echo htmlspecialchars($slip['vehicle_number'] ?: '—'); ?></td>
