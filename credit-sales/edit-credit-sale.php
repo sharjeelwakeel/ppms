@@ -113,6 +113,7 @@ if ($q_shift) {
 }
 
 $error_msg = '';
+$posted_rows = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_date     = mysqli_real_escape_string($connection, $_POST['sale_date'] ?? $target_date);
@@ -139,6 +140,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $temp_rates       = $_POST['credit_temp_rate'] ?? [];
     $ref_slip_nos     = $_POST['credit_ref_slip_no'] ?? [];
     $ref_slip_dates   = $_POST['credit_ref_slip_date'] ?? [];
+
+    // Capture submitted rows to prevent data loss on validation failure
+    if (!empty($nozzles_arr)) {
+        for ($i = 0; $i < count($nozzles_arr); $i++) {
+            $posted_rows[] = [
+                'nozzle_id'        => $nozzles_arr[$i] ?? '',
+                'slip_type'        => $slip_types[$i] ?? 'Permanent Slip',
+                'slip_date'        => $slip_dates_arr[$i] ?? $new_date,
+                'slip_no'          => $slip_nos[$i] ?? '',
+                'vehicle_number'   => $vehicles_arr[$i] ?? '',
+                'account_number'   => $accounts_arr[$i] ?? '',
+                'quantity'         => $qtys_arr[$i] ?? '0',
+                'rate'             => $rates_arr[$i] ?? '0',
+                'amount'           => $amounts_arr[$i] ?? '0',
+                'charge_amount'    => $charges_arr[$i] ?? '0',
+                'cash_rate'        => $cash_rates[$i] ?? '0',
+                'issue_quantity'   => $issue_qtys[$i] ?? '0',
+                'balance_1'        => $bal1_arr[$i] ?? '0',
+                'balance_2'        => $bal2_arr[$i] ?? '0',
+                'wasoli'           => $wasoli_arr[$i] ?? '0',
+                'temp_slip_id'     => $temp_slip_ids[$i] ?? '',
+                'temp_slip_no'     => $temp_slip_nos[$i] ?? '',
+                'temp_slip_date'   => $temp_slip_dates[$i] ?? '',
+                'temp_rate'        => $temp_rates[$i] ?? '0',
+                'ref_slip_no'      => $ref_slip_nos[$i] ?? '',
+                'ref_slip_date'    => $ref_slip_dates[$i] ?? '',
+            ];
+        }
+    }
 
     if (empty($new_shift_id)) {
         $error_msg = 'Please select a Shift before updating.';
@@ -511,7 +541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script>
 var nozzlesData      = <?php echo json_encode($nozzles); ?>;
 var vehiclesData     = <?php echo json_encode($vehicles); ?>;
-var existingSlipsData = <?php echo json_encode($existing_rows); ?>;
+var existingSlipsData = <?php echo json_encode(!empty($posted_rows) ? $posted_rows : $existing_rows); ?>;
 var creditRowIdx = 0;
 
 $(document).ready(function() {
@@ -653,24 +683,32 @@ function addCreditRowWithData(data) {
     $('#creditSalesBody').append(rowHtml);
 
     var $newRow = $('#credit_row_' + rowId);
-    updateCreditItem($newRow.find('.credit-nozzle-select')[0]);
     if (data) {
-        $newRow.find('.credit-rate').val(rateVal);
-        $newRow.find('.credit-amount-field').val(amountVal);
-        $newRow.find('.credit-charge-amount-field').val(chargeVal);
-    }
-    if (vehicleVal) {
-        onCreditVehicleInput($newRow.find('.credit-vehicle-number')[0]);
-    }
-    onSlipTypeChange($newRow.find('input[name="slip_type_radio_' + rowId + '"]:checked')[0], rowId);
-    if (data) {
+        var nz = nozzlesData.find(function(n) { return n.id == selectedNozzleId; });
+        if (nz) {
+            $newRow.find('.credit-item-name').val(nz.item_name || '');
+        }
+        if (vehicleVal) {
+            onCreditVehicleInput($newRow.find('.credit-vehicle-number')[0], true);
+        }
+        onSlipTypeChange($newRow.find('input[name="slip_type_radio_' + rowId + '"]:checked')[0], rowId);
         if (wasoliVal > 0) {
             $newRow.find('.credit-wasoli').val(wasoliVal);
         }
         if (issueVal > 0) {
             $newRow.find('.credit-issue-qty').val(issueVal);
         }
+        $newRow.find('.credit-rate').val(rateVal);
+        $newRow.find('.credit-cash-rate').val(cashRateVal);
+        $newRow.find('.credit-amount-field').val(amountVal);
         $newRow.find('.credit-charge-amount-field').val(chargeVal);
+        calculateCreditRow($newRow.find('.credit-qty')[0]);
+    } else {
+        updateCreditItem($newRow.find('.credit-nozzle-select')[0]);
+        if (vehicleVal) {
+            onCreditVehicleInput($newRow.find('.credit-vehicle-number')[0]);
+        }
+        onSlipTypeChange($newRow.find('input[name="slip_type_radio_' + rowId + '"]:checked')[0], rowId);
     }
 }
 
@@ -710,6 +748,7 @@ function onSlipTypeChange(radioElement, rowId) {
         $row.find('.credit-temp-slip-date').val('');
         $row.find('.credit-temp-rate').val(0);
         $issueQty.prop('readonly', false).css({'background-color': '', 'cursor': ''});
+        openBalanceSlipModal(rowId);
     } else if (val === 'Temporary Slip') {
         $claimBtn.hide();
         $balInfo.hide().html('');
@@ -738,40 +777,27 @@ function onSlipTypeChange(radioElement, rowId) {
     calculateCreditRow($row.find('.credit-qty')[0]);
 }
 
-function updateCreditItem(selectElement) {
-    var nzId = $(selectElement).val();
-    var $row = $(selectElement).closest('tr');
-    var nz = nozzlesData.find(function(n) { return n.id == nzId; });
-    if (nz) {
-        $row.find('.credit-item-name').val(nz.item_name || '');
-        var cr = parseFloat(nz.credit_rate) || 0;
-        var ca = parseFloat(nz.cash_rate) || 0;
-        var custFuelRate = $row.data('customer-fuel-rate') || '';
-        
-        // Dynamically apply rate based on customer fuel_rate policy
-        var applicableRate = (custFuelRate === 'Cash') ? ca : (cr > 0 ? cr : ca);
-        $row.find('.credit-rate').val(applicableRate > 0 ? applicableRate.toFixed(2) : ca.toFixed(2));
-        $row.find('.credit-cash-rate').val(ca.toFixed(2));
-
-        // Re-check date price if backdated
-        var slipDate = $row.find('.credit-slip-date').val();
-        if (slipDate && slipDate < '<?php echo date('Y-m-d'); ?>') {
-            onSlipDateChange($row.find('.credit-slip-date')[0]);
-            return;
-        }
+function resolveCreditRowRate($row, callback) {
+    var slipType = $row.find('.credit-slip-type-val').val();
+    // Balanced Slip rate is determined by the claimed balance voucher, do not overwrite
+    if (slipType === 'Balanced Slip' && $row.find('.credit-ref-slip-no').val()) {
+        calculateCreditRow($row.find('.credit-qty')[0]);
+        if (callback) callback();
+        return;
     }
-    calculateCreditRow($row.find('.credit-qty')[0]);
-}
 
-function onSlipDateChange(inputElement) {
-    var $row = $(inputElement).closest('tr');
-    var slipDate = $(inputElement).val();
+    var slipDate = $row.find('.credit-slip-date').val() || $('#sale_date').val() || '';
     var nzId = $row.find('.credit-nozzle-select').val();
     var nz = nozzlesData.find(function(n) { return n.id == nzId; });
     var policy = $row.data('customer-fuel-rate') || 'Credit';
 
     if (!nz || !nz.item_id || !slipDate) {
-        calculateCreditRow(inputElement);
+        if (!slipDate) {
+            $row.find('.credit-rate').val('').attr('placeholder', 'Pick Date');
+            $row.find('.credit-cash-rate').val('').attr('placeholder', 'Pick Date');
+        }
+        calculateCreditRow($row.find('.credit-qty')[0]);
+        if (callback) callback();
         return;
     }
 
@@ -784,12 +810,37 @@ function onSlipDateChange(inputElement) {
         if (res && res.status === 'success') {
             $row.find('.credit-rate').val(parseFloat(res.applicable_rate).toFixed(2));
             $row.find('.credit-cash-rate').val(parseFloat(res.cash_rate).toFixed(2));
-            calculateCreditRow(inputElement);
+        } else {
+            var cr = parseFloat(nz.credit_rate) || 0;
+            var ca = parseFloat(nz.cash_rate) || 0;
+            var fallback = (policy === 'Cash') ? ca : (cr > 0 ? cr : ca);
+            $row.find('.credit-rate').val(fallback.toFixed(2));
+            $row.find('.credit-cash-rate').val(ca.toFixed(2));
         }
+        calculateCreditRow($row.find('.credit-qty')[0]);
+        if (callback) callback();
+    }).fail(function() {
+        calculateCreditRow($row.find('.credit-qty')[0]);
+        if (callback) callback();
     });
 }
 
-function onCreditVehicleInput(inputElement) {
+function updateCreditItem(selectElement) {
+    var nzId = $(selectElement).val();
+    var $row = $(selectElement).closest('tr');
+    var nz = nozzlesData.find(function(n) { return n.id == nzId; });
+    if (nz) {
+        $row.find('.credit-item-name').val(nz.item_name || '');
+    }
+    resolveCreditRowRate($row);
+}
+
+function onSlipDateChange(inputElement) {
+    var $row = $(inputElement).closest('tr');
+    resolveCreditRowRate($row);
+}
+
+function onCreditVehicleInput(inputElement, skipPriceFetch) {
     var val = $(inputElement).val().trim().toUpperCase();
     var $row = $(inputElement).closest('tr');
     var $accountField = $row.find('.credit-account-number');
@@ -799,7 +850,9 @@ function onCreditVehicleInput(inputElement) {
         $accountField.val('');
         $row.removeData('customer-fuel-rate');
         $infoDiv.hide().html('');
-        updateCreditItem($row.find('.credit-nozzle-select')[0]);
+        if (!skipPriceFetch) {
+            resolveCreditRowRate($row);
+        }
         return;
     }
 
@@ -813,16 +866,6 @@ function onCreditVehicleInput(inputElement) {
         var fuelRatePolicy = matched.fuel_rate || 'Credit';
         $row.data('customer-fuel-rate', fuelRatePolicy);
 
-        var nzId = $row.find('.credit-nozzle-select').val();
-        var nz = nozzlesData.find(function(n) { return n.id == nzId; });
-        if (nz) {
-            var cr = parseFloat(nz.credit_rate) || 0;
-            var ca = parseFloat(nz.cash_rate) || 0;
-            var newRate = (fuelRatePolicy === 'Cash') ? ca : (cr > 0 ? cr : ca);
-            $row.find('.credit-rate').val(newRate.toFixed(2));
-            $row.find('.credit-cash-rate').val(ca.toFixed(2));
-        }
-
         var rateBadgeClass = (fuelRatePolicy === 'Cash') ? 'badge-success' : 'badge-primary';
         var rateBadgeText  = (fuelRatePolicy === 'Cash') ? 'Cash Rate' : 'Credit Rate';
         var rateBadgeIcon  = (fuelRatePolicy === 'Cash') ? 'fa-money-bill-wave' : 'fa-credit-card';
@@ -834,11 +877,18 @@ function onCreditVehicleInput(inputElement) {
                 '<span class="badge ' + rateBadgeClass + '" title="Customer Tariff Policy"><i class="fas ' + rateBadgeIcon + ' mr-1"></i>' + rateBadgeText + '</span>' +
             '</div>'
         );
-        calculateCreditRow($row.find('.credit-qty')[0]);
+
+        // Fetch price strictly based on this row's slip date and matched customer tariff policy
+        if (!skipPriceFetch) {
+            resolveCreditRowRate($row);
+        }
     } else {
         $accountField.val('');
         $row.removeData('customer-fuel-rate');
         $infoDiv.show().html('<span class="text-warning"><i class="fas fa-exclamation-circle"></i> Unregistered</span>');
+        if (!skipPriceFetch) {
+            resolveCreditRowRate($row);
+        }
     }
 }
 
@@ -1001,20 +1051,27 @@ function openBalanceSlipModal(rowId) {
     activeModalRowId = rowId;
     var $row = $('#credit_row_' + rowId);
     var curRate = parseFloat($row.find('.credit-rate').val()) || 0;
+    var custPolicy = $row.data('customer-fuel-rate');
 
     $('#txtSearchBalSlip').val('');
     $('#txtSearchBalDate').val('');
     $('#balFoundBox').hide();
     $('#btnApplyBalanceSlip').prop('disabled', true);
-    $('#lblCurRateNotice').text('Current Nozzle Rate: Rs. ' + curRate.toFixed(2) + ' / Ltr');
+    var rateNotice = 'Current Rate: Rs. ' + curRate.toFixed(2) + ' / Ltr';
+    if (custPolicy) {
+        rateNotice += ' (' + custPolicy + ' Policy)';
+    }
+    $('#lblCurRateNotice').text(rateNotice);
     $('#balanceSlipModal').modal('show');
 }
 
 function searchBalanceSlipManual() {
     var slipNo = $('#txtSearchBalSlip').val().trim();
-    var slipDate = $('#txtSearchBalDate').val().trim();
+    var origSlipDate = $('#txtSearchBalDate').val().trim();
     var $row = $('#credit_row_' + activeModalRowId);
+    var balanceSlipDate = $row.find('.credit-slip-date').val() || $('#sale_date').val() || '<?php echo htmlspecialchars($target_date); ?>';
     var curRate = parseFloat($row.find('.credit-rate').val()) || 0;
+    var custId = $row.find('.credit-account-number').val() || 0;
 
     if (!slipNo) {
         alert('Please enter a Permanent Slip No to search for remaining balance.');
@@ -1024,8 +1081,10 @@ function searchBalanceSlipManual() {
     $.getJSON('ajax-credit-slip-lookup.php', {
         action: 'find_balance_slip',
         slip_no: slipNo,
-        slip_date: slipDate,
-        current_rate: curRate
+        orig_slip_date: origSlipDate,
+        balance_slip_date: balanceSlipDate,
+        current_rate: curRate,
+        customer_id: custId
     }, function(res) {
         if (res && res.status === 'success' && res.found) {
             selectBalSlip(res);
@@ -1047,8 +1106,33 @@ function selectBalSlip(res) {
     $('#lblFoundMergedBal').text(parseFloat(res.total_balance).toFixed(2) + ' Ltr');
     $('#lblFoundOrigRate').text('Rs. ' + parseFloat(res.original_rate).toFixed(2));
     $('#lblFoundPrepaidVal').text('Rs. ' + parseFloat(res.prepaid_money).toFixed(2));
-    $('#lblFoundCurPrice').text('Rs. ' + parseFloat(res.current_rate).toFixed(2));
+    $('#lblFoundCurPrice').text('Rs. ' + parseFloat(res.current_rate).toFixed(2) + (res.balance_claim_date ? ' (' + res.balance_claim_date + ')' : ''));
     $('#lblFoundAdjLitres').text(parseFloat(res.adjusted_litres).toFixed(2) + ' Litres');
+
+    var diffLtr = parseFloat(res.volume_diff) || 0;
+    var priceDiff = parseFloat(res.price_diff) || 0;
+    var alertHtml = '';
+
+    if (res.fluctuation_type === 'increase' || priceDiff > 0.001) {
+        alertHtml = '<div class="alert alert-warning py-2 px-3 small mb-0 w-100 font-weight-bold" style="border-left: 4px solid #f59e0b;">' +
+            '<i class="fas fa-exclamation-triangle mr-1 text-warning"></i> ' +
+            'Price Increased (+Rs. ' + Math.abs(priceDiff).toFixed(2) + '/Ltr): ' +
+            'Petrol quantity deducted by <span class="text-danger">-' + Math.abs(diffLtr).toFixed(2) + ' Ltr</span>. ' +
+            'Customer receives <span class="text-primary">' + parseFloat(res.adjusted_litres).toFixed(2) + ' Ltr</span>.' +
+            '</div>';
+    } else if (res.fluctuation_type === 'decrease' || priceDiff < -0.001) {
+        alertHtml = '<div class="alert alert-success py-2 px-3 small mb-0 w-100 font-weight-bold" style="border-left: 4px solid #10b981;">' +
+            '<i class="fas fa-arrow-down mr-1 text-success"></i> ' +
+            'Price Decreased (-Rs. ' + Math.abs(priceDiff).toFixed(2) + '/Ltr): ' +
+            'Customer receives <span class="text-success">+' + Math.abs(diffLtr).toFixed(2) + ' Ltr bonus fuel</span> (<span class="text-success">' + parseFloat(res.adjusted_litres).toFixed(2) + ' Ltr</span>).' +
+            '</div>';
+    } else {
+        alertHtml = '<div class="alert alert-info py-2 px-3 small mb-0 w-100 font-weight-bold" style="border-left: 4px solid #3b82f6;">' +
+            '<i class="fas fa-equals mr-1 text-info"></i> ' +
+            'Price Unchanged: Customer receives exact remaining balance of ' + parseFloat(res.total_balance).toFixed(2) + ' Ltr.' +
+            '</div>';
+    }
+    $('#lblFoundFluctuationBox').html(alertHtml).show();
 
     $('#balFoundBox').show();
     $('#btnApplyBalanceSlip').prop('disabled', false);
@@ -1059,16 +1143,37 @@ function applyBalanceSlipToRow() {
     var $row = $('#credit_row_' + activeModalRowId);
     var adjLitres = parseFloat(currentSelectedBalSlip.adjusted_litres) || 0;
 
+    // Set reference slip info first
+    $row.find('.credit-ref-slip-no').val(currentSelectedBalSlip.slip_no);
+    $row.find('.credit-ref-slip-date').val(currentSelectedBalSlip.slip_date);
+
+    // Auto-populate vehicle & account if available from the original slip (skipPriceFetch to prevent async overwrite)
+    if (currentSelectedBalSlip.vehicle_number && !$row.find('.credit-vehicle-number').val().trim()) {
+        $row.find('.credit-vehicle-number').val(currentSelectedBalSlip.vehicle_number);
+        onCreditVehicleInput($row.find('.credit-vehicle-number')[0], true);
+    } else if (currentSelectedBalSlip.account_number && !$row.find('.credit-account-number').val()) {
+        $row.find('.credit-account-number').val(currentSelectedBalSlip.account_number);
+    }
+
+    if (currentSelectedBalSlip.customer_fuel_rate) {
+        $row.data('customer-fuel-rate', currentSelectedBalSlip.customer_fuel_rate);
+    }
+
+    // Set applicable rate resolved by backend (matching customer rate policy on claim date)
+    var applicableRate = parseFloat(currentSelectedBalSlip.current_rate) || parseFloat($row.find('.credit-rate').val()) || 0;
+    if (applicableRate > 0) {
+        $row.find('.credit-rate').val(applicableRate.toFixed(2));
+    }
+
     $row.find('.credit-qty').val(adjLitres.toFixed(2));
     $row.find('.credit-issue-qty').val(adjLitres.toFixed(2));
     $row.find('.credit-bal1').val(parseFloat(currentSelectedBalSlip.balance_1).toFixed(2));
     $row.find('.credit-bal2').val(parseFloat(currentSelectedBalSlip.balance_2).toFixed(2));
-    $row.find('.credit-ref-slip-no').val(currentSelectedBalSlip.slip_no);
-    $row.find('.credit-ref-slip-date').val(currentSelectedBalSlip.slip_date);
 
+    var badgeText = 'From #' + currentSelectedBalSlip.slip_no + ' (' + parseFloat(currentSelectedBalSlip.total_balance).toFixed(0) + 'L @ Rs. ' + parseFloat(currentSelectedBalSlip.original_rate).toFixed(0) + ' &rarr; ' + adjLitres.toFixed(2) + 'L @ Rs. ' + applicableRate.toFixed(0) + ')';
     $row.find('.balance-slip-info').show().html(
         '<span class="badge badge-info text-white font-weight-bold" title="Prepaid Value Rs. ' + parseFloat(currentSelectedBalSlip.prepaid_money).toFixed(2) + '">' +
-            '<i class="fas fa-balance-scale mr-1"></i> From #' + currentSelectedBalSlip.slip_no + ' (' + parseFloat(currentSelectedBalSlip.total_balance).toFixed(0) + 'L @ Rs. ' + parseFloat(currentSelectedBalSlip.original_rate).toFixed(0) + ' &rarr; ' + adjLitres.toFixed(2) + 'L)' +
+            '<i class="fas fa-balance-scale mr-1"></i> ' + badgeText +
         '</span>'
     );
 
@@ -1077,6 +1182,15 @@ function applyBalanceSlipToRow() {
 }
 
 function validateCreditForm() {
+    // 0. Validate Shift selection first
+    var shiftId = $('#shift_id').val();
+    if (!shiftId || shiftId === '0' || shiftId.trim() === '') {
+        alert('Please select an active Shift from the dropdown before saving.');
+        $('#shift_id').focus().addClass('is-invalid');
+        return false;
+    }
+    $('#shift_id').removeClass('is-invalid');
+
     // 1. Automatically prune trailing blank/untouched rows
     while ($('#creditSalesBody tr').length > 1) {
         var $lastRow = $('#creditSalesBody tr:last-child');
@@ -1274,11 +1388,11 @@ function validateCreditForm() {
                     </h6>
                     <div class="row small">
                         <div class="col-6">
-                            <span class="text-muted d-block">Original Slip:</span>
+                            <span class="text-muted d-block">Original Permanent Slip:</span>
                             <strong id="lblFoundBalSlipNo" class="text-dark"></strong>
                         </div>
                         <div class="col-6">
-                            <span class="text-muted d-block">Original Date:</span>
+                            <span class="text-muted d-block">Original Slip Date:</span>
                             <strong id="lblFoundBalDate" class="text-dark"></strong>
                         </div>
                         <div class="col-4 mt-2">
@@ -1290,7 +1404,7 @@ function validateCreditForm() {
                             <strong id="lblFoundBal2" class="text-dark"></strong>
                         </div>
                         <div class="col-4 mt-2">
-                            <span class="text-muted d-block">Merged Balance:</span>
+                            <span class="text-muted d-block">Total Balance Quota:</span>
                             <strong id="lblFoundMergedBal" class="text-primary font-weight-bold"></strong>
                         </div>
                         <div class="col-6 mt-2 pt-2 border-top">
@@ -1302,15 +1416,18 @@ function validateCreditForm() {
                             <strong id="lblFoundPrepaidVal" class="text-success font-weight-bold"></strong>
                         </div>
                         <div class="col-6 mt-2">
-                            <span class="text-muted d-block">Current Petrol Price:</span>
+                            <span class="text-muted d-block">Current Rate on Claim Date:</span>
                             <strong id="lblFoundCurPrice" class="text-danger font-weight-bold"></strong>
                         </div>
                         <div class="col-6 mt-2">
-                            <span class="text-muted d-block">Adjusted Litres to Dispense:</span>
-                            <strong id="lblFoundAdjLitres" class="text-primary font-weight-bold" style="font-size:14px;"></strong>
+                            <span class="text-muted d-block">Adjusted Petrol Quantity:</span>
+                            <strong id="lblFoundAdjLitres" class="text-primary font-weight-bold" style="font-size:16px;"></strong>
+                        </div>
+                        <div class="col-12 mt-2" id="lblFoundFluctuationBox">
+                            <!-- Injected dynamic price fluctuation alert -->
                         </div>
                         <div class="col-12 mt-2 pt-2 border-top">
-                            <span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i> Customer Charge: Rs. 0.00 (Pre-paid)</span>
+                            <span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i> Customer Charge: Rs. 0.00 (Pre-paid on Original Slip)</span>
                         </div>
                     </div>
                 </div>

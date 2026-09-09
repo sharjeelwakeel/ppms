@@ -118,7 +118,9 @@ if ($isSearched) {
                     'temporary_fuel_returned'   => 0, // Settled loan fuel litres
                     'permanent_balance'         => 0, // Sum of balance_1 + balance_2 quota generated
                     'balanced_drawn'            => 0, // Sum of fuel drawn on Balanced slips
-                    'remaining_balance'         => 0, // permanent_balance - balanced_drawn
+                    'balanced_quota_settled'    => 0, // Sum of original voucher quota cleared by Balanced slips
+                    'price_fluctuation_litres'  => 0, // Quota settled minus physical pumped
+                    'remaining_balance'         => 0, // permanent_balance - balanced_quota_settled
                     'overdraw_amount'           => 0,
                     'permanent_charge'          => 0, // Total money billed on Permanent slips
                     'temporary_charge_pending'  => 0, // Est. value of open loan chits
@@ -166,13 +168,38 @@ if ($isSearched) {
                 // Fuel drawn against pre-paid balance quota
                 $balQty = ($baseQty > 0) ? $baseQty : $issueQty;
 
-                $customers_ledger[$accNo]['balanced_fuel']  += $balQty;
-                $customers_ledger[$accNo]['balanced_drawn'] += $balQty;
-                $customers_ledger[$accNo]['total_fuel']     += $balQty;
+                // What was the original voucher quota that this balanced slip claimed and closed?
+                $origQuota = floatval($row['balance_1']) + floatval($row['balance_2']);
+                if ($origQuota <= 0 && !empty($refSlipNo)) {
+                    // Self-heal: look up referenced permanent slip's balance
+                    $rs_no_safe = mysqli_real_escape_string($connection, $refSlipNo);
+                    $rs_acc_safe = mysqli_real_escape_string($connection, $accNo);
+                    $q_ref = mysqli_query($connection, "SELECT (balance_1 + balance_2) AS ref_bal, issue_quantity, quantity FROM tbl_meter_reading_credit_sales WHERE slip_no = '$rs_no_safe' AND slip_type = 'Permanent Slip' AND account_number = '$rs_acc_safe' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY id DESC LIMIT 1");
+                    if ($q_ref && $r_ref = mysqli_fetch_assoc($q_ref)) {
+                        $origQuota = floatval($r_ref['ref_bal']);
+                        if ($origQuota <= 0) {
+                            $origQuota = max(0.00, floatval($r_ref['issue_quantity']) - floatval($r_ref['quantity']));
+                        }
+                    }
+                }
+                if ($origQuota <= 0) {
+                    $origQuota = $balQty;
+                }
+
+                // Price Fluctuation Litres: positive = price increased (absorbed); negative = price decreased (gain)
+                $priceFluctLtr = round($origQuota - $balQty, 2);
+
+                $customers_ledger[$accNo]['balanced_fuel']             += $balQty;
+                $customers_ledger[$accNo]['balanced_drawn']            += $balQty;
+                $customers_ledger[$accNo]['balanced_quota_settled']    += $origQuota;
+                $customers_ledger[$accNo]['price_fluctuation_litres']  += $priceFluctLtr;
+                $customers_ledger[$accNo]['total_fuel']                += $balQty;
 
                 $dispensedQty = $balQty;
                 $chgAmt = 0.00; // Pre-paid on original voucher
-                $row['effective_charge'] = 0.00;
+                $row['effective_charge']      = 0.00;
+                $row['orig_quota_settled']    = $origQuota;
+                $row['price_fluctuation_ltr'] = $priceFluctLtr;
             } else { // Permanent Slip
                 $dispensedQty = $baseQty;
                 $effIssue     = ($issueQty > 0) ? $issueQty : $baseQty;
@@ -212,8 +239,8 @@ if ($isSearched) {
 
     // Calculate remaining quota balance per customer and grand totals
     foreach ($customers_ledger as $cId => &$cItem) {
-        $cItem['remaining_balance'] = max(0, $cItem['permanent_balance'] - $cItem['balanced_drawn']);
-        $cItem['overdraw_amount']   = max(0, $cItem['balanced_drawn'] - $cItem['permanent_balance']);
+        $cItem['remaining_balance'] = max(0, round($cItem['permanent_balance'] - $cItem['balanced_quota_settled'], 2));
+        $cItem['overdraw_amount']   = max(0, round($cItem['balanced_quota_settled'] - $cItem['permanent_balance'], 2));
         
         $grand_total_fuel      += $cItem['total_fuel'];
         $grand_permanent_fuel  += $cItem['permanent_fuel'];
@@ -529,9 +556,22 @@ if ($isSearched) {
                                             <?php if ($st === 'Permanent Slip' && $slip['slip_balance'] > 0): ?>
                                                  <span class="badge badge-info px-2 py-0.5 font-weight-bold" title="Uncollected balance credited to customer">+<?php echo number_format($slip['slip_balance'], 2); ?> Ltr</span>
                                             <?php elseif ($st === 'Balanced Slip'): ?>
-                                                <span class="badge badge-secondary px-2 py-0.5 text-muted font-weight-bold" title="Claimed from prior balance quota">-<?php echo number_format($dispVal, 2); ?> Ltr</span>
+                                                <?php 
+                                                $quotaSettled = !empty($slip['orig_quota_settled']) ? floatval($slip['orig_quota_settled']) : $dispVal;
+                                                $pFluct = isset($slip['price_fluctuation_ltr']) ? floatval($slip['price_fluctuation_ltr']) : 0;
+                                                ?>
+                                                <span class="badge badge-secondary px-2 py-0.5 text-white font-weight-bold" title="Voucher Quota Settled">-<?php echo number_format($quotaSettled, 2); ?> Ltr</span>
                                                 <?php if (!empty($slip['ref_slip_no'])): ?>
                                                     <small class="text-muted d-block text-monospace" style="font-size:9.5px;">(from #<?php echo htmlspecialchars($slip['ref_slip_no']); ?>)</small>
+                                                <?php endif; ?>
+                                                <?php if ($pFluct > 0.001): ?>
+                                                    <span class="badge badge-warning text-dark font-weight-bold mt-1 d-inline-block" style="font-size:9px;" title="Rate increased: customer received <?php echo number_format($dispVal, 2); ?>L for <?php echo number_format($quotaSettled, 2); ?>L prepaid quota">
+                                                        <i class="fas fa-chart-line mr-1"></i>Price Absorption: -<?php echo number_format($pFluct, 2); ?> Ltr
+                                                    </span>
+                                                <?php elseif ($pFluct < -0.001): ?>
+                                                    <span class="badge badge-info text-white font-weight-bold mt-1 d-inline-block" style="font-size:9px;" title="Rate decreased: customer received <?php echo number_format($dispVal, 2); ?>L for <?php echo number_format($quotaSettled, 2); ?>L prepaid quota">
+                                                        <i class="fas fa-chart-line mr-1"></i>Price Drop Gain: +<?php echo number_format(abs($pFluct), 2); ?> Ltr
+                                                    </span>
                                                 <?php endif; ?>
                                             <?php else: ?>
                                                 <span class="text-muted">0.00</span>
@@ -667,15 +707,38 @@ if ($isSearched) {
                                                     </tr>
                                                     <tr>
                                                         <td class="text-left pl-3">
-                                                            <strong>Total Quota Claimed (Balanced Slips)</strong>
-                                                            <br><small class="text-muted">Fuel delivered on price-adjusted balanced slips</small>
+                                                            <strong>Total Quota Settled (Balanced Slips)</strong>
+                                                            <br><small class="text-muted">Prepaid voucher quota redeemed and closed</small>
                                                         </td>
-                                                        <td class="text-right pr-3 font-weight-bold text-info">-<?php echo number_format($cdata['balanced_drawn'], 2); ?> Ltr</td>
+                                                        <td class="text-right pr-3 font-weight-bold text-secondary">-<?php echo number_format($cdata['balanced_quota_settled'], 2); ?> Ltr</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-left pl-3">
+                                                            <strong>Price Fluctuation Impact (Separate Item)</strong>
+                                                            <br><small class="text-muted">
+                                                                <?php if ($cdata['price_fluctuation_litres'] > 0.001): ?>
+                                                                    Litres absorbed due to fuel price increase
+                                                                <?php elseif ($cdata['price_fluctuation_litres'] < -0.001): ?>
+                                                                    Extra litres gained due to fuel price decrease
+                                                                <?php else: ?>
+                                                                    Zero price fluctuation impact (prices unchanged)
+                                                                <?php endif; ?>
+                                                            </small>
+                                                        </td>
+                                                        <td class="text-right pr-3 font-weight-bold <?php echo ($cdata['price_fluctuation_litres'] > 0.001) ? 'text-warning' : (($cdata['price_fluctuation_litres'] < -0.001) ? 'text-info' : 'text-muted'); ?>">
+                                                            <?php if ($cdata['price_fluctuation_litres'] > 0.001): ?>
+                                                                -<?php echo number_format($cdata['price_fluctuation_litres'], 2); ?> Ltr <small class="text-muted">(Price Escalation)</small>
+                                                            <?php elseif ($cdata['price_fluctuation_litres'] < -0.001): ?>
+                                                                +<?php echo number_format(abs($cdata['price_fluctuation_litres']), 2); ?> Ltr <small class="text-muted">(Price Drop Gain)</small>
+                                                            <?php else: ?>
+                                                                0.00 Ltr
+                                                            <?php endif; ?>
+                                                        </td>
                                                     </tr>
                                                     <tr>
                                                         <td class="text-left pl-3">
                                                             <strong>Total Physical Petrol Pumped</strong>
-                                                            <br><small class="text-muted">Direct permanent + balanced + temporary loan</small>
+                                                            <br><small class="text-muted">Direct permanent + balanced delivered + temporary loan</small>
                                                         </td>
                                                         <td class="text-right pr-3 font-weight-bold text-dark"><?php echo number_format($cdata['total_fuel'], 2); ?> Ltr</td>
                                                     </tr>
@@ -725,22 +788,22 @@ if ($isSearched) {
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Total Fuel Dispensed</div>
                                     <div class="h4 font-weight-bold text-primary mb-0"><?php echo number_format($grand_total_fuel, 2); ?> <small>Ltr</small></div>
-                                    <small class="text-muted">Perm: <?php echo number_format($grand_permanent_fuel, 1); ?> | Bal: <?php echo number_format($grand_balanced_fuel, 1); ?></small>
+                                    <!--<small class="text-muted">Perm: <?php //echo number_format($grand_permanent_fuel, 1); ?> | Bal: <?php //echo number_format($grand_balanced_fuel, 1); ?></small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Total Balance Left</div>
                                     <div class="h4 font-weight-bold text-info mb-0"><?php echo number_format($grand_remaining_bal, 2); ?> <small>Ltr</small></div>
-                                    <small class="text-muted">(<?php echo number_format($grand_permanent_bal, 1); ?> - <?php echo number_format($grand_balanced_drawn, 1); ?> Ltr)</small>
+                                    <!-- <small class="text-muted">(<?php //echo number_format($grand_permanent_bal, 1); ?> - <?php //echo number_format($grand_balanced_drawn, 1); ?> Ltr)</small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-muted font-weight-bold text-uppercase">Open Loan Fuel</div>
                                     <div class="h4 font-weight-bold text-warning mb-0" style="color:#b07800 !important;">Rs. <?php echo number_format($grand_temp_collect, 2); ?></div>
-                                    <small class="text-muted"><?php echo number_format($grand_temporary_fuel, 1); ?> Ltr pending</small>
+                                    <!-- <small class="text-muted"><?php //echo number_format($grand_temporary_fuel, 1); ?> Ltr pending</small> -->
                                 </div>
                                 <div class="col-md-3 col-6 mb-2 mb-md-0">
                                     <div class="small text-danger font-weight-bold text-uppercase">Total Invoiced To Collect</div>
                                     <div class="h3 font-weight-bold text-danger mb-0">Rs. <?php echo number_format($grand_total_collect, 2); ?></div>
-                                    <small class="text-muted">Billed on permanent vouchers</small>
+                                    <!-- <small class="text-muted">Billed on permanent vouchers</small> -->
                                 </div>
                             </div>
                         </div>

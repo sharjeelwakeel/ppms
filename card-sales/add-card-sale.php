@@ -207,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="row align-items-center">
                     <div class="col-md-3 col-sm-6">
                         <label class="font-weight-bold text-dark mb-1"><i class="fas fa-calendar-day mr-1 text-primary"></i> Sale Date <span class="text-danger">*</span></label>
-                        <input type="date" name="sale_date" id="sale_date" class="form-control font-weight-bold" value="<?php echo htmlspecialchars($_POST['sale_date'] ?? date('Y-m-d')); ?>" required>
+                        <input type="date" name="sale_date" id="sale_date" class="form-control font-weight-bold" value="<?php echo htmlspecialchars($_POST['sale_date'] ?? ''); ?>" required>
                     </div>
                     <div class="col-md-3 col-sm-6 mt-3 mt-sm-0">
                         <label class="font-weight-bold text-dark mb-1"><i class="fas fa-clock mr-1 text-primary"></i> Shift <span class="text-danger">*</span></label>
@@ -380,6 +380,15 @@ function calculateCardTotal() {
 }
 
 function validateAndCleanCardForm() {
+    // 0. Validate Sale Date
+    var saleDate = $('#sale_date').val();
+    if (!saleDate || saleDate.trim() === '') {
+        alert('Please select Sale Date before saving.');
+        $('#sale_date').focus().addClass('is-invalid');
+        return false;
+    }
+    $('#sale_date').removeClass('is-invalid');
+
     // 1. Automatically prune trailing blank/untouched rows
     while ($('#cardSalesBody tr').length > 1) {
         var $lastRow = $('#cardSalesBody tr:last-child');

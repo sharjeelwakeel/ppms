@@ -158,10 +158,11 @@ switch ($action) {
         exit;
 
     case 'find_balance_slip':
-        $slip_no      = mysqli_real_escape_string($connection, trim($_GET['slip_no'] ?? $_POST['slip_no'] ?? ''));
-        $slip_date    = mysqli_real_escape_string($connection, trim($_GET['slip_date'] ?? $_POST['slip_date'] ?? ''));
-        $cust_id      = intval($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
-        $current_rate = floatval($_GET['current_rate'] ?? $_POST['current_rate'] ?? 0);
+        $slip_no           = mysqli_real_escape_string($connection, trim($_GET['slip_no'] ?? $_POST['slip_no'] ?? ''));
+        $orig_slip_date    = mysqli_real_escape_string($connection, trim($_GET['orig_slip_date'] ?? $_GET['slip_date'] ?? $_POST['orig_slip_date'] ?? $_POST['slip_date'] ?? ''));
+        $balance_slip_date = mysqli_real_escape_string($connection, trim($_GET['balance_slip_date'] ?? $_POST['balance_slip_date'] ?? ''));
+        $cust_id           = intval($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
+        $current_rate      = floatval($_GET['current_rate'] ?? $_POST['current_rate'] ?? 0);
 
         if (empty($slip_no)) {
             echo json_encode(['status' => 'error', 'message' => 'Please enter a Permanent Slip No to claim balance.']);
@@ -172,8 +173,8 @@ switch ($action) {
                   AND (cs.deleted_at IS NULL OR cs.deleted_at = '0000-00-00 00:00:00')
                   AND cs.slip_no = '$slip_no'";
 
-        if (!empty($slip_date)) {
-            $where .= " AND cs.slip_date = '$slip_date'";
+        if (!empty($orig_slip_date)) {
+            $where .= " AND cs.slip_date = '$orig_slip_date'";
         }
         if ($cust_id > 0) {
             $where .= " AND cs.account_number = '$cust_id'";
@@ -181,7 +182,8 @@ switch ($action) {
 
         $sql = "SELECT cs.id, cs.slip_no, cs.slip_date, cs.rate, cs.quantity, cs.issue_quantity,
                        cs.balance_1, cs.balance_2, cs.vehicle_number, cs.account_number,
-                       c.name AS customer_name, i.name AS item_name
+                       cs.nozzle_id, n.item_id, i.name AS item_name, i.cash_rate AS item_cash_rate, i.credit_rate AS item_credit_rate,
+                       c.name AS customer_name, c.fuel_rate AS customer_fuel_rate
                 FROM tbl_meter_reading_credit_sales cs
                 LEFT JOIN tbl_customers c ON (cs.account_number = c.id)
                 LEFT JOIN tbl_nozzles n ON (cs.nozzle_id = n.id)
@@ -216,28 +218,68 @@ switch ($action) {
             // Total prepaid monetary credit on that slip
             $prepaid_money = round($total_balance * $orig_rate, 2);
 
-            // Rate to adjust against
-            $active_price = ($current_rate > 0) ? $current_rate : $orig_rate;
+            // Determine customer tariff policy (Cash vs Credit)
+            $cust_policy = !empty($row['customer_fuel_rate']) ? $row['customer_fuel_rate'] : 'Credit';
+            $item_id     = intval($row['item_id'] ?? 0);
+            
+            // The price must be checked for the date when the balance is being claimed / collected
+            $claim_date  = !empty($balance_slip_date) ? $balance_slip_date : date('Y-m-d');
 
-            // Adjusted litres based on current petrol price
-            $adjusted_litres = ($active_price > 0) ? round($prepaid_money / $active_price, 2) : $total_balance;
+            // Resolve active price on the claim date based on customer policy
+            $resolved_rate = 0.00;
+            if ($item_id > 0) {
+                $p_info = get_price_for_date($connection, 'tbl_items', $item_id, $claim_date);
+                if ($p_info) {
+                    $resolved_rate = ($cust_policy === 'Cash') ? floatval($p_info['cash_rate']) : floatval($p_info['credit_rate']);
+                } else {
+                    $resolved_rate = ($cust_policy === 'Cash') ? floatval($row['item_cash_rate']) : floatval($row['item_credit_rate']);
+                }
+            }
+
+            if ($resolved_rate > 0) {
+                $active_price = $resolved_rate;
+            } elseif ($current_rate > 0) {
+                $active_price = $current_rate;
+            } else {
+                $active_price = $orig_rate;
+            }
+
+            // Adjusted litres based on current petrol price on the balance claim date
+            if (abs($active_price - $orig_rate) < 0.001) {
+                // If price is unchanged, adjusted litres is exactly the remaining balance
+                $adjusted_litres  = $total_balance;
+                $fluctuation_type = 'unchanged';
+                $volume_diff      = 0.00;
+                $price_diff       = 0.00;
+            } else {
+                $adjusted_litres  = ($active_price > 0) ? round($prepaid_money / $active_price, 2) : $total_balance;
+                $volume_diff      = round($adjusted_litres - $total_balance, 2);
+                $price_diff       = round($active_price - $orig_rate, 2);
+                $fluctuation_type = ($active_price > $orig_rate) ? 'increase' : 'decrease';
+            }
 
             echo json_encode([
-                'status'           => 'success',
-                'found'            => true,
-                'slip_id'          => intval($row['id']),
-                'slip_no'          => $row['slip_no'],
-                'slip_date'        => $row['slip_date'],
-                'balance_1'        => $bal1,
-                'balance_2'        => $bal2,
-                'total_balance'    => $total_balance,
-                'original_rate'    => $orig_rate,
-                'prepaid_money'    => $prepaid_money,
-                'current_rate'     => $active_price,
-                'adjusted_litres'  => $adjusted_litres,
-                'vehicle_number'   => $row['vehicle_number'],
-                'customer_name'    => $row['customer_name'] ?? 'Account #' . $row['account_number'],
-                'item_name'        => $row['item_name'] ?? 'Fuel'
+                'status'             => 'success',
+                'found'              => true,
+                'slip_id'            => intval($row['id']),
+                'slip_no'            => $row['slip_no'],
+                'slip_date'          => $row['slip_date'],
+                'balance_claim_date' => $claim_date,
+                'balance_1'          => $bal1,
+                'balance_2'          => $bal2,
+                'total_balance'      => $total_balance,
+                'original_rate'      => $orig_rate,
+                'prepaid_money'      => $prepaid_money,
+                'current_rate'       => $active_price,
+                'adjusted_litres'    => $adjusted_litres,
+                'volume_diff'        => $volume_diff,
+                'price_diff'         => $price_diff,
+                'fluctuation_type'   => $fluctuation_type,
+                'vehicle_number'     => $row['vehicle_number'],
+                'account_number'     => $row['account_number'],
+                'customer_name'      => $row['customer_name'] ?? 'Account #' . $row['account_number'],
+                'customer_fuel_rate' => $cust_policy,
+                'item_name'          => $row['item_name'] ?? 'Fuel'
             ]);
         } else {
             echo json_encode([

@@ -72,7 +72,9 @@ if ($report_res) {
                 'temporary_fuel_returned'   => 0, // Settled loan fuel litres
                 'permanent_balance'         => 0, // Sum of balance_1 + balance_2 quota generated
                 'balanced_drawn'            => 0, // Sum of fuel drawn on Balanced slips
-                'remaining_balance'         => 0, // permanent_balance - balanced_drawn
+                'balanced_quota_settled'    => 0, // Sum of original voucher quota cleared by Balanced slips
+                'price_fluctuation_litres'  => 0, // Quota settled minus physical pumped
+                'remaining_balance'         => 0, // permanent_balance - balanced_quota_settled
                 'overdraw_amount'           => 0,
                 'permanent_charge'          => 0, // Total money billed on Permanent slips
                 'temporary_charge_pending'  => 0, // Est. value of open loan chits
@@ -120,13 +122,38 @@ if ($report_res) {
             // Fuel drawn against pre-paid balance quota
             $balQty = ($baseQty > 0) ? $baseQty : $issueQty;
 
-            $customers_ledger[$accNo]['balanced_fuel']  += $balQty;
-            $customers_ledger[$accNo]['balanced_drawn'] += $balQty;
-            $customers_ledger[$accNo]['total_fuel']     += $balQty;
+            // What was the original voucher quota that this balanced slip claimed and closed?
+            $origQuota = floatval($row['balance_1']) + floatval($row['balance_2']);
+            if ($origQuota <= 0 && !empty($refSlipNo)) {
+                // Self-heal: look up referenced permanent slip's balance
+                $rs_no_safe = mysqli_real_escape_string($connection, $refSlipNo);
+                $rs_acc_safe = mysqli_real_escape_string($connection, $accNo);
+                $q_ref = mysqli_query($connection, "SELECT (balance_1 + balance_2) AS ref_bal, issue_quantity, quantity FROM tbl_meter_reading_credit_sales WHERE slip_no = '$rs_no_safe' AND slip_type = 'Permanent Slip' AND account_number = '$rs_acc_safe' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY id DESC LIMIT 1");
+                if ($q_ref && $r_ref = mysqli_fetch_assoc($q_ref)) {
+                    $origQuota = floatval($r_ref['ref_bal']);
+                    if ($origQuota <= 0) {
+                        $origQuota = max(0.00, floatval($r_ref['issue_quantity']) - floatval($r_ref['quantity']));
+                    }
+                }
+            }
+            if ($origQuota <= 0) {
+                $origQuota = $balQty;
+            }
+
+            // Price Fluctuation Litres: positive = price increased (absorbed); negative = price decreased (gain)
+            $priceFluctLtr = round($origQuota - $balQty, 2);
+
+            $customers_ledger[$accNo]['balanced_fuel']             += $balQty;
+            $customers_ledger[$accNo]['balanced_drawn']            += $balQty;
+            $customers_ledger[$accNo]['balanced_quota_settled']    += $origQuota;
+            $customers_ledger[$accNo]['price_fluctuation_litres']  += $priceFluctLtr;
+            $customers_ledger[$accNo]['total_fuel']                += $balQty;
 
             $dispensedQty = $balQty;
             $chgAmt = 0.00; // Pre-paid on original voucher
-            $row['effective_charge'] = 0.00;
+            $row['effective_charge']      = 0.00;
+            $row['orig_quota_settled']    = $origQuota;
+            $row['price_fluctuation_ltr'] = $priceFluctLtr;
         } else { // Permanent Slip
             $dispensedQty = $baseQty;
             $effIssue     = ($issueQty > 0) ? $issueQty : $baseQty;
@@ -165,8 +192,8 @@ if ($report_res) {
 
     // Calculate remaining quota balance per customer
     foreach ($customers_ledger as $cId => &$cItem) {
-        $cItem['remaining_balance'] = max(0, $cItem['permanent_balance'] - $cItem['balanced_drawn']);
-        $cItem['overdraw_amount']   = max(0, $cItem['balanced_drawn'] - $cItem['permanent_balance']);
+        $cItem['remaining_balance'] = max(0, round($cItem['permanent_balance'] - $cItem['balanced_quota_settled'], 2));
+        $cItem['overdraw_amount']   = max(0, round($cItem['balanced_quota_settled'] - $cItem['permanent_balance'], 2));
     }
     unset($cItem);
 }
@@ -375,9 +402,18 @@ if ($report_res) {
                                 <?php if ($st === 'Permanent Slip' && $slip['slip_balance'] > 0): ?>
                                     <strong style="color: #0d47a1;">+<?php echo number_format($slip['slip_balance'], 2); ?></strong>
                                 <?php elseif ($st === 'Balanced Slip'): ?>
-                                    <strong style="color: #64748b;">-<?php echo number_format($dispVal, 2); ?></strong>
+                                    <?php 
+                                    $quotaSettled = !empty($slip['orig_quota_settled']) ? floatval($slip['orig_quota_settled']) : $dispVal;
+                                    $pFluct = isset($slip['price_fluctuation_ltr']) ? floatval($slip['price_fluctuation_ltr']) : 0;
+                                    ?>
+                                    <strong style="color: #64748b;">-<?php echo number_format($quotaSettled, 2); ?></strong>
                                     <?php if (!empty($slip['ref_slip_no'])): ?>
                                         <div style="font-size: 8px; color: #777;">(from #<?php echo htmlspecialchars($slip['ref_slip_no']); ?>)</div>
+                                    <?php endif; ?>
+                                    <?php if ($pFluct > 0.001): ?>
+                                        <div style="font-size: 7.5px; color: #b45309; font-weight: bold;">(Price Escalation: -<?php echo number_format($pFluct, 2); ?>L)</div>
+                                    <?php elseif ($pFluct < -0.001): ?>
+                                        <div style="font-size: 7.5px; color: #0284c7; font-weight: bold;">(Price Drop Gain: +<?php echo number_format(abs($pFluct), 2); ?>L)</div>
                                     <?php endif; ?>
                                 <?php else: ?>
                                     0.00
@@ -448,7 +484,31 @@ if ($report_res) {
                                     <div style="font-size: 9px; color: #666"><?php echo number_format($cdata['balanced_fuel'], 2); ?> Ltr drawn against prepaid quota</div>
                                 </td>
                                 <td style="text-align: right; font-weight: bold; color: #047857;">Rs. 0.00 (Pre-paid)</td>
-                                <td style="text-align: right; font-weight: bold; color: #64748b;">Quota Claimed: -<?php echo number_format($cdata['balanced_drawn'], 2); ?> Ltr</td>
+                                <td style="text-align: right; font-weight: bold; color: #64748b;">Quota Settled: -<?php echo number_format($cdata['balanced_quota_settled'], 2); ?> Ltr</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong>Price Fluctuation Impact (Separate Item)</strong>
+                                    <div style="font-size: 8.5px; color: #666;">
+                                        <?php if ($cdata['price_fluctuation_litres'] > 0.001): ?>
+                                            Litres absorbed due to fuel price increase
+                                        <?php elseif ($cdata['price_fluctuation_litres'] < -0.001): ?>
+                                            Extra litres gained due to fuel price decrease
+                                        <?php else: ?>
+                                            Zero price fluctuation impact (prices unchanged)
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                                <td style="text-align: right; color: #666;">—</td>
+                                <td style="text-align: right; font-weight: bold; <?php echo ($cdata['price_fluctuation_litres'] > 0.001) ? 'color: #b45309;' : (($cdata['price_fluctuation_litres'] < -0.001) ? 'color: #0284c7;' : 'color: #666;'); ?>">
+                                    <?php if ($cdata['price_fluctuation_litres'] > 0.001): ?>
+                                        -<?php echo number_format($cdata['price_fluctuation_litres'], 2); ?> Ltr (Escalation)
+                                    <?php elseif ($cdata['price_fluctuation_litres'] < -0.001): ?>
+                                        +<?php echo number_format(abs($cdata['price_fluctuation_litres']), 2); ?> Ltr (Price Drop Gain)
+                                    <?php else: ?>
+                                        0.00 Ltr
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <tr>
                                 <td>
@@ -480,7 +540,7 @@ if ($report_res) {
                                 <td style="color: #047857; font-size: 11px;">
                                     ⛽ NET PETROL VOLUME PUMP MUST DELIVER:
                                     <div style="font-size: 8.5px; color: #555; font-weight: normal;">
-                                        (Total Quota Recorded: +<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr &nbsp;|&nbsp; Claimed on Balanced Slips: -<?php echo number_format($cdata['balanced_drawn'], 2); ?> Ltr)
+                                        (Total Quota Recorded: +<?php echo number_format($cdata['permanent_balance'], 2); ?> Ltr &nbsp;|&nbsp; Quota Settled on Balanced Slips: -<?php echo number_format($cdata['balanced_quota_settled'], 2); ?> Ltr)
                                     </div>
                                 </td>
                                 <td colspan="2" style="text-align: right; font-size: 13px; color: #047857;">

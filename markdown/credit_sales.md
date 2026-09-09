@@ -136,6 +136,25 @@ When a driver returns to claim uncollected balance fuel from a single prior Perm
   - Driver pumps **75.00 Ltr**, Charge = **Rs. 0.00**, Nozzle Advance = **+75.00 Ltr**.
 - **Case C: Today's Price UNCHANGED (Rs. 200.00 / Litre)**:
   $$\text{Adjusted Litres} = \frac{\text{Rs. } 12,000}{\text{Rs. } 200} = \mathbf{60.00\text{ Litres}}$$
+  - When the effective rate is unchanged, the formula guarantees exact volume equality ($|P_{\text{current}} - P_{\text{original}}| < 0.001 \implies \text{adjusted\_litres} = \text{total\_balance}$).
+- **Dual-Date Lookup & Modal Fluctuation Breakdown**:
+  - The lookup endpoint `ajax-credit-slip-lookup.php?action=find_balance_slip` accepts two distinct dates:
+    1. `orig_slip_date`: Historical date of the Permanent Slip (e.g. `2026-09-08`) used strictly to locate the record in `tbl_meter_reading_credit_sales`.
+    2. `balance_slip_date`: Current transaction date when remaining balance is claimed (e.g. `2026-09-09`), used to query `tbl_prices` for the market rate on that day.
+  - The **Claim Balance Modal** renders a prominent calculation card:
+    - **Original Permanent Slip Details**: Date, Original Rate (Rs. 200), Quota Balance (26.00 Ltr), and Prepaid Value (Rs. 5,200.00).
+    - **Claim Date Price**: Rate on collection date (Rs. 205.00 / Ltr).
+    - **Dynamic Fluctuation Alert**:
+      - *Price Increased*: Shows deducted litres (e.g. $-0.63$ Ltr) and net litres delivered (**25.37 Ltr**).
+      - *Price Decreased*: Shows bonus litres (e.g. $+1.37$ Ltr) and net litres delivered (**27.37 Ltr**).
+      - *Price Unchanged*: Shows exact remaining balance (**26.00 Ltr**).
+    - **Customer Charge**: Strictly `Rs. 0.00` (pre-paid).
+  - When applied, the row's `Quantity` and `Issue Quantity` are populated with the adjusted litres (e.g. `25.37`), the row rate is updated to the claim date price (e.g. `205.00`), and `Customer Charge` evaluates to `Rs. 0.00`.
+- **Customer Report Ledger Reconciliation & Zero-Loan Guarantee**:
+  - In `reports/customer-report.php` and `reports/generate-pdf-customer-report.php`, the ledger distinguishes between **Voucher Quota Settled** ($L_{\text{orig\_quota}}$, e.g. 26.00 Ltr) and **Physical Petrol Pumped** ($L_{\text{dispensed}}$, e.g. 20.80 Ltr).
+  - When a Balanced Slip settles a voucher, the customer's pending quota balance drops to **0.00 Ltr** ($26.00 - 26.00 = 0.00$).
+  - The volume variance ($\Delta L = L_{\text{orig\_quota}} - L_{\text{dispensed}}$) is shown on a dedicated **Price Fluctuation Impact** line (e.g. $-5.20$ Ltr price escalation absorption or $+6.50$ Ltr price drop gain).
+  - Price fluctuation **never** touches loan metrics; loan fuel remains strictly **0.00 Ltr / Rs. 0.00** unless an unreturned Temporary Slip exists.
 
 ---
 
@@ -191,3 +210,13 @@ Every appearance of the legacy term `Wasoli` or `Wasooli` across PPMS is standar
 3. **UI Display Preservation**:
    - On form load, the edit controller populates `wasoli` from database records. If historical records have `temp_slip_id` or `temp_slip_no` present but `wasoli` is 0, the controller self-heals by fetching the quantity from the temporary slip.
    - The green settlement badge (`Settling #<slip_no> (<qty>L)`) and the `Temp. Receive` input are rendered and initialized in full sync.
+4. **Shift Validation & Zero Data Loss Guarantee**:
+   - Both `add-credit-sale.php` and `edit-credit-sale.php` mandate that an active Shift is chosen (`#shift_id`).
+   - `validateCreditForm()` acts as a client-side gate before form dispatch: if `#shift_id` is unselected, submission is blocked with an alert and field focus, completely avoiding a page reload.
+   - In the event of any server-side validation error, `$posted_rows` reconstructs all entered rows and values into the spreadsheet grid, guaranteeing that user input is never wiped out.
+5. **Date-First & Row Slip-Date Pricing Precedence**:
+   - Fuel rates on credit sale rows strictly depend on that row's individual **Slip Date (`.credit-slip-date`)** and the customer's tariff policy (`fuel_rate`: `Cash` vs `Credit`).
+   - The transaction header date (`#sale_date`) only serves as the initial default date when appending a row; it does not override or constrain individual slip dates.
+   - Selecting or changing a vehicle (`onCreditVehicleInput`), nozzle (`updateCreditItem`), or slip date (`onSlipDateChange`) delegates to `resolveCreditRowRate($row)`. This invokes `ajax-credit-slip-lookup.php?action=get_price_for_date` to query `tbl_prices` for the effective price on that row's slip date, applying the customer's tariff policy without overwriting with current day station rates.
+   - Balanced Slips preserve the rate established by the claimed balance voucher and are protected from general price lookups.
+   - Initial population of existing rows in edit mode uses `skipPriceFetch = true` to preserve saved database rates against asynchronous race conditions.
