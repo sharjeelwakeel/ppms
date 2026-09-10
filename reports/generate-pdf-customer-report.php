@@ -19,6 +19,15 @@ $customerId = intval($_GET['customer_id'] ?? 0);
 $vehicleNum = trim($_GET['vehicle_number'] ?? '');
 $fromDate   = trim($_GET['from_date'] ?? '');
 $toDate     = trim($_GET['to_date'] ?? '');
+$shiftId    = intval($_GET['shift_id'] ?? 0);
+
+$selected_shift_name = '';
+if ($shiftId > 0) {
+    $sh_q = mysqli_query($connection, "SELECT name FROM tbl_shifts WHERE id = '$shiftId' LIMIT 1");
+    if ($sh_q && $sh_row = mysqli_fetch_assoc($sh_q)) {
+        $selected_shift_name = $sh_row['name'];
+    }
+}
 
 $where_clauses = ["1=1"];
 if ($customerId > 0) {
@@ -38,6 +47,9 @@ if (!empty($fromDate) && !empty($toDate)) {
 } elseif (!empty($toDate)) {
     $to_safe = mysqli_real_escape_string($connection, $toDate);
     $where_clauses[] = "mrcs.slip_date <= '$to_safe'";
+}
+if ($shiftId > 0) {
+    $where_clauses[] = "mrcs.shift_id = '$shiftId'";
 }
 $where_sql = implode(' AND ', $where_clauses);
 
@@ -353,6 +365,9 @@ if ($report_res) {
                     <p>
                         <?php if (!empty($fromDate) || !empty($toDate)): ?>
                             <strong>Date Filter:</strong> <?php echo !empty($fromDate) ? date('d-m-Y', strtotime($fromDate)) : 'Start'; ?> to <?php echo !empty($toDate) ? date('d-m-Y', strtotime($toDate)) : 'Till Date'; ?> &nbsp;|&nbsp; 
+                        <?php endif; ?>
+                        <?php if (!empty($selected_shift_name)): ?>
+                            <strong>Shift:</strong> <?php echo htmlspecialchars($selected_shift_name); ?> &nbsp;|&nbsp; 
                         <?php endif; ?>
                         Generated: <?php echo date('d-m-Y h:i A'); ?> &nbsp;|&nbsp; PPMS Audit Ledger
                     </p>

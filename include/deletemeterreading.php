@@ -35,14 +35,6 @@ if (isset($_POST['id']) && !empty($_POST['id'])) {
         }
     }
 
-    // 2. Find date and shift to clean up daily nozzle readings
-    $q_del = mysqli_query($connection, "SELECT date, shift_id FROM tbl_meter_readings WHERE id = '$id' LIMIT 1");
-    if ($q_del && $r_del = mysqli_fetch_assoc($q_del)) {
-        $del_date = $r_del['date'];
-        $del_shift = intval($r_del['shift_id']);
-        mysqli_query($connection, "DELETE FROM tbl_daily_nozzle_readings WHERE date = '$del_date' AND shift_id = '$del_shift' AND source = 'meter_reading'");
-    }
-
     $sql = "UPDATE tbl_meter_readings SET deleted_at = NOW() WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
         echo 'Meter reading deleted.';

@@ -66,18 +66,17 @@ CREATE TABLE IF NOT EXISTS `tbl_tank_dip_meter_logs` (
 - **Date**: Defaults to current date (`YYYY-MM-DD`), editable manually. Required.
 - **Shift**: Dropdown populated from active shifts (`tbl_shifts WHERE status = 'Active'`). Required.
 
-### 3. Multi-Nozzle Meter Readings & Usage Calculation Rule
+### 3. Shift Closing Meter Readings & Usage Calculation Rule
 - A tank can have 1, 2, 3, or more meters/nozzles attached (`tbl_nozzles WHERE tank_id = ? AND status = 'Active'`).
-- On `add-dip-log.php` and `edit-dip-log.php`, each attached meter/nozzle card displays:
-  - **Previous Reading ($P_i$)**: Fetched from previous day/log meter reading (or `last_reading` from `tbl_meter_reading_details` / nozzle `start_reading`).
-  - **Current Reading ($C_i$)**: Input field (`nozzle_reading[nozzle_id]`) populated with closing meter reading from `tbl_meter_reading_details` or entered manually.
-  - **Nozzle Net Usage**: $\text{Nozzle Usage}_i = \text{Current Reading}(C_i) - \text{Previous Reading}(P_i)$.
+- Physical meter reading vouchers (`tbl_meter_readings` & `tbl_meter_reading_details`) are entered at the close of every shift (Morning, Evening, Night).
+- On `add-dip-log.php` and `edit-dip-log.php`, choosing a **Date** and **Shift** automatically pulls each attached nozzle's shift closing data from `tbl_meter_reading_details`:
+  - **Previous Reading ($P_i$)**: Shift opening counter (`mrd.last_reading`).
+  - **Current Reading ($C_i$)**: Shift closing counter (`mrd.current_reading`).
+  - **Nozzle Net Usage**: Net dispensed fuel (`mrd.net_sale`, which automatically accounts for test fuel pumped back into the tank).
 - **Total Tank Usage Formula**:
-  $$\text{Usage (Ltrs)} = \sum_{i=1}^{k} \left( \text{Current Reading}(C_i) - \text{Previous Reading}(P_i) \right)$$
-  *Example*: Tank with 2 nozzles:
-  - Nozzle 1: Current (12,500) - Prev (10,000) = 2,500 Ltrs
-  - Nozzle 2: Current (6,200) - Prev (5,000) = 1,200 Ltrs
-  - **Total Usage** = $2,500 + 1,200 = 3,700$ Ltrs.
+  $$\text{Usage (Ltrs)} = \sum_{i=1}^{k} \text{mrd.net\_sale}_i$$
+- **Decoupling from Credit & Card Sales**:
+  Credit sales and Card sales are strictly payment methods for fuel already pumped through nozzles. They do not alter physical nozzle counters or tank usage.
 
 ### 4. Book Balance Rules (Initial vs Sequential Calculation)
 - **First Entry Ever for Tank** (No previous dip log exists):
@@ -109,12 +108,10 @@ $$\text{Accumulative PMG} = \text{Previous Accumulative PMG} + \text{Usage}$$
 |---|---|
 | `tanks/tanks-list.php` | Tank list table featuring the Action column chart icon button (`<i class="fas fa-chart-line"></i>`) |
 | `tanks/dip-chart.php` | Dip Chart dashboard for a specific tank with summary metric cards & DataTables log history |
-| `tanks/add-dip-log.php` | Create Dip Chart log with per-nozzle meter reading inputs, net usage subtraction ($C_i - P_i$), and auto-calculations |
+| `tanks/add-dip-log.php` | Create Dip Chart log with per-nozzle meter reading inputs, net usage auto-population from `tbl_meter_reading_details`, and auto-calculations |
 | `tanks/edit-dip-log.php` | Edit Dip Chart log entry with per-nozzle meter reading pre-filling and recalculation |
-| `tanks/get-tank-meter-readings.php` | AJAX endpoint returning day-to-day `prev_reading`, `current_reading`, and `net_sale` from `tbl_daily_nozzle_readings` |
+| `tanks/get-tank-meter-readings.php` | AJAX endpoint returning shift closing `last_reading`, `current_reading`, and `net_sale` from `tbl_meter_reading_details` by `(nozzle_id, date, shift_id)` |
 | `tanks/get-prev-dip-log.php` | AJAX endpoint returning previous dip log values for sequential calculation |
-| `include/nozzle_daily_sync.php` | Centralized helper synchronizing daily nozzle meters across Add, Edit, and Delete |
-| `markdown/daily_nozzle_readings.md` | Full architecture and lifecycle of day-to-day nozzle meter tracking |
 | `dip-lookup/lookup-by-mm.php` | Sub-2ms indexed lookup for matching `dip_mm` to `balance` (`dip_litre`) |
 | `include/deletediplog.php` | Soft delete backend handler (`UPDATE tbl_tank_dip_logs SET deleted_at = NOW() WHERE id = ?`) |
 | `include/navbar.php` | Navigation bar link updates |

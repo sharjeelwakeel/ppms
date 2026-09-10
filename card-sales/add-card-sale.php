@@ -3,7 +3,6 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
-require_once '../include/nozzle_daily_sync.php';
 
 check_access('card_sales', 'add');
 
@@ -111,19 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                              '$qty', '$fuel_rate', '$amt', '$batch_no', '$schg', '$net', '$noz_id', '$cards')";
                 if (!mysqli_query($connection, $ins_sql)) {
                     throw new Exception("Error saving card transaction: " . mysqli_error($connection));
-                }
-
-                // Add dispensed petrol quantity to the nozzle's running meter reading in tbl_nozzles
-                if ($noz_id > 0 && $qty > 0) {
-                    $upd_noz = "UPDATE tbl_nozzles 
-                                SET start_reading = start_reading + $qty 
-                                WHERE id = '$noz_id'";
-                    if (!mysqli_query($connection, $upd_noz)) {
-                        throw new Exception("Error updating nozzle meter reading: " . mysqli_error($connection));
-                    }
-
-                    // Synchronize daily nozzle snapshot
-                    sync_nozzle_daily_card_sale_delta($connection, $sale_date, $shift_id, $noz_id, $qty);
                 }
             }
             mysqli_commit($connection);

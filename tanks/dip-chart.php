@@ -212,16 +212,17 @@ if ($stmt_latest) {
                                         }
                                     }
 
-                                    // Pre-fetch daily nozzle readings from tbl_daily_nozzle_readings as fallback
-                                    $daily_readings = [];
-                                    $q_dr = mysqli_query($connection, "SELECT dnr.date, dnr.shift_id, dnr.closing_reading, n.name AS nozzle_name 
-                                                                       FROM tbl_daily_nozzle_readings dnr 
-                                                                       JOIN tbl_nozzles n ON dnr.nozzle_id = n.id 
-                                                                       WHERE dnr.tank_id = $tank_id 
+                                    // Pre-fetch shift meter readings from tbl_meter_reading_details as fallback
+                                    $shift_readings = [];
+                                    $q_sr = mysqli_query($connection, "SELECT mr.date, mr.shift_id, mrd.current_reading, n.name AS nozzle_name 
+                                                                       FROM tbl_meter_reading_details mrd 
+                                                                       JOIN tbl_meter_readings mr ON mrd.meter_reading_id = mr.id 
+                                                                       JOIN tbl_nozzles n ON mrd.nozzle_id = n.id 
+                                                                       WHERE n.tank_id = $tank_id AND (mr.deleted_at IS NULL OR mr.deleted_at = '0000-00-00 00:00:00')
                                                                        ORDER BY n.name ASC");
-                                    if ($q_dr) {
-                                        while ($d_row = mysqli_fetch_assoc($q_dr)) {
-                                            $daily_readings[$d_row['date'] . '_' . $d_row['shift_id']][] = $d_row;
+                                    if ($q_sr) {
+                                        while ($s_row = mysqli_fetch_assoc($q_sr)) {
+                                            $shift_readings[$s_row['date'] . '_' . $s_row['shift_id']][] = $s_row;
                                         }
                                     }
 
@@ -245,9 +246,9 @@ if ($stmt_latest) {
                                                 foreach ($meter_logs[$row['id']] as $mlog) {
                                                     $m_html .= '<span class="badge badge-light border text-dark font-weight-normal mr-1 mb-1"><strong>' . htmlspecialchars($mlog['nozzle_name']) . ':</strong> ' . number_format($mlog['reading'], 2) . '</span>';
                                                 }
-                                            } elseif (!empty($daily_readings[$row['date'] . '_' . $row['shift_id']])) {
-                                                foreach ($daily_readings[$row['date'] . '_' . $row['shift_id']] as $dlog) {
-                                                    $m_html .= '<span class="badge badge-light border text-dark font-weight-normal mr-1 mb-1"><strong>' . htmlspecialchars($dlog['nozzle_name']) . ':</strong> ' . number_format($dlog['closing_reading'], 2) . '</span>';
+                                            } elseif (!empty($shift_readings[$row['date'] . '_' . $row['shift_id']])) {
+                                                foreach ($shift_readings[$row['date'] . '_' . $row['shift_id']] as $slog) {
+                                                    $m_html .= '<span class="badge badge-light border text-dark font-weight-normal mr-1 mb-1"><strong>' . htmlspecialchars($slog['nozzle_name']) . ':</strong> ' . number_format($slog['current_reading'], 2) . '</span>';
                                                 }
                                             } else {
                                                 $m_html = '<span class="text-muted small font-italic">-</span>';

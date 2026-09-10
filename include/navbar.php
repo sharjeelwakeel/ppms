@@ -6,7 +6,241 @@ if (!file_exists('include/navbar.php')) {
 }
 require_once __DIR__ . '/permissions.php';
 ?>
-<nav class="navbar navbar-expand-custom bg-dark navbar-dark px-3 px-lg-4 shadow-sm main-navbar">
+<style>
+/* Main Navbar - Guaranteed Inline Layout on All Screens (>= 768px) */
+@media (min-width: 768px) {
+    .navbar.main-navbar,
+    nav.navbar.main-navbar,
+    .navbar.navbar-expand-md.main-navbar,
+    .navbar.navbar-expand-lg.main-navbar {
+        display: flex !important;
+        flex-flow: row nowrap !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        padding: 0.28rem 0.4rem !important;
+        width: 100% !important;
+    }
+    .navbar.main-navbar .navbar-brand {
+        display: inline-flex !important;
+        align-items: center !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        font-size: 1.05rem !important;
+        margin-right: 0.45rem !important;
+        padding: 0 !important;
+    }
+    .navbar.main-navbar .navbar-toggler {
+        display: none !important;
+    }
+    .navbar.main-navbar .navbar-collapse,
+    nav.navbar.main-navbar .navbar-collapse,
+    .navbar.navbar-expand-md.main-navbar .navbar-collapse,
+    .navbar.navbar-expand-lg.main-navbar .navbar-collapse {
+        display: flex !important;
+        flex-flow: row nowrap !important;
+        flex-wrap: nowrap !important;
+        flex-basis: auto !important;
+        flex-grow: 1 !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        min-width: 0 !important;
+    }
+    .navbar.main-navbar .navbar-nav {
+        display: flex !important;
+        flex-flow: row nowrap !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        margin-right: auto !important;
+        margin-bottom: 0 !important;
+        padding: 0 !important;
+        flex-shrink: 1 !important;
+        min-width: 0 !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-item {
+        flex-shrink: 0 !important;
+        width: auto !important;
+        margin: 0 1px !important;
+        padding: 0 !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link {
+        color: rgba(255, 255, 255, 0.88) !important;
+        font-size: 0.77rem !important;
+        font-weight: 500 !important;
+        padding: 0.25rem 0.35rem !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link i {
+        font-size: 0.74rem !important;
+        margin-right: 0.18rem !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link:hover,
+    .navbar.main-navbar .navbar-nav .nav-item.active .nav-link,
+    .navbar.main-navbar .navbar-nav .nav-item.show .nav-link {
+        color: #ffffff !important;
+        background-color: rgba(255, 255, 255, 0.15) !important;
+    }
+    .navbar.main-navbar .nav-action-wrapper {
+        margin-left: auto !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        width: auto !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .navbar.main-navbar .btn-logout {
+        display: inline-flex !important;
+        align-items: center !important;
+        width: auto !important;
+        white-space: nowrap !important;
+        padding: 0.22rem 0.5rem !important;
+        font-size: 0.76rem !important;
+        border-radius: 4px !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        color: #ffffff !important;
+        background: transparent !important;
+    }
+    .navbar.main-navbar .btn-logout:hover {
+        background-color: #ffffff !important;
+        color: var(--primary-color) !important;
+    }
+}
+
+/* Specific Ultra-Compact Scaling on Laptops & Tablets (768px - 1160px) */
+@media (min-width: 768px) and (max-width: 1160px) {
+    .navbar.main-navbar,
+    nav.navbar.main-navbar {
+        padding: 0.22rem 0.25rem !important;
+    }
+    .navbar.main-navbar .navbar-brand {
+        font-size: 0.98rem !important;
+        margin-right: 0.3rem !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link {
+        font-size: 0.72rem !important;
+        padding: 0.2rem 0.25rem !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link i {
+        font-size: 0.68rem !important;
+        margin-right: 0.12rem !important;
+    }
+    .navbar.main-navbar .btn-logout {
+        padding: 0.18rem 0.4rem !important;
+        font-size: 0.72rem !important;
+    }
+}
+
+/* Mobile Phone Responsive Drawer (< 768px) */
+@media (max-width: 767.98px) {
+    .navbar.main-navbar {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 0.4rem 0.8rem !important;
+    }
+    .navbar.main-navbar .navbar-brand {
+        font-size: 1.1rem !important;
+        white-space: nowrap !important;
+    }
+    .navbar.main-navbar .navbar-toggler {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.4) !important;
+        padding: 5px 9px !important;
+        border-radius: 6px !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        cursor: pointer !important;
+        margin-left: auto !important;
+    }
+    .navbar.main-navbar .navbar-collapse {
+        flex-basis: 100% !important;
+        width: 100% !important;
+        background: #031a40 !important;
+        border-radius: 8px !important;
+        margin-top: 8px !important;
+        padding: 10px 12px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        max-height: calc(100vh - 70px) !important;
+        overflow-y: auto !important;
+    }
+    .navbar.main-navbar .navbar-collapse:not(.show) {
+        display: none !important;
+    }
+    .navbar.main-navbar .navbar-collapse.show {
+        display: block !important;
+    }
+    .navbar.main-navbar .navbar-nav {
+        flex-direction: column !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-item {
+        margin-bottom: 2px !important;
+        width: 100% !important;
+    }
+    .navbar.main-navbar .navbar-nav .nav-link {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 0.88rem !important;
+        padding: 8px 10px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        white-space: normal !important;
+    }
+    .navbar.main-navbar .navbar-nav .dropdown-menu {
+        position: static !important;
+        background: rgba(255, 255, 255, 0.07) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 8px !important;
+        padding: 6px !important;
+        margin: 4px 0 8px 8px !important;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+        float: none !important;
+        width: calc(100% - 8px) !important;
+    }
+    .navbar.main-navbar .navbar-nav .dropdown-item {
+        color: rgba(255, 255, 255, 0.88) !important;
+        font-size: 0.84rem !important;
+        padding: 7px 10px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .navbar.main-navbar .nav-action-wrapper {
+        border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding-top: 10px !important;
+        margin-top: 8px !important;
+        width: 100% !important;
+    }
+    .navbar.main-navbar .btn-logout {
+        width: 100% !important;
+        padding: 8px 12px !important;
+        font-size: 0.88rem !important;
+        text-align: center !important;
+        display: block !important;
+        color: #ffffff !important;
+    }
+}
+</style>
+<nav class="navbar navbar-expand-md bg-dark navbar-dark px-2 shadow-sm main-navbar">
     <a class="navbar-brand font-weight-bold d-flex align-items-center" href="<?php echo $prefix; ?>dashboard.php">
         <i class="fas fa-gas-pump mr-2 text-warning"></i> PPMS
     </a>
@@ -138,6 +372,19 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
 
+            <!-- Accounts Menu -->
+            <?php if (has_permission('accounts', 'show') || has_permission('credit_sales', 'show')): ?>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkAccounts" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-wallet mr-1"></i> Accounts
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkAccounts">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/credit-sale-receivables.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Accounts Receivable (Credit Sale)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/payment-history.php"><i class="fas fa-history mr-1 text-primary"></i> Payment Receipts &amp; History</a>
+                </div>
+            </li>
+            <?php endif; ?>
+
             <!-- HR & Payroll -->
             <?php if (has_permission('staff', 'show')): ?>
             <li class="nav-item dropdown">
@@ -166,8 +413,8 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
         </ul>
-        <div class="nav-action-wrapper mt-3 mt-lg-0 ml-lg-3">
-            <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-light btn-sm btn-logout d-block d-lg-inline-block font-weight-bold">
+        <div class="nav-action-wrapper">
+            <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-light btn-sm btn-logout font-weight-bold">
                 <i class="fas fa-sign-out-alt mr-1"></i> Logout
             </a>
         </div>

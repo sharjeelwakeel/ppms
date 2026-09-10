@@ -36,7 +36,7 @@ $sql = "SELECT mrcs.*,
         LEFT JOIN tbl_customers c ON (mrcs.account_number = c.id)
         LEFT JOIN tbl_nozzles n ON (mrcs.nozzle_id = n.id)
         LEFT JOIN tbl_items i ON (n.item_id = i.id)
-        WHERE mrcs.slip_date = '$date_safe' $shift_clause AND (mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')
+        WHERE (mrcs.sale_date = '$date_safe' OR (mrcs.sale_date IS NULL AND mrcs.slip_date = '$date_safe')) $shift_clause AND (mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')
         ORDER BY mrcs.id ASC";
 $res = mysqli_query($connection, $sql);
 

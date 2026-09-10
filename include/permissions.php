@@ -29,6 +29,7 @@ function get_system_modules() {
         'banks'          => 'Bank Masters',
         'roles'          => 'Roles & Permissions',
         'users'          => 'System Users / Accounts',
+        'accounts'       => 'Accounts & Receivables',
         'reports'        => 'Reports & Analytics'
     ];
 }
@@ -90,8 +91,8 @@ function has_permission($module_slug, $action) {
         return intval($perm[$col_name]) === 1;
     }
 
-    // Fallback: If credit_sales or card_sales is queried, inherit from meter_readings
-    if ($module_slug === 'credit_sales' || $module_slug === 'card_sales') {
+    // Fallback: If credit_sales, card_sales, or accounts is queried, inherit from meter_readings
+    if ($module_slug === 'credit_sales' || $module_slug === 'card_sales' || $module_slug === 'accounts') {
         $fb_res = mysqli_query($connection, "SELECT $col_name FROM tbl_role_permissions WHERE role_id = '$role_id' AND module_slug = 'meter_readings' LIMIT 1");
         if ($fb_res && ($fb_perm = mysqli_fetch_assoc($fb_res))) {
             return intval($fb_perm[$col_name]) === 1;

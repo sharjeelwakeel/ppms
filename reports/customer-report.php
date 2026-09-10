@@ -33,14 +33,15 @@ foreach ($chk_aux as $col => $def) {
     }
 }
 
-// Filters: Customer, Vehicle No, From Date, To Date
+// Filters: Customer, Vehicle No, From Date, To Date, Shift
 $customerId = intval($_GET['customer_id'] ?? 0);
 $vehicleNum = trim($_GET['vehicle_number'] ?? '');
 $fromDate   = trim($_GET['from_date'] ?? '');
 $toDate     = trim($_GET['to_date'] ?? '');
+$shiftId    = intval($_GET['shift_id'] ?? 0);
 
-$isSearched = (isset($_GET['customer_id']) || isset($_GET['vehicle_number']) || isset($_GET['from_date']) || isset($_GET['to_date'])) && 
-              ($customerId > 0 || !empty($vehicleNum) || !empty($fromDate) || !empty($toDate));
+$isSearched = (isset($_GET['customer_id']) || isset($_GET['vehicle_number']) || isset($_GET['from_date']) || isset($_GET['to_date']) || isset($_GET['shift_id'])) && 
+              ($customerId > 0 || !empty($vehicleNum) || !empty($fromDate) || !empty($toDate) || $shiftId > 0);
 
 // Fetch all active customers for filter dropdown
 $customers_res = mysqli_query($connection, "SELECT id, name, phone, fuel_rate FROM tbl_customers WHERE deleted_at IS NULL ORDER BY name ASC");
@@ -48,6 +49,19 @@ $all_customers = [];
 if ($customers_res) {
     while ($crow = mysqli_fetch_assoc($customers_res)) {
         $all_customers[] = $crow;
+    }
+}
+
+// Fetch all active shifts for filter dropdown
+$shifts_res = mysqli_query($connection, "SELECT id, name FROM tbl_shifts WHERE status = 'Active' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY id ASC");
+$all_shifts = [];
+$selected_shift_name = '';
+if ($shifts_res) {
+    while ($srow = mysqli_fetch_assoc($shifts_res)) {
+        $all_shifts[] = $srow;
+        if ($shiftId == $srow['id']) {
+            $selected_shift_name = $srow['name'];
+        }
     }
 }
 
@@ -87,6 +101,9 @@ if ($isSearched) {
     } elseif (!empty($toDate)) {
         $to_safe = mysqli_real_escape_string($connection, $toDate);
         $where_clauses[] = "mrcs.slip_date <= '$to_safe'";
+    }
+    if ($shiftId > 0) {
+        $where_clauses[] = "mrcs.shift_id = '$shiftId'";
     }
 
     $where_sql = !empty($where_clauses) ? implode(' AND ', $where_clauses) : '1=1';
@@ -409,6 +426,9 @@ if ($isSearched) {
                     <?php elseif (!empty($toDate)): ?>
                         &nbsp;|&nbsp; Till Date: <strong><?php echo date('d-m-Y', strtotime($toDate)); ?></strong>
                     <?php endif; ?>
+                    <?php if (!empty($selected_shift_name)): ?>
+                        &nbsp;|&nbsp; Shift: <strong><?php echo htmlspecialchars($selected_shift_name); ?></strong>
+                    <?php endif; ?>
                 </p>
                 <hr style="border-top:2px solid #04204e;">
             </div>
@@ -423,7 +443,7 @@ if ($isSearched) {
                 </div>
                 <div class="col-md-5 text-right">
                     <?php if ($isSearched && !empty($customers_ledger)): ?>
-                    <a href="generate-pdf-customer-report.php?customer_id=<?php echo urlencode($customerId); ?>&vehicle_number=<?php echo urlencode($vehicleNum); ?>&from_date=<?php echo urlencode($fromDate); ?>&to_date=<?php echo urlencode($toDate); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
+                    <a href="generate-pdf-customer-report.php?customer_id=<?php echo urlencode($customerId); ?>&vehicle_number=<?php echo urlencode($vehicleNum); ?>&from_date=<?php echo urlencode($fromDate); ?>&to_date=<?php echo urlencode($toDate); ?>&shift_id=<?php echo urlencode($shiftId); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
                         <i class="fas fa-file-pdf mr-1"></i> Export PDF
                     </a>
                     <?php endif; ?>
@@ -436,19 +456,29 @@ if ($isSearched) {
                 </div>
             </div>
 
-            <!-- Filter Card: Customer, Vehicle & Date Range -->
-            <!-- Filter Card: Date Range, Customer & Vehicle -->
+            <!-- Filter Card: Date Range, Shift, Customer & Vehicle -->
             <div class="card p-3 mb-4 shadow-sm border-0 d-print-none" style="border-radius:10px; background:#fff;">
                 <form action="customer-report.php" method="GET" class="form-row align-items-end">
-                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                    <div class="col-xl-2 col-lg-2 col-md-4 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-calendar-alt mr-1 text-primary"></i> From Date</label>
                         <input type="date" name="from_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($fromDate); ?>">
                     </div>
-                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                    <div class="col-xl-2 col-lg-2 col-md-4 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-calendar-check mr-1 text-primary"></i> To Date</label>
                         <input type="date" name="to_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($toDate); ?>">
                     </div>
-                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                    <div class="col-xl-2 col-lg-2 col-md-4 col-sm-6 mb-2 mb-lg-0">
+                        <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-clock mr-1 text-primary"></i> Shift</label>
+                        <select name="shift_id" class="form-control form-control-sm font-weight-bold">
+                            <option value="">-- All Shifts --</option>
+                            <?php foreach ($all_shifts as $sh): ?>
+                                <option value="<?php echo $sh['id']; ?>" <?php echo ($shiftId == $sh['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($sh['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-user mr-1 text-primary"></i> Customer</label>
                         <select name="customer_id" class="form-control form-control-sm font-weight-bold">
                             <option value="">-- All Customers --</option>
@@ -459,7 +489,7 @@ if ($isSearched) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-2 mb-lg-0">
+                    <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
                         <label class="font-weight-bold small text-muted mb-1"><i class="fas fa-truck mr-1 text-primary"></i> Vehicle No</label>
                         <input type="text" name="vehicle_number" class="form-control form-control-sm font-weight-bold text-monospace" placeholder="e.g. LE-1234" value="<?php echo htmlspecialchars($vehicleNum); ?>">
                     </div>

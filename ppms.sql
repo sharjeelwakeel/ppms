@@ -5236,6 +5236,7 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
 CREATE TABLE `tbl_meter_reading_credit_sales` (
   `id` int(11) NOT NULL,
   `nozzle_id` int(11) NOT NULL,
+  `sale_date` date DEFAULT NULL,
   `slip_date` date NOT NULL,
   `shift_id` int(11) NOT NULL DEFAULT 0,
   `slip_no` varchar(64) NOT NULL,
@@ -5246,6 +5247,8 @@ CREATE TABLE `tbl_meter_reading_credit_sales` (
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `charge_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_status` enum('Unpaid','Partial','Paid') NOT NULL DEFAULT 'Unpaid',
   `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `issue_quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
   `balance_1` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -5750,6 +5753,50 @@ CREATE TABLE `tbl_tank_dip_meter_logs` (
   `reading` decimal(12,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_customer_payments`
+--
+
+CREATE TABLE `tbl_customer_payments` (
+  `id` int(11) NOT NULL,
+  `receipt_no` varchar(64) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `payment_date` date NOT NULL,
+  `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_mode` enum('Cash','Online Payment','Cheque') NOT NULL DEFAULT 'Cash',
+  `bank_id` int(11) DEFAULT NULL,
+  `transaction_ref` varchar(128) DEFAULT NULL,
+  `cheque_no` varchar(64) DEFAULT NULL,
+  `cheque_date` date DEFAULT NULL,
+  `filter_from_date` date DEFAULT NULL,
+  `filter_to_date` date DEFAULT NULL,
+  `filter_shift_id` int(11) DEFAULT 0,
+  `filter_vehicle_number` varchar(64) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_customer_payment_allocations`
+--
+
+CREATE TABLE `tbl_customer_payment_allocations` (
+  `id` int(11) NOT NULL,
+  `payment_id` int(11) NOT NULL,
+  `credit_sale_id` int(11) NOT NULL,
+  `allocated_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
 --
 -- Indexes for dumped tables
 --
@@ -5983,6 +6030,25 @@ ALTER TABLE `tbl_tank_dip_meter_logs`
   ADD KEY `idx_nozzle_id` (`nozzle_id`);
 
 --
+-- Indexes for table `tbl_customer_payments`
+--
+ALTER TABLE `tbl_customer_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_customer` (`customer_id`),
+  ADD KEY `idx_payment_date` (`payment_date`),
+  ADD KEY `idx_bank` (`bank_id`),
+  ADD KEY `idx_deleted` (`deleted_at`);
+
+--
+-- Indexes for table `tbl_customer_payment_allocations`
+--
+ALTER TABLE `tbl_customer_payment_allocations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_payment` (`payment_id`),
+  ADD KEY `idx_credit_sale` (`credit_sale_id`),
+  ADD KEY `idx_deleted` (`deleted_at`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -5991,6 +6057,18 @@ ALTER TABLE `tbl_tank_dip_meter_logs`
 --
 ALTER TABLE `tbl_accounts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `tbl_customer_payments`
+--
+ALTER TABLE `tbl_customer_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_customer_payment_allocations`
+--
+ALTER TABLE `tbl_customer_payment_allocations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_banks`

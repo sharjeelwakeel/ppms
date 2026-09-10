@@ -13,16 +13,17 @@ $to_date   = $_GET['to_date'] ?? '';
 $where = "(mrcs.deleted_at IS NULL OR mrcs.deleted_at = '0000-00-00 00:00:00')";
 if (!empty($from_date)) {
     $from_safe = mysqli_real_escape_string($connection, $from_date);
-    $where .= " AND mrcs.slip_date >= '$from_safe'";
+    $where .= " AND COALESCE(mrcs.sale_date, mrcs.slip_date) >= '$from_safe'";
 }
 if (!empty($to_date)) {
     $to_safe = mysqli_real_escape_string($connection, $to_date);
-    $where .= " AND mrcs.slip_date <= '$to_safe'";
+    $where .= " AND COALESCE(mrcs.sale_date, mrcs.slip_date) <= '$to_safe'";
 }
 
-// Group by slip_date and shift_id to show date & shift with totals
+// Group by sale_date and shift_id to show shift date & shift with totals
 $sql_daily = "SELECT 
-                mrcs.slip_date,
+                COALESCE(mrcs.sale_date, mrcs.slip_date) AS sale_date,
+                COALESCE(mrcs.sale_date, mrcs.slip_date) AS slip_date,
                 mrcs.shift_id,
                 sh.name AS shift_name,
                 COUNT(mrcs.id) AS total_slips,
@@ -39,12 +40,13 @@ $sql_daily = "SELECT
               FROM tbl_meter_reading_credit_sales mrcs
               LEFT JOIN tbl_shifts sh ON (mrcs.shift_id = sh.id)
               WHERE $where
-              GROUP BY mrcs.slip_date, mrcs.shift_id
-              ORDER BY mrcs.slip_date DESC, mrcs.shift_id ASC";
+              GROUP BY COALESCE(mrcs.sale_date, mrcs.slip_date), mrcs.shift_id
+              ORDER BY sale_date DESC, mrcs.shift_id ASC";
 $result_daily = mysqli_query($connection, $sql_daily);
 
 // Fetch all slips to support instant detail viewing in modal
 $sql_all_slips = "SELECT mrcs.*, 
+                         COALESCE(mrcs.sale_date, mrcs.slip_date) AS effective_sale_date,
                          sh.name AS shift_name,
                          c.name AS customer_name,
                          n.name AS nozzle_name,
@@ -55,12 +57,12 @@ $sql_all_slips = "SELECT mrcs.*,
                   LEFT JOIN tbl_nozzles n ON (mrcs.nozzle_id = n.id)
                   LEFT JOIN tbl_items i ON (n.item_id = i.id)
                   WHERE $where
-                  ORDER BY mrcs.slip_date DESC, mrcs.shift_id ASC, mrcs.id ASC";
+                  ORDER BY effective_sale_date DESC, mrcs.shift_id ASC, mrcs.id ASC";
 $res_slips = mysqli_query($connection, $sql_all_slips);
 $slips_by_date = [];
 if ($res_slips) {
     while ($row = mysqli_fetch_assoc($res_slips)) {
-        $key = $row['slip_date'] . '_' . intval($row['shift_id']);
+        $key = $row['effective_sale_date'] . '_' . intval($row['shift_id']);
         if (!isset($slips_by_date[$key])) {
             $slips_by_date[$key] = [];
         }
@@ -193,10 +195,10 @@ if ($res_slips) {
                         $counter = 1;
                         if ($result_daily && mysqli_num_rows($result_daily) > 0):
                             while ($row = mysqli_fetch_assoc($result_daily)): 
-                                $dateVal = $row['slip_date'];
+                                $dateVal = !empty($row['sale_date']) ? $row['sale_date'] : (!empty($row['slip_date']) ? $row['slip_date'] : '');
                                 $shiftId = intval($row['shift_id'] ?? 0);
                                 $shiftName = !empty($row['shift_name']) ? $row['shift_name'] : 'General';
-                                $displayDate = date('d-m-Y', strtotime($dateVal));
+                                $displayDate = (!empty($dateVal) && strtotime($dateVal) !== false && $dateVal !== '0000-00-00') ? date('d-m-Y', strtotime($dateVal)) : '—';
                         ?>
                         <tr>
                             <td class="font-weight-bold text-muted"><?php echo $counter++; ?></td>
@@ -217,7 +219,7 @@ if ($res_slips) {
                                 </span>
                             </td>
                             <td>
-                                <span class="badge badge-info px-2 py-1 font-weight-bold" style="font-size: 11.5px;">
+                                <span class="badge badge-info px-2 py-1 font-weight-bold" style="font-size: 11.5px; cursor:pointer;" onclick="viewDaySlips('<?php echo $dateVal; ?>', <?php echo $shiftId; ?>, '<?php echo $displayDate; ?>', '<?php echo addslashes($shiftName); ?>')" title="Click to View Slip Details">
                                     <i class="fas fa-receipt mr-1"></i><?php echo intval($row['total_slips']); ?> Slips
                                 </span>
                             </td>
@@ -252,6 +254,11 @@ if ($res_slips) {
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
+                                    <!-- View Modal -->
+                                    <button type="button" class="btn btn-info" onclick="viewDaySlips('<?php echo $dateVal; ?>', <?php echo $shiftId; ?>, '<?php echo $displayDate; ?>', '<?php echo addslashes($shiftName); ?>')" title="View Slip Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+
                                     <!-- PDF Statement -->
                                     <a href="generate-pdf-credit-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" target="_blank" class="btn btn-secondary" style="background:#04204e; border-color:#04204e;" title="Download / Print PDF">
                                         <i class="fas fa-file-pdf text-danger"></i>

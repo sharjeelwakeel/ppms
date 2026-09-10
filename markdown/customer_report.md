@@ -45,18 +45,20 @@ graph TD
 
 ## 2. Granular Filtering & Streamlined Filter Sequence
 
-The report form provides intuitive, sequential filtering arranged logically from broad period to specific account:
+The report form provides intuitive, sequential filtering arranged logically from broad period to specific operational context and account:
 
 1. **1st: Date Range (`from_date` & `to_date`)**: Limits records based on the physical credit slip date (`mrcs.slip_date`).
-2. **2nd: Customer (`customer_id`)**: Selects a specific customer account or views all customers.
-3. **3rd: Vehicle No (`vehicle_number`)**: Filters for a specific vehicle registration plate (e.g. `LEA-1234`).
-4. **Action Buttons**: Instant search submission and filter reset.
+2. **2nd: Shift (`shift_id`)**: Limits records to a specific operational shift (e.g. *Morning*, *Evening*, *Night*) or *All Shifts*.
+3. **3rd: Customer (`customer_id`)**: Selects a specific customer account or views all customers.
+4. **4th: Vehicle No (`vehicle_number`)**: Filters for a specific vehicle registration plate (e.g. `LEA-1234`).
+5. **Action Buttons**: Instant search submission and filter reset.
 
 ```mermaid
 graph LR
-    A["1. Date Range (From/To Date)"] --> B["2. Customer Account"]
-    B --> C["3. Vehicle Number"]
-    C --> D["Clean Filtered Ledger View"]
+    A["1. Date Range (From/To Date)"] --> B["2. Operational Shift"]
+    B --> C["3. Customer Account"]
+    C --> D["4. Vehicle Number"]
+    D --> E["Clean Filtered Ledger View"]
 ```
 
 When filtered, the slips table and customer reconciliation cards compute seamlessly over the specified criteria without unnecessary overhead or over-engineering.

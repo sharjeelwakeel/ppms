@@ -13,7 +13,8 @@ All credit transactions are stored in `tbl_meter_reading_credit_sales`:
 CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `nozzle_id` INT(11) NOT NULL,                        -- Attached nozzle ID (tbl_nozzles)
-  `slip_date` DATE NOT NULL,                           -- Voucher date (supports backdated pricing)
+  `sale_date` DATE NOT NULL,                           -- Header shift / daily entry date (when fuel is dispensed)
+  `slip_date` DATE NOT NULL,                           -- Physical voucher slip date (supports historical pricing)
   `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Station shift ID (tbl_shifts)
   `slip_no` VARCHAR(64) NOT NULL,                      -- Voucher slip number (mandatory)
   `slip_type` ENUM('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip',

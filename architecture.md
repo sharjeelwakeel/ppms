@@ -143,36 +143,33 @@ Whenever adding a new column or table:
 
 ### Pillar 3: Fuel Inventory & Nozzle State Synchronization
 
-Fuel pumps operate on physical mechanical/electronic totalizers. Software readings must remain strictly synchronized with physical nozzle counters.
+Fuel pumps operate on physical mechanical/electronic totalizers. Physical meter readings entered at the end of each shift (`tbl_meter_readings` & `tbl_meter_reading_details`) are the sole source of truth for nozzle counters and tank usage. Credit sales and card sales represent payment settlement methods and do NOT mutate nozzle meters.
 
 ```mermaid
 sequenceDiagram
-    participant User as Operator / Admin
-    participant Form as Sales / Reading Form
-    participant Nozzle as tbl_nozzles
-    participant Daily as tbl_daily_nozzle_readings
+    participant User as Shift Cashier / Manager
+    participant Form as Shift Meter Reading Form
+    participant Nozzle as tbl_nozzles (Running Meter)
+    participant Details as tbl_meter_reading_details (Net Sale)
     participant Dip as Dip Chart & Tank Stock
 
-    User->>Form: Submits Meter Reading / Credit / Card Sale (Qty L)
-    Form->>Nozzle: UPDATE tbl_nozzles SET start_reading = start_reading + Qty
-    Form->>Daily: sync_nozzle_daily_*() upsert daily snapshot
-    Daily->>Dip: Day-end Dip Comparison: Tank Closing vs Total Dispensed
+    User->>Form: Submits Shift Closing Meter Reading
+    Form->>Details: Records opening (last_reading), closing (current_reading), net_sale
+    Form->>Nozzle: UPDATE tbl_nozzles SET start_reading = current_reading
+    Details->>Dip: get-tank-meter-readings.php pulls net_sale as tank usage per shift
+    Dip->>Dip: Compares Physical Dip (balance) vs Book Balance (prev - usage + addition)
 ```
 
-#### Synchronous Lifecycle Rules:
-1. **Adding Sales/Readings**:
-   - `tbl_nozzles.start_reading` advances forward by the dispensed volume.
-   - `sync_nozzle_daily_*` updates `closing_reading` and increments `dispensed_litres` in `tbl_daily_nozzle_readings`.
-2. **Deleting Sales/Readings**:
-   - Dispensed volume must be automatically deducted:
-     ```sql
-     UPDATE tbl_nozzles 
-     SET start_reading = GREATEST(start_reading - $qty, 0.00) 
-     WHERE id = '$nozzle_id'
-     ```
-   - Daily log is adjusted downward via `sync_nozzle_daily_card_sale_delta($connection, $date, $shift_id, $nozzle_id, -$qty)`.
-3. **Daily Dip Reconciliation**:
-   - `tbl_daily_nozzle_readings` provides opening and closing meter readings for each nozzle per date/shift, allowing daily dip tank variances to be accurately audited.
+#### Shift Closing Meter Reading & Tank Dip Rules:
+1. **Shift Meter Reading = Sole Authority**:
+   - Submitting a meter reading sets `tbl_nozzles.start_reading = $current_reading`.
+   - `tbl_meter_reading_details` records `last_reading`, `current_reading`, and `net_sale` (dispensed volume minus test calibration fuel).
+2. **Decoupled Credit & Card Sales**:
+   - Credit slips and card machine transactions are payment methods for fuel. They do **not** advance `tbl_nozzles.start_reading` or affect tank usage.
+3. **Shift-by-Shift Tank Usage**:
+   - Dip logs (`tanks/get-tank-meter-readings.php`) retrieve usage directly from `tbl_meter_reading_details` matching `(nozzle_id, date, shift_id)`.
+   - Total tank usage for that shift equals $\sum \text{mrd.net\_sale}$ across all attached nozzles.
+   - If no shift reading exists yet, the log gracefully falls back to opening readings with usage initialized to `0.00` until shift close.
 
 ---
 

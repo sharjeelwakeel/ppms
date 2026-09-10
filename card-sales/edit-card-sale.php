@@ -3,7 +3,6 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
-require_once '../include/nozzle_daily_sync.php';
 
 check_access('card_sales', 'edit');
 
@@ -98,21 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $del_shift_clause = ($current_shift_id > 0) ? " AND shift_id = '$current_shift_id'" : "";
 
-            // Revert previously added fuel quantities from tbl_nozzles
-            $prev_q = mysqli_query($connection, "SELECT nozzle_id, SUM(quantity) AS prev_qty 
-                                                  FROM tbl_meter_reading_card_sales 
-                                                  WHERE sale_date = '$date_safe' $del_shift_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') 
-                                                  GROUP BY nozzle_id");
-            if ($prev_q) {
-                while ($prow = mysqli_fetch_assoc($prev_q)) {
-                    $p_noz = intval($prow['nozzle_id']);
-                    $p_qty = floatval($prow['prev_qty']);
-                    if ($p_noz > 0 && $p_qty > 0) {
-                        mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = GREATEST(start_reading - $p_qty, 0.00) WHERE id = '$p_noz'");
-                        sync_nozzle_daily_card_sale_delta($connection, $date_safe, $current_shift_id, $p_noz, -$p_qty);
-                    }
-                }
-            }
 
             // Soft-delete previous rows for this date and shift
             $del_sql = "UPDATE tbl_meter_reading_card_sales SET deleted_at = NOW() 
@@ -165,17 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                              '$qty', '$fuel_rate', '$amt', '$batch_no', '$schg', '$net', '$noz_id', '$cards')";
                 if (!mysqli_query($connection, $ins_sql)) {
                     throw new Exception("Error saving card transaction: " . mysqli_error($connection));
-                }
-
-                // Add dispensed petrol quantity to the nozzle's running meter reading in tbl_nozzles
-                if ($noz_id > 0 && $qty > 0) {
-                    $upd_noz = "UPDATE tbl_nozzles 
-                                SET start_reading = start_reading + $qty 
-                                WHERE id = '$noz_id'";
-                    if (!mysqli_query($connection, $upd_noz)) {
-                        throw new Exception("Error updating nozzle meter reading: " . mysqli_error($connection));
-                    }
-                    sync_nozzle_daily_card_sale_delta($connection, $new_date, $new_shift_id, $noz_id, $qty);
                 }
             }
             mysqli_commit($connection);

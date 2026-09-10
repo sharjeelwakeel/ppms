@@ -69,16 +69,20 @@ All primary color definitions are centralized in `include/style.css`.
 
 ---
 
-## 4. Tablet & Laptop Responsive Design Standards (`<= 1240px` Breakpoint)
+## 4. Navigation Bar Responsive & Inline Standards
 
-### A. Navigation Bar in Tablet & Laptop Mode (`@media (max-width: 1240px)`)
-- **Responsive Drawer Trigger**: On screen widths `<= 1240px`, the navbar automatically collapses into the responsive drawer to prevent multi-menu horizontal wrapping.
-- **Drawer Background**: `#031a40` with `1px solid rgba(255, 255, 255, 0.1)` and smooth vertical scrolling (`max-height: calc(100vh - 80px)`).
-- **Nav Links**: Touch-friendly padding (`10px 14px`), flex alignment with icons, light text (`rgba(255, 255, 255, 0.9)`), hover background `rgba(255, 255, 255, 0.12)`.
+### A. Desktop & Laptop Inline Mode (`@media (min-width: 1150px)`)
+- **Strictly Single-Row Inline**: Brand logo (`PPMS`), all module dropdowns, and the `Logout` button stay strictly on a single horizontal row (`flex-flow: row nowrap; flex-wrap: nowrap;`) across all desktop, laptop, and landscape displays (`>= 768px`).
+- **Proportional Scaling**: On compact laptops and notebooks (`768px` to `1160px`), nav links automatically scale down to `0.72rem` font size, compact padding (`0.2rem 0.25rem`), and tight icon margins so all 9 menus + brand + logout take only ~708px total, easily fitting any laptop display without line breaks.
+- **Right-Aligned Logout**: The logout button is pinned to the far right using `margin-left: auto;` in inline mode.
+
+### B. Mobile Phone Responsive Drawer (`@media (max-width: 767.98px)`)
+- **Responsive Drawer Trigger**: On small mobile screens `< 768px`, the navbar collapses into a clean vertical drawer with a hamburger toggler.
+- **Drawer Background**: `#031a40` with `1px solid rgba(255, 255, 255, 0.1)` and smooth vertical scrolling (`max-height: calc(100vh - 70px)`).
+- **Nav Links**: Touch-friendly vertical links with light text (`rgba(255, 255, 255, 0.9)`), hover background `rgba(255, 255, 255, 0.12)`.
 - **Indented Submenu Drawer**: Nested dropdowns use subtle translucent panel `rgba(255, 255, 255, 0.07)` with `1px solid rgba(255, 255, 255, 0.12)`, `8px` border radius, and indented items.
-- **Dropdown Items**: Light text (`rgba(255, 255, 255, 0.85)`), icon alignment, hover highlight `rgba(255, 255, 255, 0.18)`.
 - **Hamburger Toggler (`.navbar-toggler`)**: Rounded `6px`, `1.5px solid rgba(255, 255, 255, 0.35)` with custom glow focus ring.
-- **Logout Action**: Spans full width as block button (`width: 100%`) with clear white border and icon.
+- **Logout Action**: Spans full width as block button (`width: 100%`) with clear white border and icon at the bottom of the drawer.
 
 ### B. Layout & DataTables on Tablets & Small Laptops (`<= 1240px`)
 - **Page Header Banner (`.page-header`)**: Stacks vertically (`flex-direction: column; align-items: flex-start; gap: 12px`) with full-width action buttons.

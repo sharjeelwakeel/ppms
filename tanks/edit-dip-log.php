@@ -6,7 +6,6 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 require '../include/permissions.php';
-require_once '../include/nozzle_daily_sync.php';
 
 // Enforce access check for editing dip logs
 check_access('tanks', 'edit');
@@ -143,12 +142,8 @@ if (isset($_POST['update_dip_log'])) {
                 foreach ($_POST['nozzle_reading'] as $noz_id => $rdg) {
                     $noz_id_int = intval($noz_id);
                     $rdg_val = floatval($rdg);
-                    $prev_rdg_val = floatval($_POST['nozzle_prev_reading'][$noz_id] ?? $rdg_val);
                     mysqli_stmt_bind_param($stmt_m, "iid", $id, $noz_id_int, $rdg_val);
                     mysqli_stmt_execute($stmt_m);
-
-                    // Sync to tbl_daily_nozzle_readings
-                    sync_nozzle_daily_dip_reading($connection, $date, $shift_id, $noz_id_int, $tank_id, $rdg_val, $prev_rdg_val);
                 }
                 mysqli_stmt_close($stmt_m);
             }
@@ -274,7 +269,8 @@ if (isset($_POST['update_dip_log'])) {
                                                                         Prev: <?php echo number_format($noz['prev_reading'], 2); ?>
                                                                     </span>
                                                                 </div>
-                                                                <label class="small text-muted mb-1">Current Reading</label>
+                                                                <div class="mb-2" id="nozzle_status_badge_<?php echo $noz['id']; ?>"></div>
+                                                                <label class="small text-muted mb-1">Current Reading (Shift Closing)</label>
                                                                 <input type="hidden" name="nozzle_prev_reading[<?php echo $noz['id']; ?>]" id="nozzle_prev_reading_input_<?php echo $noz['id']; ?>" value="<?php echo $noz['prev_reading']; ?>">
                                                                 <input type="number" step="0.01" min="0" 
                                                                        class="form-control nozzle-reading-input font-weight-bold text-primary" 
@@ -283,7 +279,7 @@ if (isset($_POST['update_dip_log'])) {
                                                                        data-prev-reading="<?php echo $noz['prev_reading']; ?>"
                                                                        value="<?php echo $val; ?>" placeholder="0.00">
                                                                 <div class="d-flex justify-content-between align-items-center mt-2">
-                                                                    <small class="text-muted">Net Nozzle Usage:</small>
+                                                                    <small class="text-muted">Net Nozzle Usage (Net Sale):</small>
                                                                     <span class="font-weight-bold text-success small" id="nozzle_usage_text_<?php echo $noz['id']; ?>">0.00 Ltrs</span>
                                                                 </div>
                                                             </div>
@@ -414,10 +410,7 @@ if (isset($_POST['update_dip_log'])) {
 		// Fetch previous dip log stats
         fetchPrevDipLog();
 
-        // Check meter readings on page load if date & shift are present
-        fetchMeterReadings(false);
-
-        // Initial calculation of nozzle usage
+        // Initial calculation of nozzle usage based on existing saved values
         calculateTotalNozzleUsage();
 
         // Event listeners
@@ -486,15 +479,27 @@ if (isset($_POST['update_dip_log'])) {
             dataType: 'json',
             success: function(res) {
                 if (res.success && res.nozzles && res.nozzles.length > 0) {
+                    let totalUsage = 0.00;
                     res.nozzles.forEach(function(n) {
                         const prevR = parseFloat(n.prev_reading) || 0.00;
                         const currR = parseFloat(n.current_reading) || 0.00;
+                        const netSale = parseFloat(n.net_sale) || 0.00;
+
                         $('#nozzle_reading_' + n.id).attr('data-prev-reading', prevR);
                         $('#nozzle_prev_reading_input_' + n.id).val(prevR);
                         $('#nozzle_prev_badge_' + n.id).text('Prev: ' + prevR.toFixed(2));
                         $('#nozzle_reading_' + n.id).val(currR.toFixed(2));
+                        $('#nozzle_usage_text_' + n.id).text(netSale.toFixed(2) + ' Ltrs');
+
+                        if (n.from_meter_reading) {
+                            $('#nozzle_status_badge_' + n.id).html('<span class="badge badge-success"><i class="fas fa-check-circle mr-1"></i>Shift Closing Reading</span>');
+                        } else {
+                            $('#nozzle_status_badge_' + n.id).html('<span class="badge badge-warning text-dark"><i class="fas fa-info-circle mr-1"></i>No Shift Reading (Manual)</span>');
+                        }
+
+                        totalUsage += netSale;
                     });
-                    calculateTotalNozzleUsage();
+                    $('#usage_litre').val(totalUsage.toFixed(2));
                 }
                 calculateFormulas();
             }

@@ -3,7 +3,6 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
-require_once '../include/nozzle_daily_sync.php';
 
 check_access('credit_sales', 'edit');
 
@@ -12,6 +11,7 @@ $aux_cols = [
     'temp_slip_id'       => "INT(11) DEFAULT NULL AFTER wasoli",
     'temp_slip_no'       => "VARCHAR(64) DEFAULT NULL AFTER temp_slip_id",
     'temp_slip_date'     => "DATE DEFAULT NULL AFTER temp_slip_no",
+    'sale_date'          => "DATE NULL AFTER nozzle_id",
     'temp_rate'          => "DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER temp_slip_date",
     'ref_slip_no'        => "VARCHAR(128) DEFAULT NULL AFTER temp_rate",
     'ref_slip_date'      => "DATE DEFAULT NULL AFTER ref_slip_no",
@@ -36,7 +36,7 @@ $shift_filter = ($target_shift > 0) ? " AND shift_id = '$target_shift'" : "";
 
 // Fetch existing credit sales for this date and shift
 $sql_existing = "SELECT * FROM tbl_meter_reading_credit_sales 
-                WHERE slip_date = '$date_safe' $shift_filter AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+                WHERE (sale_date = '$date_safe' OR (sale_date IS NULL AND slip_date = '$date_safe')) $shift_filter AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
                 ORDER BY id ASC";
 $res_existing = mysqli_query($connection, $sql_existing);
 $existing_rows = [];
@@ -188,26 +188,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_begin_transaction($connection);
             try {
                 $del_shift_clause = ($current_shift_id > 0) ? " AND shift_id = '$current_shift_id'" : "";
+                $match_prev_clause = "(sale_date = '$date_safe' OR (sale_date IS NULL AND slip_date = '$date_safe')) $del_shift_clause";
 
-                // Revert previously logged fuel quantities from tbl_nozzles
-                $prev_q = mysqli_query($connection, "SELECT nozzle_id, SUM(quantity) AS prev_qty 
-                                                      FROM tbl_meter_reading_credit_sales 
-                                                      WHERE slip_date = '$date_safe' $del_shift_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') 
-                                                      GROUP BY nozzle_id");
-                if ($prev_q) {
-                    while ($prow = mysqli_fetch_assoc($prev_q)) {
-                        $p_noz = intval($prow['nozzle_id']);
-                        $p_qty = floatval($prow['prev_qty']);
-                        if ($p_noz > 0 && $p_qty > 0) {
-                            mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = GREATEST(start_reading - $p_qty, 0.00) WHERE id = '$p_noz'");
-                            sync_nozzle_daily_card_sale_delta($connection, $date_safe, $current_shift_id, $p_noz, -$p_qty);
-                        }
-                    }
-                }
 
                 // Reset any previously settled temporary slips that were linked in these rows
                 $prev_ts_q = mysqli_query($connection, "SELECT temp_slip_id FROM tbl_meter_reading_credit_sales 
-                                                        WHERE slip_date = '$date_safe' $del_shift_clause AND temp_slip_id > 0 AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
+                                                        WHERE $match_prev_clause AND temp_slip_id > 0 AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
                 if ($prev_ts_q) {
                     while ($ts_row = mysqli_fetch_assoc($prev_ts_q)) {
                         $old_ts_id = intval($ts_row['temp_slip_id']);
@@ -219,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Soft-delete previous rows for this date and shift
                 $del_sql = "UPDATE tbl_meter_reading_credit_sales SET deleted_at = NOW() 
-                            WHERE slip_date = '$date_safe' $del_shift_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')";
+                            WHERE $match_prev_clause AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')";
                 if (!mysqli_query($connection, $del_sql)) {
                     throw new Exception("Error updating existing rows: " . mysqli_error($connection));
                 }
@@ -289,11 +275,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     $ins_sql = "INSERT INTO tbl_meter_reading_credit_sales 
-                                (nozzle_id, slip_date, shift_id, slip_no, slip_type, account_number, vehicle_number,
+                                (nozzle_id, sale_date, slip_date, shift_id, slip_no, slip_type, account_number, vehicle_number,
                                  quantity, rate, amount, charge_amount, cash_rate, issue_quantity, balance_1, balance_2, wasoli,
                                  temp_slip_id, temp_slip_no, temp_slip_date, temp_rate, ref_slip_no, ref_slip_date, is_returned, returned_at)
                                 VALUES 
-                                ('$noz_id', '$row_slip_date', '$new_shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
+                                ('$noz_id', '$new_date', '$row_slip_date', '$new_shift_id', '$slip_no', '$slip_type', '$acc_num', '$veh_num',
                                  '$qty', '$rate', '$amount', '$charge_amt', '$cash_rate', '$issue_qty', '$bal1', '$bal2', '$wasoli',
                                  " . ($temp_id > 0 ? "'$temp_id'" : "NULL") . ", '$temp_no', $temp_date_sql, '$temp_rate', '$ref_no', $ref_date_sql, '$is_ret', $ret_at)";
                     if (!mysqli_query($connection, $ins_sql)) {
@@ -320,12 +306,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                        SET is_returned = 1, returned_at = NOW(), settled_in_slip_id = '$new_slip_id' 
                                                        WHERE id = '$target_temp_id'");
                         }
-                    }
-
-                    // Advance nozzle meter reading and sync daily ledger strictly by physical petrol pumped (qty)
-                    if ($noz_id > 0 && $qty > 0) {
-                        mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = start_reading + $qty WHERE id = '$noz_id'");
-                        sync_nozzle_daily_card_sale_delta($connection, $row_slip_date, $new_shift_id, $noz_id, $qty);
                     }
                 }
                 mysqli_commit($connection);
