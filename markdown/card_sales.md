@@ -7,29 +7,31 @@ The **Card Sale Reading** module in the Petrol Pump Management System (PPMS) tra
 
 ## 2. Database Schema
 
-All card transaction records are stored in the existing table `tbl_meter_reading_card_sales`, supporting both standalone entries (`meter_reading_id = 0`) and legacy shift entries:
+All card transaction records are stored in `tbl_meter_reading_card_sales`, supporting standalone shift entries (`meter_reading_id = 0`) with terminal trace and revenue difference tracking:
 
 ```sql
 CREATE TABLE IF NOT EXISTS `tbl_meter_reading_card_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `meter_reading_id` INT(11) NOT NULL DEFAULT 0,
   `sale_date` DATE NOT NULL,                           -- Date of card transactions
-  `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Attached station shift ID (tbl_shifts)
+  `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Station shift ID (tbl_shifts)
   `staff_id` INT(11) DEFAULT 0,
-  `card_machine_id` INT(11) NOT NULL,                 -- POS Machine / Bank Terminal
+  `card_machine_id` INT(11) NOT NULL,                 -- POS Machine / Bank Terminal (tbl_card_machines)
   `item_id` INT(11) DEFAULT 0,                        -- Attached fuel item
-  `no_of_cards` INT(11) NOT NULL DEFAULT 1,            -- Number of card swipes
+  `rate_type` ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash',
   `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,        -- Gross swipe amount (Rs.)
-  `batch_no` VARCHAR(64) DEFAULT NULL,                 -- POS batch / terminal slip no
+  `difference` DECIMAL(12,2) NOT NULL DEFAULT 0.00,    -- Revenue charge difference amount
+  `batch_no` VARCHAR(64) DEFAULT NULL,                 -- POS batch no
+  `trace_no` VARCHAR(64) DEFAULT NULL,                 -- POS transaction trace no
   `service_charges` DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- Bank percentage fee deducted
   `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,    -- Net deposit receivable (amount - charges)
   `nozzle_id` INT(11) DEFAULT NULL,                    -- Attached nozzle ID
+  `no_of_cards` INT(11) NOT NULL DEFAULT 1,            -- Legacy count
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_meter_reading_id` (`meter_reading_id`),
   KEY `idx_sale_date` (`sale_date`),
   KEY `idx_shift_id` (`shift_id`),
   KEY `idx_nozzle_id` (`nozzle_id`),
@@ -42,49 +44,32 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_card_sales` (
 
 ## 3. Core Business Rules & Validations
 
-### 1. 4-Decimal Bank Fee Precision
-- Bank card machines configure service charge percentages with up to 4 decimal places (e.g. `0.3456%`).
-- Selecting a card machine auto-populates the configured commission percentage.
+### 1. The 6 Standard Card Sale Entry Fields
+Each card transaction row records exactly 6 fields:
+1. **Nozzle \***: Attached fuel dispensing nozzle (`tbl_nozzles`).
+2. **Machine Type \***: Bank POS terminal (`tbl_card_machines`, e.g. Meezan, HBL, Bank Alfalah).
+3. **Batch No**: Terminal batch number from the POS receipt.
+4. **Trace No**: Unique transaction trace number from the POS receipt.
+5. **Amount (Rs.) \***: Total gross transaction swipe amount.
+6. **Difference (Rs.)**: Machine revenue difference charge.
 
-### 2. Automatic Net Bank Deposit Calculation
-For each card transaction entry:
-1. **Service Charges (Bank Fee)**:
-   $$\text{service\_charges} = \text{amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
-2. **Net Bank Receivable**:
-   $$\text{net\_amount} = \text{amount} - \text{service\_charges}$$
+### 2. Difference & Net Bank Deposit Formulas
+- **Difference Calculation**:
+  When a card machine is selected or the amount changes, Difference is automatically populated from the machine's configured `revenue_charge` %:
+  $$\text{difference} = \text{amount} \times \left(\frac{\text{revenue\_charge}}{100}\right)$$
+  Operators can also manually adjust this difference field if necessary.
+- **Bank Service Charges (Commission Fee)**:
+  Computed automatically using the machine's 4-decimal POS percentage fee (`charges_percentage`):
+  $$\text{service\_charges} = \text{amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
+- **Net Bank Receivable**:
+  $$\text{net\_amount} = \text{amount} - \text{service\_charges}$$
 
-### 3. POS Terminal & Batch Tracking
-- Each card entry tracks the POS machine name (e.g. Meezan Bank, HBL, Alfalah), terminal batch reference number, card count (number of swipes), and attached nozzle.
+### 3. Nozzle Reading Decoupling
+Physical nozzle meter counters and shift usage rely exclusively on Detail Meter Readings (`tbl_daily_nozzle_readings` and shift closing readings). Card sales record monetary settlements and revenue differences without mutating nozzle running start readings.
 
-### 4. Automatic Petrol Quantity Calculation & Nozzle Synchronization
-- **Dispensed Petrol Volume (Litres)**:
-  $$\text{quantity (Litres)} = \frac{\text{amount (Rs.)}}{\text{sale\_rate (Rs./Ltr)}}$$
-  Where `sale_rate` is determined by the transaction rate type or attached customer's `fuel_rate`:
-  - If **Credit** (customer contracted rate): `sale_rate` is retrieved from `tbl_items.credit_rate`.
-  - If **Cash** (retail walk-in rate): `sale_rate` is retrieved from `tbl_items.cash_rate`.
-  - The dispensed volume (Litres) is calculated from the gross swipe amount divided by this applicable sale rate.
-- **Nozzle Running Meter Update (`tbl_nozzles`)**:
-  - **On Add**: Automatically advances the nozzle's running meter reading:
-    ```sql
-    UPDATE tbl_nozzles SET start_reading = start_reading + $quantity WHERE id = '$nozzle_id';
-    ```
-  - **On Edit**: Atomically adjusts the nozzle's `start_reading` by reverting the previous litres and applying the new transaction litres.
-  - **On Delete**: Soft-deleting card sales for a date or single swipe automatically deducts and rolls back the petrol volume (`GREATEST(start_reading - $quantity, 0.00)`) from `tbl_nozzles`.
-
-### 5. Automatic Row Expansion & Fast Data Entry ("Add New Row")
-- **Spreadsheet-Style Auto-Spawn**:
-  - When typing or selecting data in the **last row** of the card sales table (e.g., selecting a Card Machine, typing a Batch No, or entering Amount), the next blank row automatically appears directly below it.
-  - Enables smooth, fast POS card transaction entries without touching the mouse.
-- **Manual "Add New Row" Button**:
-  - Prominent buttons are provided in both the card header (`btn-light text-primary`) and below the table (`btn-primary`):
-    ```html
-    <button type="button" class="btn btn-primary btn-sm font-weight-bold" onclick="addCardRow()">
-        <i class="fas fa-plus mr-1"></i> Add New Row
-    </button>
-    ```
-- **Smart Pruning of Trailing Empty Rows on Submit**:
-  - When saving or updating card sales, any trailing auto-spawned rows that were left untouched/empty are automatically pruned from the form before validation and submission.
-  - Guarantees zero validation errors and eliminates blank or zero-amount dummy database records.
+### 4. Automatic Row Expansion & Fast Data Entry ("Add New Row")
+- **Spreadsheet-Style Auto-Spawn**: Typing or selecting in the last row auto-spawns a new blank row.
+- **Smart Pruning**: Untouched trailing blank rows are cleanly stripped prior to form validation and database insertion.
 
 ---
 
@@ -92,51 +77,77 @@ For each card transaction entry:
 
 ### 1. Navigation Menu
 - Located under **Transactions $\rightarrow$ Card Sale Reading** in [`include/navbar.php`](../include/navbar.php).
-- Permission module: `'card_sales'` (inherits fallback from `'meter_readings'`).
+- Permission module: `'card_sales'`.
 
 ### 2. Daily Consolidated List (`card-sales/card-sales-list.php`)
-- Grouped by `sale_date` and `shift_id` showing shift-by-shift daily totals:
-  - **Date** (Clickable to edit)
-  - **Shift** (Primary gradient badge showing shift name, e.g. Morning, Evening, Night)
-  - **Batches / Entries Count**
-  - **Total Swipes (Cards)**
-  - **Gross Card Sale (Rs.)**
-  - **Service Charges (Rs.)** (Bank commission deducted)
-  - **Net Bank Receivable (Rs.)**
-  - **Actions**:
-    - **PDF Statement**: Opens print-ready A4 daily card settlement statement filtered by shift.
-    - **Delete**: SweetAlert2 soft-delete for card sales of that specific date & shift.
+- Shows date, shift, total batch entries, gross card sales, total difference, service charges, and net bank receivable.
+- **Actions**:
+  - **View Breakdown Modal**: Displays itemized table with Machine Type, Batch No, Trace No, Nozzle, Amount, Difference, Bank Fee, and Net Receivable.
+  - **PDF Statement**: Generates print-ready A4 statement with all 6 fields.
+  - **Delete**: Soft-deletes card sales for the date/shift.
+  - **Edit**: Clicking the Date link opens `edit-card-sale.php`.
 
-### 3. Add Card Sales (`card-sales/add-card-sale.php`)
-- Standalone form allowing multi-row card terminal entries for any date and shift.
-- Header card includes **Sale Date** and **Shift** select dropdown (populated from active shifts in `tbl_shifts`).
-- **Entry Table Columns** (strictly matching the classic card sale modal inputs):
-  1. **Nozzle \*** (`-- Select Nozzle --`)
-  2. **Card Machine \*** (`-- Select Machine --`)
-  3. **Batch No** (Optional text)
-  4. **No of Cards** (Numeric swipe count, default `1`)
-  5. **Amount (Rs.) \*** (Gross swipe value)
-  6. **Action** (Delete row button)
-- Dynamic **`+ Add Card Sale Row`** button to append additional entries.
-- Real-time calculations of Total Cards and Total Gross Amount, with background auto-computation of bank commission fees and net amounts upon saving.
-
-### 4. Edit Card Sales (Click on Date)
-- To preserve a clean list layout without icon clutter, **clicking directly on the Date column** in [`card-sales/card-sales-list.php`](card-sales/card-sales-list.php) opens the edit screen: [`card-sales/edit-card-sale.php?date=YYYY-MM-DD&shift_id=X`](card-sales/edit-card-sale.php).
-- Prepopulates all card transactions recorded for that date and shift across the exact same 5 input fields (`Nozzle`, `Card Machine`, `Batch No`, `No of Cards`, `Amount (Rs.)`).
-- Allows updating swipe amounts, batch numbers, shifting nozzles or machines, changing shifts, adding new rows, deleting rows, or adjusting dates atomically.
-
-### 5. Printable A4 PDF Statement (`card-sales/generate-pdf-card-sale.php?date=YYYY-MM-DD&shift_id=X`)
-- Professional print layout styled with deep navy `#04204e` branding.
-- Station header displaying Date and Shift name, summary metric cards, itemized terminal table, and bank deposit signatures.
+### 3. Add & Edit Interfaces
+- [`card-sales/add-card-sale.php`](../card-sales/add-card-sale.php) & [`card-sales/edit-card-sale.php`](../card-sales/edit-card-sale.php)
+- Lean spreadsheet layout featuring the 6 standard fields: **Nozzle**, **Machine Type**, **Batch No**, **Trace No**, **Amount (Rs.)**, **Difference**, plus row deletion action.
+- Live summary counters for Total Entries, Total Amount, and Total Difference.
 
 ---
 
-## 5. File Architecture
+## 5. Card Sale Settlement CRUD Sub-Module
+
+In addition to day-to-day shift swipe logs, the system tracks official bank terminal batch settlements via a dedicated sub-module accessible via the **Card Settlements** button on [`card-sales/card-sales-list.php`](../card-sales/card-sales-list.php).
+
+### 1. Database Schema (`tbl_card_sale_settlements`)
+```sql
+CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `card_machine_id` INT(11) NOT NULL,
+  `settlement_date` DATE NOT NULL,
+  `batch_no` VARCHAR(64) NOT NULL,
+  `no_of_cards` INT(11) NOT NULL DEFAULT 1,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+  `service_charges` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `notes` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_card_machine_id` (`card_machine_id`),
+  KEY `idx_settlement_date` (`settlement_date`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+### 2. Standard Settlement Fields
+1. **Machine**: Card Machine (Bank POS Terminal from `tbl_card_machines`).
+2. **Batch No**: Terminal batch slip reference number.
+3. **Settlement Date**: Date of settlement (defaulting to current date).
+4. **No. of Cards**: Card swipe transaction count (default `1`).
+5. **Amount (Rs.)**: Gross batch settled amount.
+6. **Charges & Net**: Automatically computed from machine fee % ($\text{Amount} \times \frac{\text{charges\_percentage}}{100}$).
+
+### 3. Workflows
+- **List View** ([`card-sales/settlement-list.php`](../card-sales/settlement-list.php)): Full paginated DataTable, date range filter, summary metric cards (Total Settlements, Cards, Gross Amount, Net Receivable), action buttons (Edit, PDF Statement, Delete).
+- **Add Settlement** ([`card-sales/add-settlement.php`](../card-sales/add-settlement.php)): Fast entry with default current date, auto-fee preview, and validation.
+- **Edit Settlement** ([`card-sales/edit-settlement.php`](../card-sales/edit-settlement.php)): Prepopulated interface for modifying batch details.
+- **Soft Delete** ([`include/deletesettlement.php`](../include/deletesettlement.php)): Soft delete endpoint protected by RBAC gate.
+- **Printable Statement** ([`card-sales/generate-pdf-settlement.php`](../card-sales/generate-pdf-settlement.php)): A4 print-ready bank reconciliation voucher.
+
+---
+
+## 6. File Architecture
 
 | File Path | Purpose |
 | :--- | :--- |
-| [`card-sales/card-sales-list.php`](../card-sales/card-sales-list.php) | Daily consolidated card sales list with metrics, date filter, modal, and action buttons |
-| [`card-sales/add-card-sale.php`](../card-sales/add-card-sale.php) | Standalone card machine swipe entry form with dynamic rows and automatic net calculation |
-| [`card-sales/edit-card-sale.php`](../card-sales/edit-card-sale.php) | Date-based card sales editing interface |
+| [`card-sales/card-sales-list.php`](../card-sales/card-sales-list.php) | Consolidated card sales list with metrics, date filter, itemized modal, and action buttons |
+| [`card-sales/add-card-sale.php`](../card-sales/add-card-sale.php) | 6-field card sale entry form with dynamic rows and difference auto-calculation |
+| [`card-sales/edit-card-sale.php`](../card-sales/edit-card-sale.php) | Card sales editing interface with prepopulated trace numbers and differences |
 | [`card-sales/generate-pdf-card-sale.php`](../card-sales/generate-pdf-card-sale.php) | A4 print-ready daily card sales settlement statement |
 | [`include/deletecardsale.php`](../include/deletecardsale.php) | Soft-delete AJAX handler for card sales by date or record ID |
+| [`card-sales/settlement-list.php`](../card-sales/settlement-list.php) | Card Sale Settlements listing with summary cards, date filter, and action buttons |
+| [`card-sales/add-settlement.php`](../card-sales/add-settlement.php) | Card Sale Settlement creation form (Machine, Batch, Date, Cards, Amount) |
+| [`card-sales/edit-settlement.php`](../card-sales/edit-settlement.php) | Card Sale Settlement edit form |
+| [`include/deletesettlement.php`](../include/deletesettlement.php) | Soft-delete AJAX handler for card sale settlements |
+| [`card-sales/generate-pdf-settlement.php`](../card-sales/generate-pdf-settlement.php) | A4 print-ready settlement statement |

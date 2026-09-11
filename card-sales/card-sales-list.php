@@ -26,8 +26,8 @@ $sql_daily = "SELECT
                 mrcs.shift_id,
                 sh.name AS shift_name,
                 COUNT(mrcs.id) AS total_entries,
-                SUM(mrcs.no_of_cards) AS total_cards,
                 SUM(mrcs.amount) AS total_gross,
+                SUM(mrcs.difference) AS total_difference,
                 SUM(mrcs.service_charges) AS total_charges,
                 SUM(mrcs.net_amount) AS total_net
               FROM tbl_meter_reading_card_sales mrcs
@@ -127,11 +127,16 @@ if ($res_cards) {
             <h4><i class="fas fa-credit-card mr-2 text-warning"></i> Card Sale Reading</h4>
             <small class="text-white-50">Track bank POS terminal swipes, batch numbers, bank service charges, and net receivables</small>
         </div>
-        <?php if (has_permission('card_sales', 'add')): ?>
-        <a href="add-card-sale.php" class="btn btn-new">
-            <i class="fas fa-plus"></i> Add Card Sale
-        </a>
-        <?php endif; ?>
+        <div>
+            <a href="settlement-list.php" class="btn btn-outline-light mr-2 font-weight-bold" title="View Card Sale Settlements">
+                <i class="fas fa-file-invoice-dollar mr-1 text-warning"></i> Card Settlements
+            </a>
+            <?php if (has_permission('card_sales', 'add')): ?>
+            <a href="add-card-sale.php" class="btn btn-new">
+                <i class="fas fa-plus"></i> Add Card Sale
+            </a>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- Filter Card -->
@@ -174,9 +179,9 @@ if ($res_cards) {
                             <th style="width: 50px;">#</th>
                             <th class="col-date">Date</th>
                             <th>Shift</th>
-                            <th>Batches / Entries</th>
-                            <th>Total Swipes (Cards)</th>
+                            <th>Entries</th>
                             <th>Gross Card Sale (Rs.)</th>
+                            <th>Difference (Rs.)</th>
                             <th>Service Charges (Rs.)</th>
                             <th>Net Bank Receivable (Rs.)</th>
                             <th style="width: 140px;">Actions</th>
@@ -212,18 +217,16 @@ if ($res_cards) {
                             </td>
                             <td>
                                 <span class="badge badge-secondary px-2 py-1">
-                                    <?php echo intval($row['total_entries']); ?> Batch Entries
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-info px-2 py-1 font-weight-bold">
-                                    <i class="fas fa-credit-card mr-1"></i><?php echo intval($row['total_cards']); ?> Cards
+                                    <?php echo intval($row['total_entries']); ?> Entries
                                 </span>
                             </td>
                             <td class="font-weight-bold text-dark">
                                 Rs. <?php echo number_format($row['total_gross'], 2); ?>
                             </td>
                             <td class="text-danger font-weight-bold">
+                                Rs. <?php echo number_format($row['total_difference'] ?? 0, 2); ?>
+                            </td>
+                            <td class="text-muted font-weight-bold">
                                 -Rs. <?php echo number_format($row['total_charges'], 2); ?>
                             </td>
                             <td>
@@ -233,6 +236,11 @@ if ($res_cards) {
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
+                                    <!-- View Details Modal -->
+                                    <button type="button" class="btn btn-info" onclick="viewDayCards('<?php echo $dateVal; ?>', <?php echo $shiftId; ?>, '<?php echo $displayDate; ?>', '<?php echo addslashes($shiftName); ?>')" title="View Card Transactions Breakdown">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+
                                     <!-- PDF Statement -->
                                     <a href="generate-pdf-card-sale.php?date=<?php echo urlencode($dateVal); ?>&shift_id=<?php echo $shiftId; ?>" target="_blank" class="btn btn-secondary" style="background:#04204e; border-color:#04204e;" title="Download / Print PDF">
                                         <i class="fas fa-file-pdf text-danger"></i>
@@ -276,13 +284,13 @@ if ($res_cards) {
                         <thead class="bg-light">
                             <tr>
                                 <th>#</th>
-                                <th>Card Machine (Bank)</th>
+                                <th>Machine Type (Bank)</th>
                                 <th>Batch No</th>
-                                <th>Nozzle / Item</th>
-                                <th>No. of Cards</th>
-                                <th>Gross Amount (Rs.)</th>
-                                <th>Fee %</th>
-                                <th>Service Charges (Rs.)</th>
+                                <th>Trace No</th>
+                                <th>Nozzle</th>
+                                <th>Amount (Rs.)</th>
+                                <th>Difference (Rs.)</th>
+                                <th>Bank Fee</th>
                                 <th>Net Receivable (Rs.)</th>
                             </tr>
                         </thead>
@@ -339,39 +347,36 @@ function viewDayCards(rawDate, shiftId, formattedDate, shiftName) {
     if (items.length === 0) {
         html = '<tr><td colspan="9" class="text-muted py-3">No card transaction details available.</td></tr>';
     } else {
-        var totCards = 0, totGross = 0, totFee = 0, totNet = 0;
+        var totEntries = 0, totGross = 0, totDiff = 0, totFee = 0, totNet = 0;
         for (var i = 0; i < items.length; i++) {
             var c = items[i];
-            var cards = parseInt(c.no_of_cards) || 0;
             var gross = parseFloat(c.amount) || 0;
+            var diff  = parseFloat(c.difference) || 0;
             var fee   = parseFloat(c.service_charges) || 0;
             var net   = parseFloat(c.net_amount) || 0;
-            totCards += cards; totGross += gross; totFee += fee; totNet += net;
+            totEntries++; totGross += gross; totDiff += diff; totFee += fee; totNet += net;
             
             var feePct = c.charges_percentage ? parseFloat(c.charges_percentage).toFixed(4) + '%' : '—';
-            var rateBadge = (c.rate_type === 'Credit') 
-                ? ' <span class="badge badge-warning ml-1" style="font-size:10px;"><i class="fas fa-file-invoice-dollar mr-1"></i>Credit Rate</span>' 
-                : ' <span class="badge badge-light border ml-1" style="font-size:10px;"><i class="fas fa-money-bill-wave mr-1 text-success"></i>Cash Rate</span>';
+            var traceNo = c.trace_no || '—';
 
             html += '<tr>' +
                 '<td>' + (i + 1) + '</td>' +
                 '<td><strong class="text-primary">' + (c.machine_name || 'Machine #' + c.card_machine_id) + '</strong></td>' +
                 '<td class="font-weight-bold text-monospace">' + (c.batch_no || '—') + '</td>' +
-                '<td>' + (c.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (c.item_name || 'Fuel') + ')</small>' + rateBadge + '</td>' +
-                '<td><span class="badge badge-info">' + cards + '</span></td>' +
+                '<td class="text-monospace">' + traceNo + '</td>' +
+                '<td>' + (c.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (c.item_name || 'Fuel') + ')</small></td>' +
                 '<td class="font-weight-bold">Rs. ' + gross.toFixed(2) + '</td>' +
-                '<td class="text-muted small">' + feePct + '</td>' +
-                '<td class="text-danger font-weight-bold">Rs. ' + fee.toFixed(2) + '</td>' +
+                '<td class="text-danger font-weight-bold">Rs. ' + diff.toFixed(2) + '</td>' +
+                '<td class="text-muted small">' + feePct + ' (Rs. ' + fee.toFixed(2) + ')</td>' +
                 '<td class="text-success font-weight-bold">Rs. ' + net.toFixed(2) + '</td>' +
             '</tr>';
         }
         
         html += '<tr class="bg-light font-weight-bold" style="font-size:13px;">' +
-            '<td colspan="4" class="text-right">SHIFT TOTALS:</td>' +
-            '<td class="text-info">' + totCards + ' Cards</td>' +
+            '<td colspan="5" class="text-right">SHIFT TOTALS (' + totEntries + ' Entries):</td>' +
             '<td>Rs. ' + totGross.toFixed(2) + '</td>' +
-            '<td>—</td>' +
-            '<td class="text-danger">Rs. ' + totFee.toFixed(2) + '</td>' +
+            '<td class="text-danger">Rs. ' + totDiff.toFixed(2) + '</td>' +
+            '<td class="text-muted">Rs. ' + totFee.toFixed(2) + '</td>' +
             '<td class="text-success">Rs. ' + totNet.toFixed(2) + '</td>' +
         '</tr>';
     }

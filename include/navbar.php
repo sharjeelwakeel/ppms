@@ -380,7 +380,6 @@ require_once __DIR__ . '/permissions.php';
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkAccounts">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/credit-sale-receivables.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Accounts Receivable (Credit Sale)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/payment-history.php"><i class="fas fa-history mr-1 text-primary"></i> Payment Receipts &amp; History</a>
                 </div>
             </li>
             <?php endif; ?>

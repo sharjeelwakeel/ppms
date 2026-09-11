@@ -35,10 +35,14 @@ if (empty($existing_rows)) {
 
 $current_shift_id = ($target_shift > 0) ? $target_shift : intval($existing_rows[0]['shift_id'] ?? 0);
 
-// Ensure rate_type column exists (self-healing migration)
-$chk_col = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'rate_type'");
+// Ensure trace_no and difference columns exist (self-healing migration)
+$chk_col = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'trace_no'");
 if ($chk_col && mysqli_num_rows($chk_col) == 0) {
-    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN rate_type ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash' AFTER item_id");
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN trace_no VARCHAR(64) DEFAULT NULL AFTER batch_no");
+}
+$chk_diff = mysqli_query($connection, "SHOW COLUMNS FROM tbl_meter_reading_card_sales LIKE 'difference'");
+if ($chk_diff && mysqli_num_rows($chk_diff) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_meter_reading_card_sales ADD COLUMN difference DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER amount");
 }
 
 // Fetch Nozzles with attached items
@@ -54,9 +58,9 @@ if ($q_noz) {
     }
 }
 
-// Fetch Card Machines with fee percentage
+// Fetch Card Machines with fee percentage and revenue charge
 $card_machines = [];
-$q_cm = mysqli_query($connection, "SELECT id, name, charges_percentage 
+$q_cm = mysqli_query($connection, "SELECT id, name, charges_percentage, revenue_charge 
                                    FROM tbl_card_machines 
                                    WHERE deleted_at IS NULL 
                                    ORDER BY name ASC");
@@ -81,12 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_date     = mysqli_real_escape_string($connection, $_POST['sale_date'] ?? $target_date);
     $new_shift_id = intval($_POST['shift_id'] ?? $current_shift_id);
 
-    $nozzle_ids    = $_POST['card_nozzle_id'] ?? [];
-    $machine_ids   = $_POST['card_machine_id'] ?? [];
-    $rate_types    = $_POST['card_rate_type'] ?? [];
-    $batch_nos     = $_POST['card_batch_no'] ?? [];
-    $card_counts   = $_POST['card_no_of_cards'] ?? [];
-    $amounts       = $_POST['card_amount'] ?? [];
+    $nozzle_ids   = $_POST['card_nozzle_id'] ?? [];
+    $machine_ids  = $_POST['card_machine_id'] ?? [];
+    $batch_nos    = $_POST['card_batch_no'] ?? [];
+    $trace_nos    = $_POST['card_trace_no'] ?? [];
+    $amounts      = $_POST['card_amount'] ?? [];
+    $differences  = $_POST['card_difference'] ?? [];
 
     if (empty($new_shift_id)) {
         $error_msg = 'Please select a Shift before updating.';
@@ -96,7 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_begin_transaction($connection);
         try {
             $del_shift_clause = ($current_shift_id > 0) ? " AND shift_id = '$current_shift_id'" : "";
-
 
             // Soft-delete previous rows for this date and shift
             $del_sql = "UPDATE tbl_meter_reading_card_sales SET deleted_at = NOW() 
@@ -108,45 +111,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             for ($i = 0; $i < count($machine_ids); $i++) {
                 $m_id      = intval($machine_ids[$i]);
                 $noz_id    = intval($nozzle_ids[$i] ?? 0);
-                $rate_type = (isset($rate_types[$i]) && $rate_types[$i] === 'Credit') ? 'Credit' : 'Cash';
                 $batch_no  = mysqli_real_escape_string($connection, trim($batch_nos[$i] ?? ''));
-                $cards     = intval($card_counts[$i] ?? 1);
+                $trace_no  = mysqli_real_escape_string($connection, trim($trace_nos[$i] ?? ''));
                 $amt       = floatval($amounts[$i] ?? 0);
 
                 // Calculate fee and net amount automatically from card machine settings
                 $fee_pct = 0.00;
+                $rev_pct = 0.00;
                 foreach ($card_machines as $cm_item) {
                     if ($cm_item['id'] == $m_id) {
                         $fee_pct = floatval($cm_item['charges_percentage'] ?? 0);
+                        $rev_pct = floatval($cm_item['revenue_charge'] ?? 0);
                         break;
                     }
                 }
                 $schg = round($amt * ($fee_pct / 100), 2);
                 $net  = round($amt - $schg, 2);
 
-                // Look up attached item_id and cash/credit rate from nozzle
+                // User entered difference or auto-calculated from machine revenue charge %
+                if (isset($differences[$i]) && trim($differences[$i]) !== '') {
+                    $diff = floatval($differences[$i]);
+                } else {
+                    $diff = round($amt * ($rev_pct / 100), 2);
+                }
+
+                // Look up attached item_id and cash rate from nozzle
                 $item_id   = 0;
                 $cash_rate = 0.00;
-                $cred_rate = 0.00;
                 foreach ($nozzles as $nz) {
                     if ($nz['id'] == $noz_id) {
                         $item_id   = intval($nz['item_id']);
                         $cash_rate = floatval($nz['cash_rate'] ?? 0);
-                        $cred_rate = floatval($nz['credit_rate'] ?? 0);
                         break;
                     }
                 }
-                $fuel_rate = ($rate_type === 'Credit' && $cred_rate > 0) ? $cred_rate : $cash_rate;
-
-                // Calculate dispensed petrol volume (Litres)
-                $qty = ($fuel_rate > 0) ? round($amt / $fuel_rate, 2) : 0.00;
+                $qty = ($cash_rate > 0) ? round($amt / $cash_rate, 2) : 0.00;
 
                 $ins_sql = "INSERT INTO tbl_meter_reading_card_sales 
                             (meter_reading_id, sale_date, shift_id, staff_id, card_machine_id, item_id, rate_type, 
-                             quantity, rate, amount, batch_no, service_charges, net_amount, nozzle_id, no_of_cards)
+                             quantity, rate, amount, difference, batch_no, trace_no, service_charges, net_amount, nozzle_id, no_of_cards)
                             VALUES 
-                            (0, '$new_date', '$new_shift_id', 0, '$m_id', '$item_id', 
-                             '$qty', '$fuel_rate', '$amt', '$batch_no', '$schg', '$net', '$noz_id', '$cards')";
+                            (0, '$new_date', '$new_shift_id', 0, '$m_id', '$item_id', 'Cash', 
+                             '$qty', '$cash_rate', '$amt', '$diff', '$batch_no', '$trace_no', '$schg', '$net', '$noz_id', 1)";
                 if (!mysqli_query($connection, $ins_sql)) {
                     throw new Exception("Error saving card transaction: " . mysqli_error($connection));
                 }
@@ -265,12 +271,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <table class="table table-bordered table-striped table-sm text-center mb-0" id="cardSalesTable" style="font-size: 13px;">
                         <thead>
                             <tr style="background: var(--primary-color); color: #fff;">
-                                <th style="width: 22%;">Nozzle <span class="text-danger">*</span></th>
-                                <th style="width: 20%;">Card Machine <span class="text-danger">*</span></th>
-                                <th style="width: 14%;">Rate Type</th>
-                                <th style="width: 16%;">Batch No</th>
-                                <th style="width: 10%;">Cards</th>
-                                <th style="width: 18%;">Amount (Rs.) <span class="text-danger">*</span></th>
+                                <th style="width: 20%;">Nozzle <span class="text-danger">*</span></th>
+                                <th style="width: 20%;">Machine Type <span class="text-danger">*</span></th>
+                                <th style="width: 15%;">Batch No</th>
+                                <th style="width: 15%;">Trace No</th>
+                                <th style="width: 15%;">Amount (Rs.) <span class="text-danger">*</span></th>
+                                <th style="width: 15%;">Difference</th>
                                 <th style="width: 50px;">Action</th>
                             </tr>
                         </thead>
@@ -290,12 +296,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-3 border-top">
                     <div class="d-flex align-items-center">
                         <div class="mr-4">
-                            <span class="text-muted small d-block font-weight-bold">TOTAL CARDS:</span>
-                            <span class="text-dark font-weight-bold" id="lblTotalCards">0 Cards</span>
+                            <span class="text-muted small d-block font-weight-bold">TOTAL ENTRIES:</span>
+                            <span class="text-dark font-weight-bold" id="lblTotalEntries">0 Entries</span>
                         </div>
                         <div class="mr-4">
                             <span class="text-muted small d-block font-weight-bold">TOTAL AMOUNT:</span>
                             <span class="text-primary font-weight-bold" style="font-size:16px;" id="lblTotalGross">Rs. 0.00</span>
+                        </div>
+                        <div class="mr-4">
+                            <span class="text-muted small d-block font-weight-bold">TOTAL DIFFERENCE:</span>
+                            <span class="text-danger font-weight-bold" style="font-size:16px;" id="lblTotalDiff">Rs. 0.00</span>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary font-weight-bold px-4">
@@ -339,9 +349,24 @@ $(document).ready(function() {
 function isCardRowActive($tr) {
     if (!$tr || $tr.length === 0) return false;
     var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
-    var machineId = $tr.find('select[name="card_machine_id[]"]').val() || '';
+    var noz = $tr.find('select[name="card_nozzle_id[]"]').val() || '';
+    var machineId = $tr.find('.card-machine-select').val() || '';
     var batch = ($tr.find('input[name="card_batch_no[]"]').val() || '').trim();
-    return (amt > 0 || machineId !== '' || batch !== '');
+    var trace = ($tr.find('input[name="card_trace_no[]"]').val() || '').trim();
+    return (amt > 0 || noz !== '' || machineId !== '' || batch !== '' || trace !== '');
+}
+
+function onRowMachineOrAmountChange(el) {
+    var $tr = $(el).closest('tr');
+    var $machSelect = $tr.find('.card-machine-select');
+    var revCharge = parseFloat($machSelect.find('option:selected').attr('data-revenue-charge')) || 0;
+    var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
+
+    // Auto-calculate Difference = Amount * (Revenue Charge % / 100)
+    var diff = (amt * (revCharge / 100)).toFixed(2);
+    $tr.find('.card-diff-field').val(diff);
+
+    calculateCardTotal();
 }
 
 function addCardRow() {
@@ -352,10 +377,10 @@ function addCardRowWithData(data) {
     var rowId = cardRowIdx++;
     var selectedMachineId = data ? data.card_machine_id : '';
     var selectedNozzleId  = data ? data.nozzle_id : '';
-    var selectedRateType  = data ? (data.rate_type || 'Cash') : 'Cash';
     var batchNoVal        = data ? (data.batch_no || '') : '';
-    var cardsVal          = data ? parseInt(data.no_of_cards) : 1;
+    var traceNoVal        = data ? (data.trace_no || '') : '';
     var amountVal         = data ? parseFloat(data.amount) : 0;
+    var diffVal           = data ? (data.difference !== undefined && data.difference !== null ? parseFloat(data.difference) : 0.00) : 0.00;
 
     var nozzleOptions = '<option value="">-- Select Nozzle --</option>';
     for (var j = 0; j < nozzlesData.length; j++) {
@@ -364,17 +389,24 @@ function addCardRowWithData(data) {
         nozzleOptions += '<option value="' + nz.id + '" ' + isNzSel + '>' + nz.name + '</option>';
     }
 
-    var machineOptions = '<option value="">-- Select Machine --</option>';
+    var machineOptions = '<option value="" data-revenue-charge="0">-- Select Machine --</option>';
     for (var i = 0; i < cardMachinesData.length; i++) {
         var cm = cardMachinesData[i];
+        var rev = parseFloat(cm.revenue_charge) || 0;
         var isSel = (cm.id == selectedMachineId) ? 'selected' : '';
-        machineOptions += '<option value="' + cm.id + '" ' + isSel + '>' + cm.name + '</option>';
+        machineOptions += '<option value="' + cm.id + '" data-revenue-charge="' + rev + '" ' + isSel + '>' + cm.name + '</option>';
     }
 
-    var rateTypeOptions = '<select name="card_rate_type[]" class="form-control form-control-sm font-weight-bold">' +
-        '<option value="Cash"' + (selectedRateType === 'Cash' ? ' selected' : '') + '>Cash Rate</option>' +
-        '<option value="Credit"' + (selectedRateType === 'Credit' ? ' selected' : '') + '>Credit Rate</option>' +
-    '</select>';
+    // If diffVal is 0 and amountVal > 0, calculate from machine revenue charge %
+    if (data && (!diffVal || diffVal === 0) && amountVal > 0 && selectedMachineId) {
+        for (var k = 0; k < cardMachinesData.length; k++) {
+            if (cardMachinesData[k].id == selectedMachineId) {
+                var rCharge = parseFloat(cardMachinesData[k].revenue_charge) || 0;
+                diffVal = parseFloat((amountVal * (rCharge / 100)).toFixed(2));
+                break;
+            }
+        }
+    }
 
     var rowHtml = '<tr id="card_row_' + rowId + '">' +
         '<td>' +
@@ -383,21 +415,21 @@ function addCardRowWithData(data) {
             '</select>' +
         '</td>' +
         '<td>' +
-            '<select name="card_machine_id[]" class="form-control form-control-sm">' +
+            '<select name="card_machine_id[]" class="form-control form-control-sm card-machine-select" onchange="onRowMachineOrAmountChange(this)">' +
                 machineOptions +
             '</select>' +
-        '</td>' +
-        '<td>' +
-            rateTypeOptions +
         '</td>' +
         '<td>' +
             '<input type="text" name="card_batch_no[]" class="form-control form-control-sm" placeholder="Batch No" value="' + batchNoVal + '">' +
         '</td>' +
         '<td>' +
-            '<input type="number" min="1" name="card_no_of_cards[]" class="form-control form-control-sm text-center" value="' + cardsVal + '" oninput="calculateCardTotal()">' +
+            '<input type="text" name="card_trace_no[]" class="form-control form-control-sm" placeholder="Trace No" value="' + traceNoVal + '">' +
         '</td>' +
         '<td>' +
-            '<input type="number" step="0.01" min="0" name="card_amount[]" class="form-control form-control-sm card-amount-field font-weight-bold text-primary" value="' + amountVal + '" oninput="calculateCardTotal()">' +
+            '<input type="number" step="0.01" min="0" name="card_amount[]" class="form-control form-control-sm card-amount-field font-weight-bold text-primary" value="' + amountVal + '" placeholder="0.00" oninput="onRowMachineOrAmountChange(this)">' +
+        '</td>' +
+        '<td>' +
+            '<input type="number" step="0.01" name="card_difference[]" class="form-control form-control-sm card-diff-field font-weight-bold text-danger" value="' + (diffVal || 0).toFixed(2) + '" placeholder="0.00" oninput="calculateCardTotal()">' +
         '</td>' +
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCardRow(this)"><i class="fas fa-trash-alt"></i></button></td>' +
         '</tr>';
@@ -416,17 +448,34 @@ function removeCardRow(btn) {
 }
 
 function calculateCardTotal() {
-    var totCards = 0, totAmount = 0;
+    var totEntries = 0, totAmount = 0, totDiff = 0;
     $('#cardSalesBody tr').each(function() {
-        totCards  += parseInt($(this).find('input[name="card_no_of_cards[]"]').val()) || 0;
-        totAmount += parseFloat($(this).find('.card-amount-field').val()) || 0;
+        var amt = parseFloat($(this).find('.card-amount-field').val()) || 0;
+        var diff = parseFloat($(this).find('.card-diff-field').val()) || 0;
+        var noz = $(this).find('select[name="card_nozzle_id[]"]').val() || '';
+        var mach = $(this).find('.card-machine-select').val() || '';
+        if (amt > 0 || noz !== '' || mach !== '') {
+            totEntries++;
+        }
+        totAmount += amt;
+        totDiff += diff;
     });
 
-    $('#lblTotalCards').text(totCards + ' Cards');
+    $('#lblTotalEntries').text(totEntries + ' Entries');
     $('#lblTotalGross').text('Rs. ' + totAmount.toFixed(2));
+    $('#lblTotalDiff').text('Rs. ' + totDiff.toFixed(2));
 }
 
 function validateAndCleanCardForm() {
+    // 0. Validate Sale Date
+    var saleDate = $('#sale_date').val();
+    if (!saleDate || saleDate.trim() === '') {
+        alert('Please select Sale Date before saving.');
+        $('#sale_date').focus().addClass('is-invalid');
+        return false;
+    }
+    $('#sale_date').removeClass('is-invalid');
+
     // 1. Automatically prune trailing blank/untouched rows
     while ($('#cardSalesBody tr').length > 1) {
         var $lastRow = $('#cardSalesBody tr:last-child');
@@ -450,7 +499,7 @@ function validateAndCleanCardForm() {
     $rows.each(function(idx) {
         var rowNum = idx + 1;
         var noz = $(this).find('select[name="card_nozzle_id[]"]').val();
-        var mach = $(this).find('select[name="card_machine_id[]"]').val();
+        var mach = $(this).find('.card-machine-select').val();
         var amt = parseFloat($(this).find('.card-amount-field').val()) || 0;
 
         if (!noz) {
@@ -460,8 +509,8 @@ function validateAndCleanCardForm() {
             return false;
         }
         if (!mach) {
-            alert('Please select a Card Machine on row #' + rowNum);
-            $(this).find('select[name="card_machine_id[]"]').focus();
+            alert('Please select a Machine Type on row #' + rowNum);
+            $(this).find('.card-machine-select').focus();
             isValid = false;
             return false;
         }

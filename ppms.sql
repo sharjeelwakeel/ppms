@@ -5218,11 +5218,34 @@ CREATE TABLE `tbl_meter_reading_card_sales` (
   `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `difference` decimal(12,2) NOT NULL DEFAULT 0.00,
   `batch_no` varchar(64) NOT NULL DEFAULT '',
+  `trace_no` varchar(64) DEFAULT NULL,
   `service_charges` decimal(10,2) NOT NULL DEFAULT 0.00,
   `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `nozzle_id` int(11) DEFAULT NULL,
   `no_of_cards` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_card_sale_settlements`
+--
+
+CREATE TABLE `tbl_card_sale_settlements` (
+  `id` int(11) NOT NULL,
+  `card_machine_id` int(11) NOT NULL,
+  `settlement_date` date NOT NULL,
+  `batch_no` varchar(64) NOT NULL,
+  `no_of_cards` int(11) NOT NULL DEFAULT 1,
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `charges_percentage` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `service_charges` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -5902,6 +5925,14 @@ ALTER TABLE `tbl_meter_reading_card_sales`
   ADD KEY `item_id` (`item_id`);
 
 --
+-- Indexes for table `tbl_card_sale_settlements`
+--
+ALTER TABLE `tbl_card_sale_settlements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `card_machine_id` (`card_machine_id`),
+  ADD KEY `settlement_date` (`settlement_date`);
+
+--
 -- Indexes for table `tbl_meter_reading_credit_sales`
 --
 ALTER TABLE `tbl_meter_reading_credit_sales`
@@ -6146,6 +6177,12 @@ ALTER TABLE `tbl_meter_readings`
 -- AUTO_INCREMENT for table `tbl_meter_reading_card_sales`
 --
 ALTER TABLE `tbl_meter_reading_card_sales`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_card_sale_settlements`
+--
+ALTER TABLE `tbl_card_sale_settlements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
