@@ -82,17 +82,10 @@ For each nozzle row:
 
 ### 4. Automatic Reversion on Meter Reading Deletion (`include/deletemeterreading.php`)
 - When a shift meter reading is deleted:
-  - The system iterates over all attached nozzles in `tbl_meter_reading_details`.
-  - If the nozzle is still at the closing reading, its running meter (`tbl_nozzles.start_reading`) reverts directly back to `last_reading` (or deducts `net_sale` if subsequent transactions occurred):
-    ```sql
-    UPDATE tbl_nozzles 
-    SET start_reading = CASE 
-        WHEN ROUND(start_reading, 2) = ROUND($current_reading, 2) THEN $last_reading 
-        ELSE GREATEST(start_reading - $net_sale, 0.00) 
-    END 
-    WHERE id = '$nozzle_id';
-    ```
-  - Cleans up the daily snapshot from `tbl_daily_nozzle_readings`.
+  - The record is soft-deleted (`UPDATE tbl_meter_readings SET deleted_at = NOW() WHERE id = '$id'`).
+  - For each affected nozzle, the system queries the **latest active meter reading** remaining in the system (`WHERE deleted_at IS NULL ORDER BY date DESC, shift_id DESC, id DESC LIMIT 1`) and synchronizes `tbl_nozzles.start_reading = latest_reading.current_reading`.
+  - If no active meter readings remain for that nozzle, `tbl_nozzles.start_reading` safely reverts to the baseline opening reading (`last_reading`).
+
 
 ---
 

@@ -1,6 +1,9 @@
-# Daily Nozzle Readings & Dip Chart Synchronization
+# Daily Nozzle Readings & Dip Chart Synchronization (Archived / Decommissioned)
+
+> **Note**: This table has been decommissioned. In the modern PPMS architecture ([`architecture.md`](../architecture.md)), historical shift readings, net sales, and tank dip usages are queried directly from [`tbl_meter_reading_details`](meter_reading.md) as the single source of truth.
 
 ## 1. Overview & Purpose
+
 
 In petrol pump management, reconciling physical storage tank levels (via Tank Dips) against dispensed fuel requires **accurate, historical day-to-day nozzle meter readings**.
 

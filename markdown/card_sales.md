@@ -65,7 +65,7 @@ Each card transaction row records exactly 6 fields:
   $$\text{net\_amount} = \text{amount} - \text{service\_charges}$$
 
 ### 3. Nozzle Reading Decoupling
-Physical nozzle meter counters and shift usage rely exclusively on Detail Meter Readings (`tbl_daily_nozzle_readings` and shift closing readings). Card sales record monetary settlements and revenue differences without mutating nozzle running start readings.
+Physical nozzle meter counters and shift usage rely exclusively on Detail Meter Readings (`tbl_meter_reading_details` and shift closing readings). Card sales record monetary settlements and revenue differences without mutating nozzle running start readings.
 
 ### 4. Automatic Row Expansion & Fast Data Entry ("Add New Row")
 - **Spreadsheet-Style Auto-Spawn**: Typing or selecting in the last row auto-spawns a new blank row.
