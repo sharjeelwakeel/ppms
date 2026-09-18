@@ -5,6 +5,21 @@ if (!file_exists('include/navbar.php')) {
     $prefix = '../';
 }
 require_once __DIR__ . '/permissions.php';
+
+// Fetch current user display name and role
+$nav_user_name = 'Account';
+$nav_user_role = 'User';
+if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
+    $nav_uid = intval($_SESSION['loggedInUser']);
+    $u_res = mysqli_query($connection, "SELECT a.username, a.type, r.name as role_name 
+                                         FROM tbl_accounts a 
+                                         LEFT JOIN tbl_roles r ON a.role_id = r.id 
+                                         WHERE a.id = '$nav_uid' LIMIT 1");
+    if ($u_res && ($u_row = mysqli_fetch_assoc($u_res))) {
+        $nav_user_name = !empty($u_row['username']) ? $u_row['username'] : 'Account';
+        $nav_user_role = !empty($u_row['role_name']) ? $u_row['role_name'] : (!empty($u_row['type']) ? ucfirst($u_row['type']) : 'User');
+    }
+}
 ?>
 <style>
 /* Main Navbar - Guaranteed Inline Layout on All Screens (>= 768px) */
@@ -101,21 +116,27 @@ require_once __DIR__ . '/permissions.php';
         display: flex !important;
         align-items: center !important;
     }
-    .navbar.main-navbar .btn-logout {
+    .navbar.main-navbar .user-profile-btn {
         display: inline-flex !important;
         align-items: center !important;
         width: auto !important;
         white-space: nowrap !important;
-        padding: 0.22rem 0.5rem !important;
+        padding: 0.22rem 0.55rem !important;
         font-size: 0.76rem !important;
-        border-radius: 4px !important;
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
         color: #ffffff !important;
-        background: transparent !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        transition: all 0.15s ease !important;
     }
-    .navbar.main-navbar .btn-logout:hover {
-        background-color: #ffffff !important;
-        color: var(--primary-color) !important;
+    .navbar.main-navbar .user-profile-btn:hover,
+    .navbar.main-navbar .user-profile-dropdown.show .user-profile-btn {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        border-color: rgba(255, 255, 255, 0.6) !important;
+        color: #ffffff !important;
+        text-decoration: none !important;
     }
 }
 
@@ -137,8 +158,8 @@ require_once __DIR__ . '/permissions.php';
         font-size: 0.68rem !important;
         margin-right: 0.12rem !important;
     }
-    .navbar.main-navbar .btn-logout {
-        padding: 0.18rem 0.4rem !important;
+    .navbar.main-navbar .user-profile-btn {
+        padding: 0.18rem 0.45rem !important;
         font-size: 0.72rem !important;
     }
 }
@@ -230,13 +251,16 @@ require_once __DIR__ . '/permissions.php';
         margin-top: 8px !important;
         width: 100% !important;
     }
-    .navbar.main-navbar .btn-logout {
+    .navbar.main-navbar .user-profile-btn {
         width: 100% !important;
         padding: 8px 12px !important;
         font-size: 0.88rem !important;
-        text-align: center !important;
-        display: block !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
         color: #ffffff !important;
+        border-radius: 6px !important;
+        background: rgba(255, 255, 255, 0.1) !important;
     }
 }
 </style>
@@ -344,7 +368,6 @@ require_once __DIR__ . '/permissions.php';
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php"><i class="fas fa-boxes mr-1 text-muted"></i> Products</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Purchases (Inflow)</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Sales (Outflow)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php"><i class="fas fa-file-invoice mr-1 text-info"></i> Stock Report</a>
                 </div>
             </li>
             <?php endif; ?>
@@ -412,10 +435,32 @@ require_once __DIR__ . '/permissions.php';
             </li>
             <?php endif; ?>
         </ul>
+
+        <!-- User Profile Dropdown -->
         <div class="nav-action-wrapper">
-            <a href="<?php echo $prefix; ?>include/logout.php" class="btn btn-outline-light btn-sm btn-logout font-weight-bold">
-                <i class="fas fa-sign-out-alt mr-1"></i> Logout
-            </a>
+            <div class="dropdown user-profile-dropdown">
+                <a class="user-profile-btn dropdown-toggle" href="#" id="navbarDropdownProfile" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-user-circle mr-1 text-warning"></i>
+                    <span class="font-weight-bold mr-1"><?php echo htmlspecialchars($nav_user_name); ?></span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="navbarDropdownProfile" style="min-width: 210px; border-radius: 8px;">
+                    <div class="px-3 py-2 bg-light border-bottom rounded-top" style="font-size: 12px;">
+                        <div class="font-weight-bold text-dark"><i class="fas fa-user mr-1 text-primary"></i> <?php echo htmlspecialchars($nav_user_name); ?></div>
+                        <div class="text-muted" style="font-size: 11px;"><i class="fas fa-shield-alt mr-1 text-success"></i> <?php echo htmlspecialchars($nav_user_role); ?></div>
+                    </div>
+
+                    <?php if (has_permission('settings', 'show') || has_permission('settings', 'edit')): ?>
+                    <a class="dropdown-item py-2" href="<?php echo $prefix; ?>settings/station-settings.php">
+                        <i class="fas fa-cogs mr-2 text-primary"></i> Station Settings
+                    </a>
+                    <?php endif; ?>
+
+                    <div class="dropdown-divider my-1"></div>
+                    <a class="dropdown-item py-2 text-danger font-weight-bold" href="<?php echo $prefix; ?>include/logout.php">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </nav>

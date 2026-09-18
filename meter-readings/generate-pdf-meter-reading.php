@@ -2,6 +2,10 @@
 require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
+require '../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     header('Location: meter-reading-list.php'); exit;
@@ -115,13 +119,27 @@ body {
 
 /* Document header */
 .doc-header {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: <?php echo $hasLogo ? 'space-between' : 'center'; ?>;
+    text-align: <?php echo $hasLogo ? 'left' : 'center'; ?>;
     border-bottom: 2px solid var(--primary-color);
     padding-bottom: 8px;
     margin-bottom: 12px;
+    gap: 16px;
 }
-.doc-header h1 { font-size: 16px; color: var(--primary-color); font-weight: bold; }
-.doc-header p  { font-size: 11px; color: #555; margin-top: 2px; }
+.doc-header-text {
+    flex: 1;
+}
+.doc-header-logo {
+    max-height: 55px;
+    max-width: 140px;
+    object-fit: contain;
+}
+.doc-header h1 { font-size: 17px; color: var(--primary-color); font-weight: bold; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+.doc-header .doc-tagline { font-size: 11px; color: #444; font-weight: 600; margin-top: 1px; }
+.doc-header .doc-meta { font-size: 10px; color: #666; margin-top: 2px; }
+.doc-header .doc-title { font-size: 11.5px; color: #0284c7; font-weight: bold; margin-top: 3px; }
 
 /* Info grid */
 .info-grid {
@@ -308,8 +326,27 @@ body {
 
     <!-- Document header -->
     <div class="doc-header">
-        <h1>PPMS &mdash; Petrol Pump Management System</h1>
-        <p>Meter Reading Report &nbsp;&bull;&nbsp; Reading #<?php echo $id; ?></p>
+        <?php if ($hasLogo): ?>
+            <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" class="doc-header-logo">
+        <?php endif; ?>
+        <div class="doc-header-text">
+            <h1><?php echo htmlspecialchars($station_settings['pump_name']); ?></h1>
+            <?php if (!empty($station_settings['tagline'])): ?>
+                <div class="doc-tagline"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+            <?php endif; ?>
+            <div class="doc-meta">
+                <?php if (!empty($station_settings['address'])): ?>
+                    <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                <?php endif; ?>
+                <?php if (!empty($station_settings['phone'])): ?>
+                    <span> &nbsp;&bull;&nbsp; <i class="fas fa-phone"></i> <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                <?php endif; ?>
+                <?php if (!empty($station_settings['ntn_no'])): ?>
+                    <span> &nbsp;&bull;&nbsp; NTN: <?php echo htmlspecialchars($station_settings['ntn_no']); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="doc-title">Shift Meter Reading &amp; Sales Settlement Report &mdash; Reading #<?php echo $id; ?></div>
+        </div>
     </div>
 
     <!-- Info grid -->

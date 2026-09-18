@@ -9,6 +9,10 @@ if (!isset($_SESSION['loggedInUser'])) {
 
 require_once '../include/config.php';
 require_once '../include/permissions.php';
+require_once '../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 check_access('credit_sales', 'show');
 
@@ -221,11 +225,28 @@ if ($res) {
     <table class="header-table">
         <tr>
             <td style="width: 65%;">
-                <div class="station-title">Petrol Pump Management System</div>
-                <div class="report-title">Daily Credit Sales Statement</div>
-                <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Station Operations &bull; Client Credit Slips Manifest</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <?php if ($hasLogo): ?>
+                        <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" style="max-height: 48px; max-width: 120px; object-fit: contain;">
+                    <?php endif; ?>
+                    <div>
+                        <div class="station-title"><?php echo htmlspecialchars($station_settings['pump_name']); ?></div>
+                        <?php if (!empty($station_settings['tagline'])): ?>
+                            <div style="font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 1px;"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+                        <?php endif; ?>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                            <?php if (!empty($station_settings['address'])): ?>
+                                <span><?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($station_settings['phone'])): ?>
+                                <span> &bull; Tel: <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="report-title">Daily Credit Sales Statement</div>
+                    </div>
+                </div>
             </td>
-            <td style="width: 35%; text-align: right;">
+            <td style="width: 35%; text-align: right; vertical-align: top;">
                 <div style="font-size: 11px; font-weight: bold;">Date: <span style="color: #04204e; font-size: 13px;"><?php echo $display_date; ?></span></div>
                 <?php if (!empty($shift_name)): ?>
                 <div style="font-size: 10.5px; font-weight: bold; color: #04204e; margin-top: 1px;">Shift: <span><?php echo htmlspecialchars($shift_name); ?></span></div>

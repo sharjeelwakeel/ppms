@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require '../include/card_helper.php';
 
 check_access('card_sales', 'edit');
 
@@ -109,11 +110,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             for ($i = 0; $i < count($machine_ids); $i++) {
-                $m_id      = intval($machine_ids[$i]);
-                $noz_id    = intval($nozzle_ids[$i] ?? 0);
-                $batch_no  = mysqli_real_escape_string($connection, trim($batch_nos[$i] ?? ''));
-                $trace_no  = mysqli_real_escape_string($connection, trim($trace_nos[$i] ?? ''));
-                $amt       = floatval($amounts[$i] ?? 0);
+                $m_id   = intval($machine_ids[$i]);
+                $noz_id = intval($nozzle_ids[$i] ?? 0);
+                if ($m_id <= 0) {
+                    continue;
+                }
+
+                $user_batch = trim($batch_nos[$i] ?? '');
+                if (empty($user_batch)) {
+                    throw new Exception("Please enter a Batch Number on row " . ($i + 1));
+                }
+                $batch_no = mysqli_real_escape_string($connection, $user_batch);
+                $trace_no = mysqli_real_escape_string($connection, trim($trace_nos[$i] ?? ''));
+                $amt      = floatval($amounts[$i] ?? 0);
 
                 // Calculate fee and net amount automatically from card machine settings
                 $fee_pct = 0.00;
@@ -205,6 +214,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .summary-badge-box {
             background:#eef2ff; border-radius:8px; border:1px solid #c7d2fe; padding:12px 18px;
         }
+        .bg-readonly-batch {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -214,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="page-header">
         <div>
             <h4><i class="fas fa-edit mr-2 text-warning"></i> Edit Card Sale Reading</h4>
-            <small class="text-white-50">Editing card transactions for <?php echo date('d-m-Y', strtotime($target_date)); ?></small>
+            <small class="text-white-50">Edit card sales, trace numbers, differences, and amounts for <?php echo htmlspecialchars($target_date); ?></small>
         </div>
         <a href="card-sales-list.php" class="btn btn-outline-light btn-sm font-weight-bold">
             <i class="fas fa-arrow-left mr-1"></i> Back to List
@@ -229,30 +244,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 
     <form method="POST" id="cardSaleForm" onsubmit="return validateAndCleanCardForm()">
-        <!-- Date Card -->
+        <!-- Date Selection Card -->
         <div class="form-card mb-3">
             <div class="form-card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-calendar-alt mr-2"></i> Transaction Date</span>
+                <span><i class="fas fa-calendar-alt mr-2"></i> Transaction Details</span>
             </div>
             <div class="p-3">
                 <div class="row align-items-center">
                     <div class="col-md-3 col-sm-6">
                         <label class="font-weight-bold text-dark mb-1"><i class="fas fa-calendar-day mr-1 text-primary"></i> Sale Date <span class="text-danger">*</span></label>
-                        <input type="date" name="sale_date" id="sale_date" class="form-control font-weight-bold" value="<?php echo htmlspecialchars($target_date); ?>" required>
+                        <input type="date" name="sale_date" id="sale_date" class="form-control font-weight-bold" value="<?php echo htmlspecialchars($_POST['sale_date'] ?? $target_date); ?>" required>
                     </div>
                     <div class="col-md-3 col-sm-6 mt-3 mt-sm-0">
                         <label class="font-weight-bold text-dark mb-1"><i class="fas fa-clock mr-1 text-primary"></i> Shift <span class="text-danger">*</span></label>
                         <select name="shift_id" id="shift_id" class="form-control font-weight-bold" required>
                             <option value="">-- Select Shift --</option>
                             <?php foreach ($shifts as $sh): ?>
-                                <option value="<?php echo $sh['id']; ?>" <?php echo ($current_shift_id == $sh['id']) ? 'selected' : ''; ?>>
+                                <option value="<?php echo $sh['id']; ?>" <?php echo (($current_shift_id == $sh['id']) ? 'selected' : ''); ?>>
                                     <?php echo htmlspecialchars($sh['name']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-6 col-sm-12 mt-3 mt-md-0 text-md-right text-muted small">
-                        <span class="badge badge-primary px-2 py-1"><i class="fas fa-credit-card mr-1"></i> Bank POS Card Sales Entry</span>
+                        <span class="badge badge-primary px-2 py-1"><i class="fas fa-edit mr-1"></i> Updating Existing Card Sales</span>
                     </div>
                 </div>
             </div>
@@ -273,7 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <tr style="background: var(--primary-color); color: #fff;">
                                 <th style="width: 20%;">Nozzle <span class="text-danger">*</span></th>
                                 <th style="width: 20%;">Machine Type <span class="text-danger">*</span></th>
-                                <th style="width: 15%;">Batch No</th>
+                                <th style="width: 15%;">Batch No <span class="text-danger">*</span></th>
                                 <th style="width: 15%;">Trace No</th>
                                 <th style="width: 15%;">Amount (Rs.) <span class="text-danger">*</span></th>
                                 <th style="width: 15%;">Difference</th>
@@ -281,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </tr>
                         </thead>
                         <tbody id="cardSalesBody">
-                            <!-- Injected via JS -->
+                            <!-- Rows injected via JS -->
                         </tbody>
                     </table>
                 </div>
@@ -294,21 +309,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Bottom Summary & Action -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-3 border-top">
-                    <div class="d-flex align-items-center">
-                        <div class="mr-4">
+                    <div class="d-flex align-items-center flex-wrap">
+                        <div class="mr-4 my-1">
                             <span class="text-muted small d-block font-weight-bold">TOTAL ENTRIES:</span>
                             <span class="text-dark font-weight-bold" id="lblTotalEntries">0 Entries</span>
                         </div>
-                        <div class="mr-4">
+                        <div class="mr-4 my-1">
                             <span class="text-muted small d-block font-weight-bold">TOTAL AMOUNT:</span>
                             <span class="text-primary font-weight-bold" style="font-size:16px;" id="lblTotalGross">Rs. 0.00</span>
                         </div>
-                        <div class="mr-4">
+                        <div class="mr-4 my-1">
                             <span class="text-muted small d-block font-weight-bold">TOTAL DIFFERENCE:</span>
                             <span class="text-danger font-weight-bold" style="font-size:16px;" id="lblTotalDiff">Rs. 0.00</span>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary font-weight-bold px-4">
+                    <button type="submit" class="btn btn-primary font-weight-bold px-4 my-1">
                         <i class="fas fa-save mr-1"></i> Update Card Sales
                     </button>
                 </div>
@@ -326,11 +341,16 @@ var nozzlesData       = <?php echo json_encode($nozzles); ?>;
 var cardMachinesData  = <?php echo json_encode($card_machines); ?>;
 var existingCardsData = <?php echo json_encode($existing_rows); ?>;
 var cardRowIdx = 0;
+var machineLastBatch = {};
 
 $(document).ready(function() {
     if (existingCardsData && existingCardsData.length > 0) {
         for (var i = 0; i < existingCardsData.length; i++) {
-            addCardRowWithData(existingCardsData[i]);
+            var item = existingCardsData[i];
+            if (item.card_machine_id && item.batch_no) {
+                machineLastBatch[item.card_machine_id] = item.batch_no;
+            }
+            addCardRowWithData(item);
         }
     } else {
         addCardRow();
@@ -351,16 +371,34 @@ function isCardRowActive($tr) {
     var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
     var noz = $tr.find('select[name="card_nozzle_id[]"]').val() || '';
     var machineId = $tr.find('.card-machine-select').val() || '';
-    var batch = ($tr.find('input[name="card_batch_no[]"]').val() || '').trim();
     var trace = ($tr.find('input[name="card_trace_no[]"]').val() || '').trim();
-    return (amt > 0 || noz !== '' || machineId !== '' || batch !== '' || trace !== '');
+    var batch = ($tr.find('.card-batch-field').val() || '').trim();
+    return (amt > 0 || noz !== '' || machineId !== '' || trace !== '' || batch !== '');
+}
+
+function onRowBatchInput(el) {
+    var $tr = $(el).closest('tr');
+    var mId = $tr.find('.card-machine-select').val();
+    var val = $(el).val().trim();
+    if (mId && val) {
+        machineLastBatch[mId] = val;
+    }
 }
 
 function onRowMachineOrAmountChange(el) {
     var $tr = $(el).closest('tr');
     var $machSelect = $tr.find('.card-machine-select');
+    var machineId = $machSelect.val();
     var revCharge = parseFloat($machSelect.find('option:selected').attr('data-revenue-charge')) || 0;
     var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
+
+    // Suggest last typed batch for this machine if current row's batch is empty
+    if (machineId && machineLastBatch[machineId]) {
+        var $batchField = $tr.find('.card-batch-field');
+        if (!$batchField.val().trim()) {
+            $batchField.val(machineLastBatch[machineId]);
+        }
+    }
 
     // Auto-calculate Difference = Amount * (Revenue Charge % / 100)
     var diff = (amt * (revCharge / 100)).toFixed(2);
@@ -377,7 +415,7 @@ function addCardRowWithData(data) {
     var rowId = cardRowIdx++;
     var selectedMachineId = data ? data.card_machine_id : '';
     var selectedNozzleId  = data ? data.nozzle_id : '';
-    var batchNoVal        = data ? (data.batch_no || '') : '';
+    var batchNoVal        = data ? (data.batch_no || '') : (machineLastBatch[selectedMachineId] || '');
     var traceNoVal        = data ? (data.trace_no || '') : '';
     var amountVal         = data ? parseFloat(data.amount) : 0;
     var diffVal           = data ? (data.difference !== undefined && data.difference !== null ? parseFloat(data.difference) : 0.00) : 0.00;
@@ -420,7 +458,7 @@ function addCardRowWithData(data) {
             '</select>' +
         '</td>' +
         '<td>' +
-            '<input type="text" name="card_batch_no[]" class="form-control form-control-sm" placeholder="Batch No" value="' + batchNoVal + '">' +
+            '<input type="text" name="card_batch_no[]" class="form-control form-control-sm text-monospace text-center card-batch-field font-weight-bold" placeholder="Batch #" value="' + batchNoVal + '" oninput="onRowBatchInput(this)">' +
         '</td>' +
         '<td>' +
             '<input type="text" name="card_trace_no[]" class="form-control form-control-sm" placeholder="Trace No" value="' + traceNoVal + '">' +
@@ -498,9 +536,10 @@ function validateAndCleanCardForm() {
     var isValid = true;
     $rows.each(function(idx) {
         var rowNum = idx + 1;
-        var noz = $(this).find('select[name="card_nozzle_id[]"]').val();
-        var mach = $(this).find('.card-machine-select').val();
-        var amt = parseFloat($(this).find('.card-amount-field').val()) || 0;
+        var noz   = $(this).find('select[name="card_nozzle_id[]"]').val();
+        var mach  = $(this).find('.card-machine-select').val();
+        var batch = ($(this).find('.card-batch-field').val() || '').trim();
+        var amt   = parseFloat($(this).find('.card-amount-field').val()) || 0;
 
         if (!noz) {
             alert('Please select a Nozzle on row #' + rowNum);
@@ -511,6 +550,12 @@ function validateAndCleanCardForm() {
         if (!mach) {
             alert('Please select a Machine Type on row #' + rowNum);
             $(this).find('.card-machine-select').focus();
+            isValid = false;
+            return false;
+        }
+        if (!batch) {
+            alert('Please enter a Batch Number on row #' + rowNum);
+            $(this).find('.card-batch-field').focus();
             isValid = false;
             return false;
         }

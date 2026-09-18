@@ -30,7 +30,8 @@ function get_system_modules() {
         'roles'          => 'Roles & Permissions',
         'users'          => 'System Users / Accounts',
         'accounts'       => 'Accounts & Receivables',
-        'reports'        => 'Reports & Analytics'
+        'reports'        => 'Reports & Analytics',
+        'settings'       => 'Station Settings'
     ];
 }
 

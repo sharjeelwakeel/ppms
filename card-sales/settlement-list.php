@@ -6,18 +6,21 @@ require '../include/permissions.php';
 
 check_access('card_sales', 'show');
 
-// Self-healing migration for tbl_card_sale_settlements
+// Self-healing migration for tbl_card_sale_settlements & auxiliary columns
 $chk_tbl = mysqli_query($connection, "SHOW TABLES LIKE 'tbl_card_sale_settlements'");
 if ($chk_tbl && mysqli_num_rows($chk_tbl) == 0) {
     mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
       `id` INT(11) NOT NULL AUTO_INCREMENT,
       `card_machine_id` INT(11) NOT NULL,
       `settlement_date` DATE NOT NULL,
+      `shift_id` INT(11) NOT NULL DEFAULT 0,
       `batch_no` VARCHAR(64) NOT NULL,
       `no_of_cards` INT(11) NOT NULL DEFAULT 1,
       `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
       `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
       `service_charges` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      `revenue_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+      `revenue_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
       `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
       `notes` TEXT DEFAULT NULL,
       `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,13 +28,37 @@ if ($chk_tbl && mysqli_num_rows($chk_tbl) == 0) {
       PRIMARY KEY (`id`),
       KEY `idx_card_machine_id` (`card_machine_id`),
       KEY `idx_settlement_date` (`settlement_date`),
+      KEY `idx_shift_id` (`shift_id`),
       KEY `idx_deleted_at` (`deleted_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
+} else {
+    $chk_col = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_sale_settlements LIKE 'shift_id'");
+    if ($chk_col && mysqli_num_rows($chk_col) == 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_card_sale_settlements ADD COLUMN shift_id INT(11) NOT NULL DEFAULT 0 AFTER settlement_date, ADD KEY idx_shift_id (shift_id)");
+    }
+    $chk_rev_pct = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_sale_settlements LIKE 'revenue_percentage'");
+    if ($chk_rev_pct && mysqli_num_rows($chk_rev_pct) == 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_card_sale_settlements ADD COLUMN revenue_percentage DECIMAL(8,4) NOT NULL DEFAULT 0.0000 AFTER service_charges");
+    }
+    $chk_rev_amt = mysqli_query($connection, "SHOW COLUMNS FROM tbl_card_sale_settlements LIKE 'revenue_amount'");
+    if ($chk_rev_amt && mysqli_num_rows($chk_rev_amt) == 0) {
+        mysqli_query($connection, "ALTER TABLE tbl_card_sale_settlements ADD COLUMN revenue_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER revenue_percentage");
+    }
+}
+
+// Fetch active shifts for filter
+$shifts = [];
+$q_sh = mysqli_query($connection, "SELECT id, name FROM tbl_shifts WHERE status = 'Active' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY id ASC");
+if ($q_sh) {
+    while ($r = mysqli_fetch_assoc($q_sh)) {
+        $shifts[] = $r;
+    }
 }
 
 // Filter handling
-$from_date = $_GET['from_date'] ?? '';
-$to_date   = $_GET['to_date'] ?? '';
+$from_date    = $_GET['from_date'] ?? '';
+$to_date      = $_GET['to_date'] ?? '';
+$filter_shift = intval($_GET['shift_id'] ?? 0);
 
 $where = "(s.deleted_at IS NULL OR s.deleted_at = '0000-00-00 00:00:00')";
 if (!empty($from_date)) {
@@ -42,6 +69,9 @@ if (!empty($to_date)) {
     $to_safe = mysqli_real_escape_string($connection, $to_date);
     $where .= " AND s.settlement_date <= '$to_safe'";
 }
+if ($filter_shift > 0) {
+    $where .= " AND s.shift_id = '$filter_shift'";
+}
 
 // Summary Metrics
 $sql_summary = "SELECT 
@@ -49,18 +79,24 @@ $sql_summary = "SELECT
                   COALESCE(SUM(s.no_of_cards), 0) AS total_cards,
                   COALESCE(SUM(s.amount), 0) AS total_gross,
                   COALESCE(SUM(s.service_charges), 0) AS total_charges,
+                  COALESCE(SUM(s.revenue_amount), 0) AS total_revenue,
                   COALESCE(SUM(s.net_amount), 0) AS total_net
                 FROM tbl_card_sale_settlements s
                 WHERE $where";
 $res_summary = mysqli_query($connection, $sql_summary);
 $metrics = mysqli_fetch_assoc($res_summary) ?: [
-    'total_settlements' => 0, 'total_cards' => 0, 'total_gross' => 0, 'total_charges' => 0, 'total_net' => 0
+    'total_settlements' => 0, 'total_cards' => 0, 'total_gross' => 0, 'total_charges' => 0, 'total_revenue' => 0, 'total_net' => 0
 ];
 
 // Main Listing Query
-$sql_list = "SELECT s.*, cm.name AS machine_name, cm.charges_percentage AS machine_fee_rate
+$sql_list = "SELECT s.*, 
+                    cm.name AS machine_name, 
+                    cm.charges_percentage AS machine_fee_rate,
+                    cm.revenue_charge AS machine_rev_rate,
+                    sh.name AS shift_name
              FROM tbl_card_sale_settlements s
              LEFT JOIN tbl_card_machines cm ON (s.card_machine_id = cm.id)
+             LEFT JOIN tbl_shifts sh ON (s.shift_id = sh.id)
              WHERE $where
              ORDER BY s.settlement_date DESC, s.id DESC";
 $res_list = mysqli_query($connection, $sql_list);
@@ -156,25 +192,31 @@ $canDelete = has_permission('card_sales', 'delete');
 
     <!-- Metric Cards -->
     <div class="row">
-        <div class="col-xl-3 col-md-6">
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
             <div class="metric-card">
                 <div class="metric-label">Total Settlements</div>
-                <div class="metric-value text-dark"><?php echo intval($metrics['total_settlements']); ?> <small class="text-muted font-weight-normal" style="font-size:12px;">Batches</small></div>
+                <div class="metric-value text-dark"><?php echo intval($metrics['total_settlements']); ?> <small class="text-muted font-weight-normal" style="font-size:11px;">Batches</small></div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6">
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
             <div class="metric-card accent-blue">
                 <div class="metric-label">Total Cards / Swipes</div>
-                <div class="metric-value text-primary"><?php echo intval($metrics['total_cards']); ?> <small class="text-muted font-weight-normal" style="font-size:12px;">Cards</small></div>
+                <div class="metric-value text-primary"><?php echo intval($metrics['total_cards']); ?> <small class="text-muted font-weight-normal" style="font-size:11px;">Cards</small></div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="metric-card accent-red">
-                <div class="metric-label">Gross Settled Amount</div>
+        <div class="col-xl-3 col-md-4 col-sm-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Total Pure Sales</div>
                 <div class="metric-value text-dark">Rs. <?php echo number_format($metrics['total_gross'], 2); ?></div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6">
+        <div class="col-xl-2 col-md-6 col-sm-6 mb-3">
+            <div class="metric-card accent-red">
+                <div class="metric-label">Bank Service Fees</div>
+                <div class="metric-value text-danger">-Rs. <?php echo number_format($metrics['total_charges'], 2); ?></div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-sm-6 mb-3">
             <div class="metric-card accent-green">
                 <div class="metric-label">Net Bank Receivable</div>
                 <div class="metric-value text-success">Rs. <?php echo number_format($metrics['total_net'], 2); ?></div>
@@ -187,23 +229,33 @@ $canDelete = has_permission('card_sales', 'delete');
         <div class="card-body py-3">
             <form method="GET" class="form-inline d-flex flex-wrap justify-content-between align-items-center">
                 <div class="d-flex align-items-center flex-wrap">
-                    <label class="mr-2 font-weight-bold text-muted small"><i class="fas fa-calendar-alt mr-1"></i> From Date:</label>
+                    <label class="mr-2 font-weight-bold text-muted small"><i class="fas fa-calendar-alt mr-1"></i> From:</label>
                     <input type="date" name="from_date" class="form-control form-control-sm mr-3 mb-2 mb-md-0" value="<?php echo htmlspecialchars($from_date); ?>">
                     
-                    <label class="mr-2 font-weight-bold text-muted small"><i class="fas fa-calendar-alt mr-1"></i> To Date:</label>
+                    <label class="mr-2 font-weight-bold text-muted small"><i class="fas fa-calendar-alt mr-1"></i> To:</label>
                     <input type="date" name="to_date" class="form-control form-control-sm mr-3 mb-2 mb-md-0" value="<?php echo htmlspecialchars($to_date); ?>">
                     
+                    <label class="mr-2 font-weight-bold text-muted small"><i class="fas fa-clock mr-1"></i> Shift:</label>
+                    <select name="shift_id" class="form-control form-control-sm mr-3 mb-2 mb-md-0 font-weight-bold">
+                        <option value="0">All Shifts</option>
+                        <?php foreach ($shifts as $sh): ?>
+                            <option value="<?php echo $sh['id']; ?>" <?php echo ($filter_shift == $sh['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($sh['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
                     <button type="submit" class="btn btn-primary btn-sm px-3 mr-2 mb-2 mb-md-0">
                         <i class="fas fa-filter mr-1"></i> Filter
                     </button>
-                    <?php if (!empty($from_date) || !empty($to_date)): ?>
+                    <?php if (!empty($from_date) || !empty($to_date) || $filter_shift > 0): ?>
                     <a href="settlement-list.php" class="btn btn-outline-secondary btn-sm mb-2 mb-md-0">
                         <i class="fas fa-times mr-1"></i> Clear
                     </a>
                     <?php endif; ?>
                 </div>
                 <div class="text-muted small mt-2 mt-md-0">
-                    <i class="fas fa-info-circle mr-1 text-primary"></i> Filter settlements by settlement date
+                    <i class="fas fa-info-circle mr-1 text-primary"></i> Filter settlements by date & shift
                 </div>
             </form>
         </div>
@@ -214,26 +266,49 @@ $canDelete = has_permission('card_sales', 'delete');
         <div class="list-card-title d-flex justify-content-between align-items-center">
             <span><i class="fas fa-list mr-2"></i> POS Terminal Settlements</span>
             <?php if ($res_list && mysqli_num_rows($res_list) > 0): ?>
-            <a href="generate-pdf-settlement.php<?php echo (!empty($from_date) || !empty($to_date)) ? '?from_date='.urlencode($from_date).'&to_date='.urlencode($to_date) : ''; ?>" target="_blank" class="btn btn-sm btn-light text-primary font-weight-bold">
+            <?php
+            $pdf_params = [];
+            if (!empty($from_date)) $pdf_params[] = 'from_date=' . urlencode($from_date);
+            if (!empty($to_date)) $pdf_params[] = 'to_date=' . urlencode($to_date);
+            if ($filter_shift > 0) $pdf_params[] = 'shift_id=' . $filter_shift;
+            $pdf_qs = !empty($pdf_params) ? ('?' . implode('&', $pdf_params)) : '';
+            ?>
+            <a href="generate-pdf-settlement.php<?php echo $pdf_qs; ?>" target="_blank" class="btn btn-sm btn-light text-primary font-weight-bold">
                 <i class="fas fa-file-pdf text-danger mr-1"></i> Print PDF Statement
             </a>
             <?php endif; ?>
         </div>
+
+        <!-- Informative Rate & Revenue Note Banner -->
+        <div class="px-3 pt-3">
+            <div class="alert alert-light border py-2 px-3 mb-0 small d-flex flex-wrap align-items-center justify-content-between" style="border-left: 4px solid #0284c7 !important;">
+                <div>
+                    <i class="fas fa-info-circle text-info mr-1"></i>
+                    <strong>Settlement Rate Note:</strong>
+                    <strong>Fee %</strong> and <strong>Charges (Rs.)</strong> are deducted by the bank to produce <strong>Net Amount (Rs.)</strong>.
+                    <strong>Revenue %</strong> and <strong>Revenue (Rs.)</strong> record internal station surcharge and are strictly kept separate from the bank net deposit.
+                </div>
+            </div>
+        </div>
+
         <div class="p-3">
             <div class="table-responsive">
                 <table class="table table-bordered table-hover text-center mb-0" id="settlementsTable">
                     <thead>
                         <tr>
-                            <th style="width: 45px;">#</th>
-                            <th style="width: 110px;">Date</th>
+                            <th style="width: 35px;">#</th>
+                            <th style="width: 95px;">Date</th>
+                            <th style="width: 80px;">Shift</th>
                             <th>Machine (Bank Terminal)</th>
-                            <th>Batch No</th>
-                            <th style="width: 80px;">Cards</th>
-                            <th>Amount (Rs.)</th>
-                            <th style="width: 80px;">Fee %</th>
+                            <th style="width: 75px;">Batch No</th>
+                            <th style="width: 50px;">Cards</th>
+                            <th>Total Amount (Rs.)</th>
+                            <th style="width: 70px;">Fee %</th>
                             <th>Charges (Rs.)</th>
                             <th>Net Amount (Rs.)</th>
-                            <th style="width: 100px;">Actions</th>
+                            <th style="width: 80px;">Revenue %</th>
+                            <th>Revenue (Rs.)</th>
+                            <th style="width: 80px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -245,7 +320,16 @@ $canDelete = has_permission('card_sales', 'delete');
                                 $displayDate = date('d-m-Y', strtotime($dateVal));
                                 $id = intval($row['id']);
                                 $machineName = !empty($row['machine_name']) ? $row['machine_name'] : ('Machine #' . $row['card_machine_id']);
+                                $shiftName = !empty($row['shift_name']) ? $row['shift_name'] : '-';
                                 $feePct = floatval($row['charges_percentage']);
+                                $revPct = floatval($row['revenue_percentage'] ?? 0);
+                                if ($revPct <= 0 && !empty($row['machine_rev_rate'])) {
+                                    $revPct = floatval($row['machine_rev_rate']);
+                                }
+                                $revAmt = floatval($row['revenue_amount'] ?? 0);
+                                if ($revAmt <= 0 && $revPct > 0) {
+                                    $revAmt = round(floatval($row['amount']) * ($revPct / 100), 2);
+                                }
                         ?>
                         <tr>
                             <td class="font-weight-bold text-muted"><?php echo $counter++; ?></td>
@@ -258,6 +342,11 @@ $canDelete = has_permission('card_sales', 'delete');
                                     <i class="fas fa-calendar-day mr-1 text-muted"></i><?php echo $displayDate; ?>
                                 <?php endif; ?>
                             </td>
+                            <td>
+                                <span class="badge badge-light border text-dark font-weight-bold px-2 py-1">
+                                    <?php echo htmlspecialchars($shiftName); ?>
+                                </span>
+                            </td>
                             <td class="font-weight-bold text-left text-primary">
                                 <i class="fas fa-credit-card mr-1 text-muted"></i><?php echo htmlspecialchars($machineName); ?>
                             </td>
@@ -269,20 +358,33 @@ $canDelete = has_permission('card_sales', 'delete');
                                     <?php echo intval($row['no_of_cards']); ?>
                                 </span>
                             </td>
-                            <td class="font-weight-bold text-dark">
+                            <!-- 1. Total Pure Sales Amount -->
+                            <td class="font-weight-bold text-dark" style="font-size: 13.5px;">
                                 Rs. <?php echo number_format($row['amount'], 2); ?>
                             </td>
-                            <td class="text-muted small">
+                            <!-- 2. Fee % -->
+                            <td class="font-weight-bold text-muted text-monospace">
                                 <?php echo number_format($feePct, 4); ?>%
                             </td>
-                            <td class="text-danger font-weight-bold">
+                            <!-- 3. Charges (Rs.) -->
+                            <td class="font-weight-bold text-danger">
                                 -Rs. <?php echo number_format($row['service_charges'], 2); ?>
                             </td>
+                            <!-- 4. Net Amount (- Service Charges) -->
                             <td>
-                                <strong class="text-success font-weight-bold">
+                                <strong class="text-success font-weight-bold" style="font-size: 13.5px;">
                                     Rs. <?php echo number_format($row['net_amount'], 2); ?>
                                 </strong>
                             </td>
+                            <!-- 5. Revenue % -->
+                            <td class="font-weight-bold text-monospace" style="color: #0284c7;">
+                                <?php echo number_format($revPct, 4); ?>%
+                            </td>
+                            <!-- 6. Revenue (Rs.) (Separate) -->
+                            <td>
+                                <span class="font-weight-bold" style="color: #0284c7;">+Rs. <?php echo number_format($revAmt, 2); ?></span>
+                            </td>
+                            <!-- Actions -->
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
                                     <?php if ($canEdit): ?>
@@ -313,7 +415,7 @@ $canDelete = has_permission('card_sales', 'delete');
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>

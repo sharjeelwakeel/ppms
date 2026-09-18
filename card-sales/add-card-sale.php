@@ -3,6 +3,7 @@ require '../include/session.php';
 if (!userloggedin()) { header('Location:../login.php'); exit; }
 require '../include/config.php';
 require '../include/permissions.php';
+require '../include/card_helper.php';
 
 check_access('card_sales', 'add');
 
@@ -73,11 +74,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_begin_transaction($connection);
         try {
             for ($i = 0; $i < count($machine_ids); $i++) {
-                $m_id      = intval($machine_ids[$i]);
-                $noz_id    = intval($nozzle_ids[$i] ?? 0);
-                $batch_no  = mysqli_real_escape_string($connection, trim($batch_nos[$i] ?? ''));
-                $trace_no  = mysqli_real_escape_string($connection, trim($trace_nos[$i] ?? ''));
-                $amt       = floatval($amounts[$i] ?? 0);
+                $m_id   = intval($machine_ids[$i]);
+                $noz_id = intval($nozzle_ids[$i] ?? 0);
+                if ($m_id <= 0) {
+                    continue;
+                }
+
+                $user_batch = trim($batch_nos[$i] ?? '');
+                if (empty($user_batch)) {
+                    throw new Exception("Please enter a Batch Number on row " . ($i + 1));
+                }
+                $batch_no = mysqli_real_escape_string($connection, $user_batch);
+                $trace_no = mysqli_real_escape_string($connection, trim($trace_nos[$i] ?? ''));
+                $amt      = floatval($amounts[$i] ?? 0);
 
                 // Calculate fee and net amount automatically from card machine settings
                 $fee_pct = 0.00;
@@ -169,6 +178,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .summary-badge-box {
             background:#eef2ff; border-radius:8px; border:1px solid #c7d2fe; padding:12px 18px;
         }
+        .bg-readonly-batch {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -237,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <tr style="background: var(--primary-color); color: #fff;">
                                 <th style="width: 20%;">Nozzle <span class="text-danger">*</span></th>
                                 <th style="width: 20%;">Machine Type <span class="text-danger">*</span></th>
-                                <th style="width: 15%;">Batch No</th>
+                                <th style="width: 15%;">Batch No <span class="text-danger">*</span></th>
                                 <th style="width: 15%;">Trace No</th>
                                 <th style="width: 15%;">Amount (Rs.) <span class="text-danger">*</span></th>
                                 <th style="width: 15%;">Difference</th>
@@ -289,6 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 var nozzlesData      = <?php echo json_encode($nozzles); ?>;
 var cardMachinesData = <?php echo json_encode($card_machines); ?>;
 var cardRowIdx = 0;
+var machineLastBatch = {};
 
 $(document).ready(function() {
     addCardRow(); // Start with 1 row by default
@@ -307,16 +323,34 @@ function isCardRowActive($tr) {
     var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
     var noz = $tr.find('select[name="card_nozzle_id[]"]').val() || '';
     var machineId = $tr.find('.card-machine-select').val() || '';
-    var batch = ($tr.find('input[name="card_batch_no[]"]').val() || '').trim();
     var trace = ($tr.find('input[name="card_trace_no[]"]').val() || '').trim();
-    return (amt > 0 || noz !== '' || machineId !== '' || batch !== '' || trace !== '');
+    var batch = ($tr.find('.card-batch-field').val() || '').trim();
+    return (amt > 0 || noz !== '' || machineId !== '' || trace !== '' || batch !== '');
+}
+
+function onRowBatchInput(el) {
+    var $tr = $(el).closest('tr');
+    var mId = $tr.find('.card-machine-select').val();
+    var val = $(el).val().trim();
+    if (mId && val) {
+        machineLastBatch[mId] = val;
+    }
 }
 
 function onRowMachineOrAmountChange(el) {
     var $tr = $(el).closest('tr');
     var $machSelect = $tr.find('.card-machine-select');
+    var machineId = $machSelect.val();
     var revCharge = parseFloat($machSelect.find('option:selected').attr('data-revenue-charge')) || 0;
     var amt = parseFloat($tr.find('.card-amount-field').val()) || 0;
+
+    // Suggest last typed batch for this machine if current row's batch is empty
+    if (machineId && machineLastBatch[machineId]) {
+        var $batchField = $tr.find('.card-batch-field');
+        if (!$batchField.val().trim()) {
+            $batchField.val(machineLastBatch[machineId]);
+        }
+    }
 
     // Auto-calculate Difference = Amount * (Revenue Charge % / 100)
     var diff = (amt * (revCharge / 100)).toFixed(2);
@@ -353,7 +387,7 @@ function addCardRow() {
             '</select>' +
         '</td>' +
         '<td>' +
-            '<input type="text" name="card_batch_no[]" class="form-control form-control-sm" placeholder="Batch No">' +
+            '<input type="text" name="card_batch_no[]" class="form-control form-control-sm text-monospace text-center card-batch-field font-weight-bold" placeholder="Batch #" oninput="onRowBatchInput(this)">' +
         '</td>' +
         '<td>' +
             '<input type="text" name="card_trace_no[]" class="form-control form-control-sm" placeholder="Trace No">' +
@@ -431,9 +465,10 @@ function validateAndCleanCardForm() {
     var isValid = true;
     $rows.each(function(idx) {
         var rowNum = idx + 1;
-        var noz = $(this).find('select[name="card_nozzle_id[]"]').val();
-        var mach = $(this).find('.card-machine-select').val();
-        var amt = parseFloat($(this).find('.card-amount-field').val()) || 0;
+        var noz   = $(this).find('select[name="card_nozzle_id[]"]').val();
+        var mach  = $(this).find('.card-machine-select').val();
+        var batch = ($(this).find('.card-batch-field').val() || '').trim();
+        var amt   = parseFloat($(this).find('.card-amount-field').val()) || 0;
 
         if (!noz) {
             alert('Please select a Nozzle on row #' + rowNum);
@@ -444,6 +479,12 @@ function validateAndCleanCardForm() {
         if (!mach) {
             alert('Please select a Machine Type on row #' + rowNum);
             $(this).find('.card-machine-select').focus();
+            isValid = false;
+            return false;
+        }
+        if (!batch) {
+            alert('Please enter a Batch Number on row #' + rowNum);
+            $(this).find('.card-batch-field').focus();
             isValid = false;
             return false;
         }

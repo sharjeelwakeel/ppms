@@ -9,11 +9,16 @@ if (!isset($_SESSION['loggedInUser'])) {
 
 require_once '../include/config.php';
 require_once '../include/permissions.php';
+require_once '../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 check_access('card_sales', 'show');
 
 $from_date = $_GET['from_date'] ?? '';
 $to_date   = $_GET['to_date'] ?? '';
+$shift_id  = intval($_GET['shift_id'] ?? 0);
 
 $where = "(s.deleted_at IS NULL OR s.deleted_at = '0000-00-00 00:00:00')";
 if (!empty($from_date)) {
@@ -24,10 +29,16 @@ if (!empty($to_date)) {
     $to_safe = mysqli_real_escape_string($connection, $to_date);
     $where .= " AND s.settlement_date <= '$to_safe'";
 }
+if ($shift_id > 0) {
+    $where .= " AND s.shift_id = '$shift_id'";
+}
 
-$sql = "SELECT s.*, cm.name AS machine_name 
+$sql = "SELECT s.*, 
+               cm.name AS machine_name,
+               sh.name AS shift_name
         FROM tbl_card_sale_settlements s
         LEFT JOIN tbl_card_machines cm ON (s.card_machine_id = cm.id)
+        LEFT JOIN tbl_shifts sh ON (s.shift_id = sh.id)
         WHERE $where
         ORDER BY s.settlement_date ASC, s.id ASC";
 $res = mysqli_query($connection, $sql);
@@ -37,6 +48,7 @@ $tot_cards = 0;
 $tot_gross = 0;
 $tot_charges = 0;
 $tot_net = 0;
+$tot_revenue = 0;
 
 if ($res) {
     while ($r = mysqli_fetch_assoc($res)) {
@@ -45,6 +57,7 @@ if ($res) {
         $tot_gross += floatval($r['amount']);
         $tot_charges += floatval($r['service_charges']);
         $tot_net += floatval($r['net_amount']);
+        $tot_revenue += floatval($r['revenue_amount'] ?? 0);
     }
 }
 ?>
@@ -92,20 +105,21 @@ if ($res) {
         }
         .metric-cell {
             display: table-cell;
-            width: 25%;
-            padding: 6px 10px;
+            width: 20%;
+            padding: 6px 8px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
+            border-radius: 6px;
             text-align: center;
         }
         .metric-cell .lbl {
-            font-size: 9px;
-            font-weight: bold;
-            color: #64748b;
+            font-size: 8.5px;
             text-transform: uppercase;
+            color: #64748b;
+            font-weight: bold;
         }
         .metric-cell .val {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             color: #04204e;
             margin-top: 2px;
@@ -113,28 +127,27 @@ if ($res) {
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
         .data-table th {
             background-color: #04204e;
-            color: #ffffff;
-            font-weight: bold;
-            text-align: center;
-            padding: 6px 4px;
-            border: 1px solid #04204e;
+            color: #fff;
             font-size: 9.5px;
+            font-weight: 600;
+            padding: 6px 4px;
+            text-align: center;
+            border: 1px solid #04204e;
         }
         .data-table td {
-            padding: 5px 4px;
             border: 1px solid #cbd5e1;
-            vertical-align: middle;
+            padding: 5px 5px;
+            font-size: 9.5px;
         }
-        .data-table tr:nth-child(even) {
+        .data-table tbody tr:nth-child(even) {
             background-color: #f8fafc;
         }
         .sig-section {
-            margin-top: 25px;
+            margin-top: 30px;
             display: table;
             width: 100%;
         }
@@ -142,35 +155,41 @@ if ($res) {
             display: table-cell;
             width: 33.33%;
             text-align: center;
-            border-top: 1px solid #475569;
-            padding-top: 5px;
+            padding-top: 40px;
+            border-top: 1px dashed #94a3b8;
             font-size: 10px;
             font-weight: bold;
-            color: #334155;
-        }
-        @media print {
-            .no-print { display: none !important; }
-            body { padding: 0; }
+            color: #475569;
         }
     </style>
 </head>
 <body>
-
-    <div class="no-print" style="margin-bottom: 12px; text-align: right;">
-        <button onclick="window.print()" style="padding: 6px 14px; background: #04204e; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
-            🖨️ Print / Save PDF
-        </button>
-    </div>
-
     <!-- Station Header -->
     <table class="header-table">
         <tr>
-            <td style="width: 65%;">
-                <div class="station-title">Petrol Pump Management System</div>
-                <div class="report-title">Card Sale Settlements Statement</div>
-                <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Bank POS Batch Terminal Settlement &bull; Deposit Summary</div>
+            <td style="width: 65%; vertical-align: middle;">
+                <div style="display: flex; align-items: center;">
+                    <?php if ($hasLogo): ?>
+                        <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Station Logo" style="max-height: 48px; max-width: 120px; margin-right: 12px;">
+                    <?php endif; ?>
+                    <div>
+                        <div class="station-title"><?php echo htmlspecialchars($station_settings['pump_name']); ?></div>
+                        <?php if (!empty($station_settings['tagline'])): ?>
+                            <div style="font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 1px;"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+                        <?php endif; ?>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                            <?php if (!empty($station_settings['address'])): ?>
+                                <span><?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($station_settings['phone'])): ?>
+                                <span> &bull; Tel: <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="report-title">Card Sale Settlements Statement</div>
+                    </div>
+                </div>
             </td>
-            <td style="width: 35%; text-align: right;">
+            <td style="width: 35%; text-align: right; vertical-align: top;">
                 <div style="font-size: 11px; font-weight: bold;">
                     Period: 
                     <span style="color: #04204e;">
@@ -200,16 +219,20 @@ if ($res) {
             <div class="val"><?php echo count($items); ?> Batches</div>
         </div>
         <div class="metric-cell">
-            <div class="lbl">Total Swipes / Cards</div>
-            <div class="val"><?php echo $tot_cards; ?> Cards</div>
+            <div class="lbl">Total Pure Sales</div>
+            <div class="val text-primary" style="color: #04204e;">Rs. <?php echo number_format($tot_gross, 2); ?></div>
         </div>
         <div class="metric-cell">
-            <div class="lbl">Gross Settled Amount</div>
-            <div class="val">Rs. <?php echo number_format($tot_gross, 2); ?></div>
+            <div class="lbl">Bank Service Fees</div>
+            <div class="val" style="color: #dc2626;">-Rs. <?php echo number_format($tot_charges, 2); ?></div>
         </div>
         <div class="metric-cell" style="background: #f0fdf4; border-color: #86efac;">
-            <div class="lbl" style="color: #047857;">Net Bank Receivable</div>
+            <div class="lbl" style="color: #047857;">Net Settled Deposit</div>
             <div class="val" style="color: #047857;">Rs. <?php echo number_format($tot_net, 2); ?></div>
+        </div>
+        <div class="metric-cell" style="background: #f0f9ff; border-color: #7dd3fc;">
+            <div class="lbl" style="color: #0284c7;">Revenue Surcharge</div>
+            <div class="val" style="color: #0284c7;">+Rs. <?php echo number_format($tot_revenue, 2); ?></div>
         </div>
     </div>
 
@@ -217,15 +240,18 @@ if ($res) {
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 25px;">#</th>
-                <th style="width: 75px;">Date</th>
+                <th style="width: 20px;">#</th>
+                <th style="width: 60px;">Date</th>
+                <th style="width: 50px;">Shift</th>
                 <th>Card Machine (Bank Terminal)</th>
-                <th style="width: 80px;">Batch No</th>
-                <th style="width: 60px;">Cards</th>
-                <th style="width: 90px;">Gross Amount</th>
-                <th style="width: 65px;">Fee %</th>
-                <th style="width: 85px;">Service Charges</th>
-                <th style="width: 95px;">Net Receivable</th>
+                <th style="width: 60px;">Batch No</th>
+                <th style="width: 35px;">Cards</th>
+                <th style="width: 70px;">Total Amount</th>
+                <th style="width: 45px;">Fee %</th>
+                <th style="width: 65px;">Service Fee</th>
+                <th style="width: 70px;">Net Amount</th>
+                <th style="width: 45px;">Rev. %</th>
+                <th style="width: 65px;">Revenue (Rs.)</th>
             </tr>
         </thead>
         <tbody>
@@ -233,7 +259,7 @@ if ($res) {
             if (empty($items)): 
             ?>
             <tr>
-                <td colspan="9" style="text-align: center; color: #94a3b8; padding: 15px;">No card sale settlements recorded for this criteria.</td>
+                <td colspan="12" style="text-align: center; color: #94a3b8; padding: 15px;">No card sale settlements recorded for this criteria.</td>
             </tr>
             <?php 
             else: 
@@ -244,27 +270,35 @@ if ($res) {
                     $fee   = floatval($item['service_charges']);
                     $net   = floatval($item['net_amount']);
                     $feePct = floatval($item['charges_percentage']);
+                    $revAmt = floatval($item['revenue_amount'] ?? 0);
+                    $revPct = floatval($item['revenue_percentage'] ?? 0);
                     $dateDisp = date('d-m-Y', strtotime($item['settlement_date']));
+                    $shiftDisp = !empty($item['shift_name']) ? $item['shift_name'] : '-';
             ?>
             <tr>
                 <td style="text-align: center;"><?php echo $c++; ?></td>
                 <td style="text-align: center; font-weight: bold;"><?php echo $dateDisp; ?></td>
+                <td style="text-align: center;"><?php echo htmlspecialchars($shiftDisp); ?></td>
                 <td><strong><?php echo htmlspecialchars($item['machine_name'] ?? 'Machine #' . $item['card_machine_id']); ?></strong></td>
                 <td style="text-align: center; font-family: monospace; font-weight: bold;"><?php echo htmlspecialchars($item['batch_no']); ?></td>
                 <td style="text-align: center; font-weight: bold;"><?php echo $cards; ?></td>
-                <td style="text-align: right; font-weight: bold;">Rs. <?php echo number_format($gross, 2); ?></td>
-                <td style="text-align: center; font-size: 9px; color: #64748b;"><?php echo number_format($feePct, 4); ?>%</td>
-                <td style="text-align: right; font-weight: bold; color: #b91c1c;">-Rs. <?php echo number_format($fee, 2); ?></td>
-                <td style="text-align: right; font-weight: bold; color: #047857;">Rs. <?php echo number_format($net, 2); ?></td>
+                <td style="text-align: right; font-weight: bold; color: #04204e;">Rs. <?php echo number_format($gross, 2); ?></td>
+                <td style="text-align: center; font-size: 8.5px; color: #64748b;"><?php echo number_format($feePct, 4); ?>%</td>
+                <td style="text-align: right; font-weight: bold; color: #dc2626;">-Rs. <?php echo number_format($fee, 2); ?></td>
+                <td style="text-align: right; font-weight: bold; color: #16a34a;">Rs. <?php echo number_format($net, 2); ?></td>
+                <td style="text-align: center; font-size: 8.5px; color: #0284c7;"><?php echo number_format($revPct, 4); ?>%</td>
+                <td style="text-align: right; font-weight: bold; color: #0284c7;">+Rs. <?php echo number_format($revAmt, 2); ?></td>
             </tr>
             <?php endforeach; ?>
             <tr style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #04204e;">
-                <td colspan="4" style="text-align: right; font-size: 10.5px;">TOTALS (<?php echo count($items); ?> Settlements):</td>
-                <td style="text-align: center; color: #04204e; font-size: 10.5px;"><?php echo $tot_cards; ?></td>
-                <td style="text-align: right; font-size: 10.5px;">Rs. <?php echo number_format($tot_gross, 2); ?></td>
+                <td colspan="5" style="text-align: right; font-size: 10px;">TOTALS (<?php echo count($items); ?> Settlements):</td>
+                <td style="text-align: center; color: #04204e; font-size: 10px;"><?php echo $tot_cards; ?></td>
+                <td style="text-align: right; font-size: 10px; color: #04204e;">Rs. <?php echo number_format($tot_gross, 2); ?></td>
                 <td>—</td>
-                <td style="text-align: right; color: #b91c1c; font-size: 10px;">-Rs. <?php echo number_format($tot_charges, 2); ?></td>
-                <td style="text-align: right; color: #047857; font-size: 11px;">Rs. <?php echo number_format($tot_net, 2); ?></td>
+                <td style="text-align: right; color: #dc2626; font-size: 9.5px;">-Rs. <?php echo number_format($tot_charges, 2); ?></td>
+                <td style="text-align: right; color: #16a34a; font-size: 10.5px;">Rs. <?php echo number_format($tot_net, 2); ?></td>
+                <td>—</td>
+                <td style="text-align: right; color: #0284c7; font-size: 10.5px;">+Rs. <?php echo number_format($tot_revenue, 2); ?></td>
             </tr>
             <?php endif; ?>
         </tbody>

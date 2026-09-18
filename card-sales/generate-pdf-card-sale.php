@@ -9,6 +9,10 @@ if (!isset($_SESSION['loggedInUser'])) {
 
 require_once '../include/config.php';
 require_once '../include/permissions.php';
+require_once '../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 check_access('card_sales', 'show');
 
@@ -104,7 +108,7 @@ if ($res) {
         }
         .metric-cell {
             display: table-cell;
-            width: 25%;
+            width: 33.33%;
             padding: 6px 10px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -178,11 +182,28 @@ if ($res) {
     <table class="header-table">
         <tr>
             <td style="width: 65%;">
-                <div class="station-title">Petrol Pump Management System</div>
-                <div class="report-title">Daily Card Sales Settlement Statement</div>
-                <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Bank POS Terminals &bull; Net Deposit Reconciliation</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <?php if ($hasLogo): ?>
+                        <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" style="max-height: 48px; max-width: 120px; object-fit: contain;">
+                    <?php endif; ?>
+                    <div>
+                        <div class="station-title"><?php echo htmlspecialchars($station_settings['pump_name']); ?></div>
+                        <?php if (!empty($station_settings['tagline'])): ?>
+                            <div style="font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 1px;"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+                        <?php endif; ?>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                            <?php if (!empty($station_settings['address'])): ?>
+                                <span><?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($station_settings['phone'])): ?>
+                                <span> &bull; Tel: <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="report-title">Daily Card Sales Settlement Statement</div>
+                    </div>
+                </div>
             </td>
-            <td style="width: 35%; text-align: right;">
+            <td style="width: 35%; text-align: right; vertical-align: top;">
                 <div style="font-size: 11px; font-weight: bold;">Date: <span style="color: #04204e; font-size: 13px;"><?php echo $display_date; ?></span></div>
                 <?php if (!empty($shift_name)): ?>
                 <div style="font-size: 10.5px; font-weight: bold; color: #04204e; margin-top: 1px;">Shift: <span><?php echo htmlspecialchars($shift_name); ?></span></div>
@@ -207,10 +228,6 @@ if ($res) {
             <div class="lbl" style="color: #b91c1c;">Total Difference</div>
             <div class="val" style="color: #b91c1c;">Rs. <?php echo number_format($tot_diff, 2); ?></div>
         </div>
-        <div class="metric-cell" style="background: #f0fdf4; border-color: #86efac;">
-            <div class="lbl" style="color: #047857;">Net Bank Receivable</div>
-            <div class="val" style="color: #047857;">Rs. <?php echo number_format($tot_net, 2); ?></div>
-        </div>
     </div>
 
     <!-- Data Table -->
@@ -219,13 +236,11 @@ if ($res) {
             <tr>
                 <th style="width: 25px;">#</th>
                 <th>Machine Type (Bank Terminal)</th>
-                <th style="width: 70px;">Batch No</th>
-                <th style="width: 70px;">Trace No</th>
-                <th style="width: 100px;">Attached Nozzle</th>
-                <th style="width: 85px;">Amount (Rs.)</th>
-                <th style="width: 85px;">Difference (Rs.)</th>
-                <th style="width: 80px;">Bank Charges</th>
-                <th style="width: 90px;">Net Receivable</th>
+                <th style="width: 80px;">Batch No</th>
+                <th style="width: 80px;">Trace No</th>
+                <th style="width: 120px;">Attached Nozzle</th>
+                <th style="width: 100px;">Amount (Rs.)</th>
+                <th style="width: 100px;">Difference (Rs.)</th>
             </tr>
         </thead>
         <tbody>
@@ -253,16 +268,12 @@ if ($res) {
                 <td style="text-align: center;"><?php echo htmlspecialchars($item['nozzle_name'] ?? '—'); ?> <span style="font-size:8.5px; color:#64748b;">(<?php echo htmlspecialchars($item['item_name'] ?? ''); ?>)</span></td>
                 <td style="text-align: right; font-weight: bold;">Rs. <?php echo number_format($gross, 2); ?></td>
                 <td style="text-align: right; font-weight: bold; color: #b91c1c;">Rs. <?php echo number_format($diff, 2); ?></td>
-                <td style="text-align: right; font-size: 9px; color: #64748b;"><?php echo $feePct; ?> (-Rs. <?php echo number_format($fee, 2); ?>)</td>
-                <td style="text-align: right; font-weight: bold; color: #047857;">Rs. <?php echo number_format($net, 2); ?></td>
             </tr>
             <?php endforeach; ?>
             <tr style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #04204e;">
                 <td colspan="5" style="text-align: right; font-size: 10.5px;">TOTALS (<?php echo count($items); ?> Entries):</td>
                 <td style="text-align: right; font-size: 10.5px;">Rs. <?php echo number_format($tot_gross, 2); ?></td>
                 <td style="text-align: right; color: #b91c1c; font-size: 10.5px;">Rs. <?php echo number_format($tot_diff, 2); ?></td>
-                <td style="text-align: right; color: #64748b; font-size: 9.5px;">-Rs. <?php echo number_format($tot_charges, 2); ?></td>
-                <td style="text-align: right; color: #047857; font-size: 11px;">Rs. <?php echo number_format($tot_net, 2); ?></td>
             </tr>
             <?php endif; ?>
         </tbody>

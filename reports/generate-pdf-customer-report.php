@@ -9,6 +9,10 @@ if (!isset($_SESSION['loggedInUser'])) {
 
 require_once '../include/config.php';
 require_once '../include/permissions.php';
+require_once '../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 if (!has_permission('reports', 'show') && !has_permission('customers', 'show') && !has_permission('meter_readings', 'show')) {
     header('Location: ../dashboard.php');
@@ -245,14 +249,28 @@ if ($report_res) {
         }
 
         .header-box {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: <?php echo $hasLogo ? 'space-between' : 'center'; ?>;
+            text-align: <?php echo $hasLogo ? 'left' : 'center'; ?>;
             border-bottom: 2px solid #04204e;
             padding-bottom: 12px;
             margin-bottom: 16px;
+            gap: 16px;
         }
-        .header-box h2 { margin: 0 0 4px; color: #04204e; font-size: 18px; font-weight: 800; text-transform: uppercase; }
-        .header-box h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #333; }
-        .header-box p { margin: 0; font-size: 10px; color: #666; }
+        .header-box-logo {
+            max-height: 60px;
+            max-width: 150px;
+            object-fit: contain;
+        }
+        .header-box-content {
+            flex: 1;
+        }
+        .header-box h2 { margin: 0 0 2px; color: #04204e; font-size: 19px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .header-box .station-tagline { font-size: 11.5px; font-weight: 600; color: #475569; margin-bottom: 3px; }
+        .header-box .station-contact { font-size: 10px; color: #64748b; margin-bottom: 4px; }
+        .header-box h4 { margin: 2px 0 3px; font-size: 13px; font-weight: 700; color: #0284c7; }
+        .header-box p { margin: 0; font-size: 9.5px; color: #64748b; }
 
         .customer-meta-box {
             background: #f8fafc;
@@ -360,17 +378,36 @@ if ($report_res) {
             <div class="customer-card-break">
                 <!-- Letterhead -->
                 <div class="header-box">
-                    <h2>Petrol Pump Management System</h2>
-                    <h4>Customer Credit &amp; Fuel Ledger Statement</h4>
-                    <p>
-                        <?php if (!empty($fromDate) || !empty($toDate)): ?>
-                            <strong>Date Filter:</strong> <?php echo !empty($fromDate) ? date('d-m-Y', strtotime($fromDate)) : 'Start'; ?> to <?php echo !empty($toDate) ? date('d-m-Y', strtotime($toDate)) : 'Till Date'; ?> &nbsp;|&nbsp; 
+                    <?php if ($hasLogo): ?>
+                        <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" class="header-box-logo">
+                    <?php endif; ?>
+                    <div class="header-box-content">
+                        <h2><?php echo htmlspecialchars($station_settings['pump_name']); ?></h2>
+                        <?php if (!empty($station_settings['tagline'])): ?>
+                            <div class="station-tagline"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
                         <?php endif; ?>
-                        <?php if (!empty($selected_shift_name)): ?>
-                            <strong>Shift:</strong> <?php echo htmlspecialchars($selected_shift_name); ?> &nbsp;|&nbsp; 
-                        <?php endif; ?>
-                        Generated: <?php echo date('d-m-Y h:i A'); ?> &nbsp;|&nbsp; PPMS Audit Ledger
-                    </p>
+                        <div class="station-contact">
+                            <?php if (!empty($station_settings['address'])): ?>
+                                <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($station_settings['phone'])): ?>
+                                <span> &nbsp;|&nbsp; <i class="fas fa-phone"></i> <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($station_settings['ntn_no'])): ?>
+                                <span> &nbsp;|&nbsp; NTN: <?php echo htmlspecialchars($station_settings['ntn_no']); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <h4>Customer Credit &amp; Fuel Ledger Statement</h4>
+                        <p>
+                            <?php if (!empty($fromDate) || !empty($toDate)): ?>
+                                <strong>Date Filter:</strong> <?php echo !empty($fromDate) ? date('d-m-Y', strtotime($fromDate)) : 'Start'; ?> to <?php echo !empty($toDate) ? date('d-m-Y', strtotime($toDate)) : 'Till Date'; ?> &nbsp;|&nbsp; 
+                            <?php endif; ?>
+                            <?php if (!empty($selected_shift_name)): ?>
+                                <strong>Shift:</strong> <?php echo htmlspecialchars($selected_shift_name); ?> &nbsp;|&nbsp; 
+                            <?php endif; ?>
+                            Generated: <?php echo date('d-m-Y h:i A'); ?> &nbsp;|&nbsp; PPMS Audit Ledger
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Customer Details -->

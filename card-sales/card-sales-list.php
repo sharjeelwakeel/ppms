@@ -160,7 +160,7 @@ if ($res_cards) {
                     <?php endif; ?>
                 </div>
                 <div class="text-muted small mt-2 mt-md-0">
-                    <i class="fas fa-info-circle mr-1 text-primary"></i> Grouped by daily date with total swipe amounts &amp; net bank settlements
+                    <i class="fas fa-info-circle mr-1 text-primary"></i> Grouped by daily date and shift with card sales totals &amp; difference
                 </div>
             </form>
         </div>
@@ -182,8 +182,6 @@ if ($res_cards) {
                             <th>Entries</th>
                             <th>Gross Card Sale (Rs.)</th>
                             <th>Difference (Rs.)</th>
-                            <th>Service Charges (Rs.)</th>
-                            <th>Net Bank Receivable (Rs.)</th>
                             <th style="width: 140px;">Actions</th>
                         </tr>
                     </thead>
@@ -225,14 +223,6 @@ if ($res_cards) {
                             </td>
                             <td class="text-danger font-weight-bold">
                                 Rs. <?php echo number_format($row['total_difference'] ?? 0, 2); ?>
-                            </td>
-                            <td class="text-muted font-weight-bold">
-                                -Rs. <?php echo number_format($row['total_charges'], 2); ?>
-                            </td>
-                            <td>
-                                <strong class="text-success" style="font-size: 14px;">
-                                    Rs. <?php echo number_format($row['total_net'], 2); ?>
-                                </strong>
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
@@ -290,8 +280,6 @@ if ($res_cards) {
                                 <th>Nozzle</th>
                                 <th>Amount (Rs.)</th>
                                 <th>Difference (Rs.)</th>
-                                <th>Bank Fee</th>
-                                <th>Net Receivable (Rs.)</th>
                             </tr>
                         </thead>
                         <tbody id="modalCardsBody">
@@ -345,18 +333,15 @@ function viewDayCards(rawDate, shiftId, formattedDate, shiftName) {
     var html = '';
     
     if (items.length === 0) {
-        html = '<tr><td colspan="9" class="text-muted py-3">No card transaction details available.</td></tr>';
+        html = '<tr><td colspan="7" class="text-muted py-3">No card transaction details available.</td></tr>';
     } else {
-        var totEntries = 0, totGross = 0, totDiff = 0, totFee = 0, totNet = 0;
+        var totEntries = 0, totGross = 0, totDiff = 0;
         for (var i = 0; i < items.length; i++) {
             var c = items[i];
             var gross = parseFloat(c.amount) || 0;
             var diff  = parseFloat(c.difference) || 0;
-            var fee   = parseFloat(c.service_charges) || 0;
-            var net   = parseFloat(c.net_amount) || 0;
-            totEntries++; totGross += gross; totDiff += diff; totFee += fee; totNet += net;
+            totEntries++; totGross += gross; totDiff += diff;
             
-            var feePct = c.charges_percentage ? parseFloat(c.charges_percentage).toFixed(4) + '%' : '—';
             var traceNo = c.trace_no || '—';
 
             html += '<tr>' +
@@ -365,19 +350,15 @@ function viewDayCards(rawDate, shiftId, formattedDate, shiftName) {
                 '<td class="font-weight-bold text-monospace">' + (c.batch_no || '—') + '</td>' +
                 '<td class="text-monospace">' + traceNo + '</td>' +
                 '<td>' + (c.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (c.item_name || 'Fuel') + ')</small></td>' +
-                '<td class="font-weight-bold">Rs. ' + gross.toFixed(2) + '</td>' +
+                '<td class="font-weight-bold text-primary">Rs. ' + gross.toFixed(2) + '</td>' +
                 '<td class="text-danger font-weight-bold">Rs. ' + diff.toFixed(2) + '</td>' +
-                '<td class="text-muted small">' + feePct + ' (Rs. ' + fee.toFixed(2) + ')</td>' +
-                '<td class="text-success font-weight-bold">Rs. ' + net.toFixed(2) + '</td>' +
             '</tr>';
         }
         
         html += '<tr class="bg-light font-weight-bold" style="font-size:13px;">' +
             '<td colspan="5" class="text-right">SHIFT TOTALS (' + totEntries + ' Entries):</td>' +
-            '<td>Rs. ' + totGross.toFixed(2) + '</td>' +
+            '<td class="text-primary">Rs. ' + totGross.toFixed(2) + '</td>' +
             '<td class="text-danger">Rs. ' + totDiff.toFixed(2) + '</td>' +
-            '<td class="text-muted">Rs. ' + totFee.toFixed(2) + '</td>' +
-            '<td class="text-success">Rs. ' + totNet.toFixed(2) + '</td>' +
         '</tr>';
     }
     

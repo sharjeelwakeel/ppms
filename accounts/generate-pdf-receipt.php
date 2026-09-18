@@ -9,6 +9,10 @@ if (!isset($_SESSION['loggedInUser'])) {
 
 require_once __DIR__ . '/../include/config.php';
 require_once __DIR__ . '/../include/permissions.php';
+require_once __DIR__ . '/../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
 
 if (!has_permission('accounts', 'show') && !has_permission('credit_sales', 'show') && !has_permission('reports', 'show')) {
     echo 'Unauthorized access.';
@@ -95,23 +99,56 @@ if ($res_alloc) {
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
         .header {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: <?php echo $hasLogo ? 'space-between' : 'center'; ?>;
+            text-align: <?php echo $hasLogo ? 'left' : 'center'; ?>;
             border-bottom: 2px solid #04204e;
             padding-bottom: 12px;
             margin-bottom: 18px;
+            gap: 16px;
+        }
+        .header-logo {
+            max-height: 55px;
+            max-width: 140px;
+            object-fit: contain;
+        }
+        .header-content {
+            flex: 1;
         }
         .header h2 {
-            margin: 0 0 4px 0;
+            margin: 0 0 2px 0;
             color: #04204e;
             font-size: 20px;
             font-weight: 900;
             letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .header .tagline {
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 2px;
+        }
+        .header .contact-line {
+            font-size: 9.5px;
+            color: #64748b;
+            margin-bottom: 3px;
         }
         .header h4 {
-            margin: 0 0 6px 0;
-            color: #444;
-            font-size: 14px;
+            margin: 3px 0 2px 0;
+            color: #0284c7;
+            font-size: 13.5px;
             font-weight: 700;
+        }
+        .receipt-footer-policy {
+            margin-top: 18px;
+            padding-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+            font-size: 9.5px;
+            color: #64748b;
+            text-align: center;
+            font-style: italic;
         }
         .meta-grid {
             display: flex;
@@ -211,15 +248,35 @@ if ($res_alloc) {
     <div class="receipt-card">
         <!-- Letterhead -->
         <div class="header">
-            <h2>PETROL PUMP MANAGEMENT SYSTEM</h2>
-            <h4>CUSTOMER PAYMENT ACKNOWLEDGMENT RECEIPT</h4>
-            <div style="font-size: 11px; color:#666;">Official Acknowledgment of Credit Sale Settlement</div>
+            <?php if ($hasLogo): ?>
+                <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" class="header-logo">
+            <?php endif; ?>
+            <div class="header-content">
+                <h2><?php echo htmlspecialchars($station_settings['pump_name']); ?></h2>
+                <?php if (!empty($station_settings['tagline'])): ?>
+                    <div class="tagline"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+                <?php endif; ?>
+                <div class="contact-line">
+                    <?php if (!empty($station_settings['address'])): ?>
+                        <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($station_settings['phone'])): ?>
+                        <span> &nbsp;|&nbsp; <i class="fas fa-phone"></i> <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($station_settings['ntn_no'])): ?>
+                        <span> &nbsp;|&nbsp; NTN: <?php echo htmlspecialchars($station_settings['ntn_no']); ?></span>
+                    <?php endif; ?>
+                </div>
+                <h4>CUSTOMER PAYMENT ACKNOWLEDGMENT RECEIPT</h4>
+                <div style="font-size: 10px; color:#666;">Official Acknowledgment of Credit Sale Settlement</div>
+            </div>
         </div>
 
         <!-- Meta Details -->
         <div class="meta-grid">
             <div class="meta-col">
                 <div><strong>Receipt No:</strong> <span style="font-family:monospace; font-size:12.5px; font-weight:bold;"><?php echo htmlspecialchars($payment['receipt_no']); ?></span></div>
+                <div><strong>Receipt Date:</strong> <?php echo !empty($payment['receipt_date']) ? date('d-m-Y', strtotime($payment['receipt_date'])) : date('d-m-Y', strtotime($payment['payment_date'])); ?></div>
                 <div><strong>Payment Date:</strong> <?php echo date('d-m-Y', strtotime($payment['payment_date'])); ?></div>
                 <div><strong>Customer Name:</strong> <?php echo htmlspecialchars($payment['customer_name'] ?: 'Account #' . $payment['customer_id']); ?></div>
                 <div><strong>Phone:</strong> <?php echo htmlspecialchars($payment['customer_phone'] ?: '—'); ?></div>
@@ -294,6 +351,12 @@ if ($res_alloc) {
             <div class="sig-box">Customer Signature / Acknowledgment</div>
             <div class="sig-box">Authorized Station Cashier / Manager</div>
         </div>
+
+        <?php if (!empty($station_settings['receipt_footer'])): ?>
+            <div class="receipt-footer-policy">
+                <?php echo htmlspecialchars($station_settings['receipt_footer']); ?>
+            </div>
+        <?php endif; ?>
     </div>
 
 </body>

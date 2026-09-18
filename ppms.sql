@@ -5239,11 +5239,14 @@ CREATE TABLE `tbl_card_sale_settlements` (
   `id` int(11) NOT NULL,
   `card_machine_id` int(11) NOT NULL,
   `settlement_date` date NOT NULL,
+  `shift_id` int(11) NOT NULL DEFAULT 0,
   `batch_no` varchar(64) NOT NULL,
   `no_of_cards` int(11) NOT NULL DEFAULT 1,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `charges_percentage` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `service_charges` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `revenue_percentage` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `revenue_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -5785,6 +5788,7 @@ CREATE TABLE `tbl_tank_dip_meter_logs` (
 CREATE TABLE `tbl_customer_payments` (
   `id` int(11) NOT NULL,
   `receipt_no` varchar(64) NOT NULL,
+  `receipt_date` date DEFAULT NULL,
   `customer_id` int(11) NOT NULL,
   `payment_date` date NOT NULL,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -6311,9 +6315,57 @@ ALTER TABLE `tbl_purchase_payments`
 ALTER TABLE `tbl_staff_guarantors`
   ADD CONSTRAINT `tbl_staff_guarantors_ibfk_1` FOREIGN KEY (`staff_id`) REFERENCES `tbl_staff` (`id`) ON DELETE CASCADE;
 
+--
+-- Table structure for table `tbl_settings`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_settings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pump_name` varchar(255) NOT NULL DEFAULT 'PPMS Petrol Pump',
+  `tagline` varchar(255) DEFAULT 'Petrol Pump Management System',
+  `phone` varchar(100) DEFAULT '',
+  `email` varchar(100) DEFAULT '',
+  `address` text DEFAULT NULL,
+  `city` varchar(100) DEFAULT '',
+  `ntn_no` varchar(100) DEFAULT '',
+  `license_no` varchar(100) DEFAULT '',
+  `receipt_footer` text DEFAULT 'Thank you for your business! Fuel once sold will not be returned.',
+  `logo_path` varchar(255) DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `tbl_settings` (`id`, `pump_name`, `tagline`, `phone`, `email`, `address`, `city`, `ntn_no`, `license_no`, `receipt_footer`, `logo_path`) VALUES
+(1, 'PPMS Petrol Pump', 'Authorized Petroleum & Lubricants Dealer', '+92 300 1234567', 'info@ppms.pk', 'Main Highway Road', 'City', '', '', 'Thank you for your business! Fuel once sold will not be returned.', '')
+ON DUPLICATE KEY UPDATE `id` = 1;
+CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `card_machine_id` INT(11) NOT NULL,
+  `settlement_date` DATE NOT NULL,
+  `shift_id` INT(11) NOT NULL DEFAULT 0,
+  `batch_no` VARCHAR(64) NOT NULL,
+  `no_of_cards` INT(11) NOT NULL DEFAULT 1,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+  `service_charges` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `revenue_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+  `revenue_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `notes` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_card_machine_id` (`card_machine_id`),
+  KEY `idx_settlement_date` (`settlement_date`),
+  KEY `idx_shift_id` (`shift_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
 

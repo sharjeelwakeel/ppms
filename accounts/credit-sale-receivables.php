@@ -19,6 +19,10 @@ if ($c2 && mysqli_num_rows($c2) == 0) {
     mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD COLUMN payment_status ENUM('Unpaid', 'Partial', 'Paid') NOT NULL DEFAULT 'Unpaid' AFTER paid_amount");
     mysqli_query($connection, "ALTER TABLE tbl_meter_reading_credit_sales ADD INDEX idx_payment_status (payment_status)");
 }
+$c3 = mysqli_query($connection, "SHOW COLUMNS FROM tbl_customer_payments LIKE 'receipt_date'");
+if ($c3 && mysqli_num_rows($c3) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_customer_payments ADD COLUMN receipt_date DATE DEFAULT NULL AFTER receipt_no");
+}
 
 // Fetch active shifts for filter dropdown
 $shifts_res = mysqli_query($connection, "SELECT id, name FROM tbl_shifts WHERE deleted_at IS NULL ORDER BY id ASC");
@@ -650,6 +654,19 @@ if ($isSearched) {
                             </div>
                         </div>
 
+                        <!-- Receipt Date & Receipt No (Below Payment Date & Amount Received) -->
+                        <div class="form-row">
+                            <div class="col-md-6 mb-3">
+                                <label class="font-weight-bold small text-muted"><i class="fas fa-calendar-check mr-1 text-primary"></i> Receipt Date <span class="text-danger">*</span></label>
+                                <input type="date" name="receipt_date" id="modalReceiptDate" class="form-control font-weight-bold" value="<?php echo date('Y-m-d'); ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="font-weight-bold small text-muted"><i class="fas fa-receipt mr-1 text-primary"></i> Receipt No</label>
+                                <input type="text" name="receipt_no" id="modalReceiptNo" class="form-control font-weight-bold text-monospace" placeholder="e.g. RCP-0001 (Leave blank for auto)">
+                                <small class="text-muted">Optional custom/book receipt reference</small>
+                            </div>
+                        </div>
+
                         <!-- Payment Mode Selection -->
                         <div class="mb-3">
                             <label class="font-weight-bold small text-muted mb-2"><i class="fas fa-credit-card mr-1 text-primary"></i> Select Payment Mode <span class="text-danger">*</span></label>
@@ -776,6 +793,12 @@ if ($isSearched) {
         $('#modalDueText').text('Rs. ' + currentDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         $('#modalAmount').val(currentDue.toFixed(2)).attr('max', currentDue.toFixed(2));
         $('#modalMaxHelp').text('Maximum allowed: Rs. ' + currentDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+        // Set default dates to today and clear receipt number
+        var today = new Date().toISOString().split('T')[0];
+        $('#modalPaymentDate').val(today);
+        $('#modalReceiptDate').val(today);
+        $('#modalReceiptNo').val('');
 
         // Reset mode to cash
         $('#modeCash').prop('checked', true);

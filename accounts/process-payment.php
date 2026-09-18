@@ -21,8 +21,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Self-healing schema check
+$c_chk = mysqli_query($connection, "SHOW COLUMNS FROM tbl_customer_payments LIKE 'receipt_date'");
+if ($c_chk && mysqli_num_rows($c_chk) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_customer_payments ADD COLUMN receipt_date DATE DEFAULT NULL AFTER receipt_no");
+}
+
 $customerId    = intval($_POST['customer_id'] ?? 0);
 $paymentDate   = trim($_POST['payment_date'] ?? '');
+$receiptDate   = trim($_POST['receipt_date'] ?? '');
+$userReceiptNo = trim($_POST['receipt_no'] ?? '');
 $amount        = round(floatval($_POST['amount'] ?? 0), 2);
 $paymentMode   = trim($_POST['payment_mode'] ?? 'Cash');
 $bankId        = intval($_POST['bank_id'] ?? 0);
@@ -47,6 +55,9 @@ if ($amount <= 0.00) {
 }
 if (empty($paymentDate) || strtotime($paymentDate) === false) {
     $paymentDate = date('Y-m-d');
+}
+if (empty($receiptDate) || strtotime($receiptDate) === false) {
+    $receiptDate = $paymentDate;
 }
 
 $allowedModes = ['Cash', 'Online Payment', 'Cheque'];
@@ -153,17 +164,22 @@ try {
         exit;
     }
 
-    // 2. Generate Receipt Number: RCP-YYYYMM-XXXX
-    $prefix_rcp = 'RCP-' . date('Ym', strtotime($paymentDate)) . '-';
-    $q_last = mysqli_query($connection, "SELECT receipt_no FROM tbl_customer_payments WHERE receipt_no LIKE '$prefix_rcp%' ORDER BY id DESC LIMIT 1 FOR UPDATE");
-    $next_num = 1;
-    if ($q_last && ($r_last = mysqli_fetch_assoc($q_last))) {
-        $last_seq = intval(substr($r_last['receipt_no'], strlen($prefix_rcp)));
-        $next_num = $last_seq + 1;
+    // 2. Determine Receipt Number (User-specified or Auto-generated)
+    if (!empty($userReceiptNo)) {
+        $receiptNo = mysqli_real_escape_string($connection, $userReceiptNo);
+    } else {
+        $prefix_rcp = 'RCP-' . date('Ym', strtotime($receiptDate)) . '-';
+        $q_last = mysqli_query($connection, "SELECT receipt_no FROM tbl_customer_payments WHERE receipt_no LIKE '$prefix_rcp%' ORDER BY id DESC LIMIT 1 FOR UPDATE");
+        $next_num = 1;
+        if ($q_last && ($r_last = mysqli_fetch_assoc($q_last))) {
+            $last_seq = intval(substr($r_last['receipt_no'], strlen($prefix_rcp)));
+            $next_num = $last_seq + 1;
+        }
+        $receiptNo = $prefix_rcp . str_pad($next_num, 4, '0', STR_PAD_LEFT);
     }
-    $receiptNo = $prefix_rcp . str_pad($next_num, 4, '0', STR_PAD_LEFT);
 
     // 3. Insert Master Payment Record
+    $receipt_dt_sql = "'" . mysqli_real_escape_string($connection, $receiptDate) . "'";
     $f_from_sql    = !empty($filterFromDate) ? "'" . mysqli_real_escape_string($connection, $filterFromDate) . "'" : "NULL";
     $f_to_sql      = !empty($filterToDate) ? "'" . mysqli_real_escape_string($connection, $filterToDate) . "'" : "NULL";
     $f_vehicle_sql = !empty($filterVehicle) ? "'" . mysqli_real_escape_string($connection, $filterVehicle) . "'" : "NULL";
@@ -174,11 +190,11 @@ try {
     $remarks_sql   = !empty($remarks) ? "'" . mysqli_real_escape_string($connection, $remarks) . "'" : "NULL";
 
     $ins_payment = "INSERT INTO tbl_customer_payments 
-                    (receipt_no, customer_id, payment_date, total_amount, payment_mode, bank_id, 
+                    (receipt_no, receipt_date, customer_id, payment_date, total_amount, payment_mode, bank_id, 
                      transaction_ref, cheque_no, cheque_date, filter_from_date, filter_to_date, 
                      filter_shift_id, filter_vehicle_number, remarks, created_by, created_at)
                     VALUES 
-                    ('$receiptNo', '$customerId', '$paymentDate', '$amount', '$paymentMode', $bank_id_sql,
+                    ('$receiptNo', $receipt_dt_sql, '$customerId', '$paymentDate', '$amount', '$paymentMode', $bank_id_sql,
                      $trans_ref_sql, $cheque_no_sql, $cheque_dt_sql, $f_from_sql, $f_to_sql, 
                      '$filterShiftId', $f_vehicle_sql, $remarks_sql, '$userId', NOW())";
 
@@ -248,10 +264,11 @@ try {
     }
 
     echo json_encode([
-        'status'     => 'success',
-        'message'    => $msg,
-        'payment_id' => $paymentId,
-        'receipt_no' => $receiptNo
+        'status'       => 'success',
+        'message'      => $msg,
+        'payment_id'   => $paymentId,
+        'receipt_no'   => $receiptNo,
+        'receipt_date' => $receiptDate
     ]);
 
 } catch (Exception $e) {

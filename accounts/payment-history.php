@@ -9,6 +9,12 @@ require_once __DIR__ . '/../include/permissions.php';
 
 check_access('accounts', 'show');
 
+// Self-healing schema check
+$c3 = mysqli_query($connection, "SHOW COLUMNS FROM tbl_customer_payments LIKE 'receipt_date'");
+if ($c3 && mysqli_num_rows($c3) == 0) {
+    mysqli_query($connection, "ALTER TABLE tbl_customer_payments ADD COLUMN receipt_date DATE DEFAULT NULL AFTER receipt_no");
+}
+
 // Fetch all active payments
 $sql_payments = "SELECT p.*, 
                         c.name AS customer_name,
@@ -150,6 +156,7 @@ if ($res_alloc) {
                             <tr>
                                 <th style="width: 40px;">#</th>
                                 <th>Receipt No</th>
+                                <th>Receipt Date</th>
                                 <th>Payment Date</th>
                                 <th>Customer Account</th>
                                 <th>Amount Paid (Rs.)</th>
@@ -169,6 +176,7 @@ if ($res_alloc) {
                                 $cName = $p['customer_name'] ?: 'Account #' . $p['customer_id'];
                                 $allocList = $allocations_by_payment[$pid] ?? [];
                                 $allocCount = count($allocList);
+                                $rcpDate = !empty($p['receipt_date']) ? $p['receipt_date'] : $p['payment_date'];
 
                                 // Filter context string
                                 $filterContext = [];
@@ -205,7 +213,10 @@ if ($res_alloc) {
                                 <td class="font-weight-bold text-monospace text-primary">
                                     <?php echo htmlspecialchars($p['receipt_no']); ?>
                                 </td>
-                                <td class="text-nowrap font-weight-bold">
+                                <td class="text-nowrap font-weight-bold text-dark">
+                                    <?php echo date('d-m-Y', strtotime($rcpDate)); ?>
+                                </td>
+                                <td class="text-nowrap text-muted">
                                     <?php echo date('d-m-Y', strtotime($p['payment_date'])); ?>
                                 </td>
                                 <td class="text-left font-weight-bold">
@@ -222,7 +233,7 @@ if ($res_alloc) {
                                 <td>
                                     <div class="btn-group btn-group-sm" role="group">
                                         <!-- View Settled Slips -->
-                                        <button type="button" class="btn btn-info" onclick="viewSettledSlips(<?php echo $pid; ?>, '<?php echo addslashes($p['receipt_no']); ?>', '<?php echo addslashes($cName); ?>', <?php echo $p['total_amount']; ?>, '<?php echo $p['payment_date']; ?>')" title="View <?php echo $allocCount; ?> Settled Slips">
+                                        <button type="button" class="btn btn-info" onclick="viewSettledSlips(<?php echo $pid; ?>, '<?php echo addslashes($p['receipt_no']); ?>', '<?php echo addslashes($cName); ?>', <?php echo $p['total_amount']; ?>, '<?php echo $p['payment_date']; ?>', '<?php echo $rcpDate; ?>')" title="View <?php echo $allocCount; ?> Settled Slips">
                                             <i class="fas fa-list"></i>
                                         </button>
 
@@ -262,12 +273,16 @@ if ($res_alloc) {
                     </button>
                 </div>
                 <div class="modal-body p-4">
-                    <div class="p-3 mb-3 rounded d-flex justify-content-between align-items-center" style="background:#f1f5f9;">
+                    <div class="p-3 mb-3 rounded d-flex justify-content-between align-items-center flex-wrap" style="background:#f1f5f9;">
                         <div>
                             <span class="text-muted small text-uppercase font-weight-bold">Customer:</span>
-                            <h6 class="font-weight-bold mb-0" id="modalCustName" style="color:#04204e;">—</h6>
+                            <h6 class="font-weight-bold mb-1" id="modalCustName" style="color:#04204e;">—</h6>
+                            <small class="text-muted d-block">
+                                <span class="mr-2"><i class="fas fa-calendar-check mr-1 text-primary"></i> Receipt Date: <strong id="modalReceiptDate" class="text-dark">—</strong></span>
+                                <span><i class="fas fa-calendar-alt mr-1 text-secondary"></i> Payment Date: <strong id="modalPaymentDate" class="text-dark">—</strong></span>
+                            </small>
                         </div>
-                        <div class="text-right">
+                        <div class="text-right mt-2 mt-sm-0">
                             <span class="text-muted small text-uppercase font-weight-bold">Total Payment Amount:</span>
                             <h5 class="font-weight-bold text-success mb-0" id="modalPayAmt">Rs. 0.00</h5>
                         </div>
@@ -321,9 +336,11 @@ if ($res_alloc) {
         });
     });
 
-    function viewSettledSlips(paymentId, receiptNo, customerName, totalAmount, paymentDate) {
+    function viewSettledSlips(paymentId, receiptNo, customerName, totalAmount, paymentDate, receiptDate) {
         $('#modalReceiptTitle').text(receiptNo);
         $('#modalCustName').text(customerName);
+        $('#modalReceiptDate').text(receiptDate ? receiptDate.split('-').reverse().join('-') : '—');
+        $('#modalPaymentDate').text(paymentDate ? paymentDate.split('-').reverse().join('-') : '—');
         $('#modalPayAmt').text('Rs. ' + parseFloat(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         $('#modalPdfBtn').attr('href', 'generate-pdf-receipt.php?payment_id=' + paymentId);
 

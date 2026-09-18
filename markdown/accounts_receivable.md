@@ -79,6 +79,7 @@ graph LR
 CREATE TABLE IF NOT EXISTS `tbl_customer_payments` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `receipt_no` varchar(64) NOT NULL,
+  `receipt_date` date DEFAULT NULL,
   `customer_id` int(11) NOT NULL,
   `payment_date` date NOT NULL,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
@@ -151,7 +152,11 @@ The module simultaneously surfaces two distinct balance metrics:
    - The filter card sits at the very top directly beneath the page header.
    - Initial page load does **not** fetch or render all database slips; it renders a clean search prompt card requesting the operator to apply customer, vehicle, shift, or date criteria.
    - When filters are submitted (`$isSearched = true`), the system calculates filtered totals and renders the 4-card metric ribbon directly above the data ledger table.
-2. **Clean Payment Receipts Ledger (`accounts/payment-history.php`)**:
-   - Displays a clean audit table of all customer payment vouchers directly below the header.
-   - Detailed modal breakdown displays exact permanent slips settled per payment.
+2. **Receive Customer Payment Modal**:
+   - **Row 1**: Payment Date (mandatory) & Amount Received (mandatory).
+   - **Row 2**: Receipt Date (mandatory, defaults to today) & Receipt No (manual input or auto-generated `RCP-YYYYMM-XXXX`).
+   - **Payment Modes**: Cash, Online Payment (Bank + Transaction Ref), Cheque (Cheque No + Cheque Date).
+3. **Clean Payment Receipts Ledger (`accounts/payment-history.php`)**:
+   - Displays a clean audit table of all customer payment vouchers with both Receipt No, Receipt Date, and Payment Date directly below the header.
+   - Detailed modal breakdown displays exact permanent slips settled per payment along with Receipt Date and Payment Date.
 
