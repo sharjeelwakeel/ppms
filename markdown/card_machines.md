@@ -45,16 +45,20 @@ CREATE TABLE IF NOT EXISTS `tbl_card_machines` (
   ```
 - **List Display**: Displayed in the main data table (`card-machines/card-machines-list.php`) under the dedicated **Revenue Charge %** column formatted to 4 decimal places with `%` suffix (`number_format($row['revenue_charge'], 4) . '%'`).
 
-### 3. Service Charge Calculation Formula
-When recording card transactions in daily meter readings (`meter-readings/add-meter-reading.php`) or card sales (`card-sales/add-card-sale.php`):
-$$\text{Service Charges} = \text{Card Amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
-$$\text{Net Bank Receivable} = \text{Card Amount} - \text{Service Charges}$$
+### 3. Service Charge Calculation Formula (Applied on Batch Total)
+Commercial banks levy merchant processing fees on the closing **Batch Total** rather than per individual fuel swipe at the nozzle. Individual card swipes record pure gross fuel sales (`service_charges = 0.00`, `net_amount = amount`). In Card Sale Settlements (`tbl_card_sale_settlements`) and Accounts Receivable:
 
-*Example*:
-- Card Sale Amount: Rs. 100,000.00
-- Card Machine Fee: `0.3456%`
-- Service Charges Deducted: $\text{Rs. } 100,000 \times \frac{0.3456}{100} = \text{Rs. } 345.60$
-- Net Bank Amount: $\text{Rs. } 100,000 - 345.60 = \text{Rs. } 99,654.40$
+$$\text{Batch Pure Sales} = \sum \text{Swipe Amounts}$$
+$$\text{Batch Service Charges} = \text{Batch Pure Sales} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
+$$\text{Net Bank Receivable} = \text{Batch Pure Sales} - \text{Batch Service Charges}$$
+
+*Benchmark Example*:
+- Entry 1: Rs. 200.00 (Pure fuel dispensed)
+- Entry 2: Rs. 200.00 (Pure fuel dispensed)
+- **Batch Pure Sales Total**: **Rs. 400.00**
+- Card Machine Fee Rate: `0.3000%`
+- **Batch Service Charges Deducted**: $\text{Rs. } 400.00 \times \frac{0.3000}{100} = \mathbf{Rs.\ 1.20}$ (Deducted on total 400, not individual 200s)
+- **Net Bank Receivable Deposited**: $\text{Rs. } 400.00 - 1.20 = \mathbf{Rs.\ 398.80}$
 
 ---
 

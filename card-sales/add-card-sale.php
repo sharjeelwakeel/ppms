@@ -98,8 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         break;
                     }
                 }
-                $schg = round($amt * ($fee_pct / 100), 2);
-                $net  = round($amt - $schg, 2);
+                // Service charges are NOT deducted on individual transactions; they are deducted on batch total during settlement
+                $schg = 0.00;
+                $net  = $amt;
 
                 // User entered difference or auto-calculated from machine revenue charge %
                 if (isset($differences[$i]) && trim($differences[$i]) !== '') {

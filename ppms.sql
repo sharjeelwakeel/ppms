@@ -6352,6 +6352,8 @@ CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
   `revenue_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
   `revenue_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `payment_status` ENUM('Unpaid', 'Partial', 'Paid') NOT NULL DEFAULT 'Unpaid',
   `notes` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `deleted_at` DATETIME DEFAULT NULL,
@@ -6359,6 +6361,104 @@ CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
   KEY `idx_card_machine_id` (`card_machine_id`),
   KEY `idx_settlement_date` (`settlement_date`),
   KEY `idx_shift_id` (`shift_id`),
+  KEY `idx_payment_status` (`payment_status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_card_settlement_payments` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `payment_date` DATE NOT NULL,
+  `card_machine_id` INT(11) NOT NULL,
+  `bank_id` INT(11) NOT NULL,
+  `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `filter_from_date` DATE DEFAULT NULL,
+  `filter_to_date` DATE DEFAULT NULL,
+  `transaction_ref` VARCHAR(128) DEFAULT NULL,
+  `remarks` TEXT DEFAULT NULL,
+  `created_by` INT(11) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_machine` (`card_machine_id`),
+  KEY `idx_payment_date` (`payment_date`),
+  KEY `idx_bank` (`bank_id`),
+  KEY `idx_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_card_settlement_payment_allocations` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `payment_id` INT(11) NOT NULL,
+  `settlement_id` INT(11) NOT NULL,
+  `allocated_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_payment` (`payment_id`),
+  KEY `idx_settlement` (`settlement_id`),
+  KEY `idx_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_card_revenue_payments` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `payment_date` DATE NOT NULL,
+  `card_machine_id` INT(11) NOT NULL,
+  `payment_mode` ENUM('Cash', 'Bank') NOT NULL DEFAULT 'Cash',
+  `bank_id` INT(11) DEFAULT NULL,
+  `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `filter_from_date` DATE DEFAULT NULL,
+  `filter_to_date` DATE DEFAULT NULL,
+  `transaction_ref` VARCHAR(128) DEFAULT NULL,
+  `remarks` TEXT DEFAULT NULL,
+  `created_by` INT(11) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_machine` (`card_machine_id`),
+  KEY `idx_payment_date` (`payment_date`),
+  KEY `idx_bank` (`bank_id`),
+  KEY `idx_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_card_revenue_payment_allocations` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `payment_id` INT(11) NOT NULL,
+  `settlement_id` INT(11) NOT NULL,
+  `allocated_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_payment` (`payment_id`),
+  KEY `idx_settlement` (`settlement_id`),
+  KEY `idx_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_product_categories` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(128) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `status` ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `tbl_product_subcategories` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `category_id` INT(11) NOT NULL,
+  `name` VARCHAR(128) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `status` ENUM('Active', 'Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_category_id` (`category_id`),
+  KEY `idx_status` (`status`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

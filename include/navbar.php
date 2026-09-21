@@ -301,6 +301,8 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
 
                     <?php if (has_permission('items', 'show')): ?>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>items/items-list.php"><i class="fas fa-cubes mr-1 text-muted"></i> Items</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/categories-list.php"><i class="fas fa-tags mr-1 text-muted"></i> Product Categories</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/subcategories-list.php"><i class="fas fa-tag mr-1 text-muted"></i> Product Subcategories</a>
                     <?php endif; ?>
 
                     <?php if (has_permission('tanks', 'show')): ?>
@@ -365,6 +367,8 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 <i class="fas fa-oil-can mr-1"></i> Stock &amp; Lubricants
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/categories-list.php"><i class="fas fa-tags mr-1 text-muted"></i> Product Categories</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/subcategories-list.php"><i class="fas fa-tag mr-1 text-muted"></i> Product Subcategories</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php"><i class="fas fa-boxes mr-1 text-muted"></i> Products</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Purchases (Inflow)</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Sales (Outflow)</a>
@@ -396,13 +400,15 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
             <?php endif; ?>
 
             <!-- Accounts Menu -->
-            <?php if (has_permission('accounts', 'show') || has_permission('credit_sales', 'show')): ?>
+            <?php if (has_permission('accounts', 'show') || has_permission('credit_sales', 'show') || has_permission('card_sales', 'show')): ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkAccounts" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-wallet mr-1"></i> Accounts
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkAccounts">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/credit-sale-receivables.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Accounts Receivable (Credit Sale)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-sale-receivables.php"><i class="fas fa-credit-card mr-1 text-info"></i> Accounts Receivable (Card Sale)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-revenue-receivables.php"><i class="fas fa-chart-line mr-1 text-primary"></i> Accounts Receivable (Card Revenue)</a>
                 </div>
             </li>
             <?php endif; ?>

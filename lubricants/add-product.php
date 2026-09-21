@@ -27,12 +27,18 @@ if ($chk_del && mysqli_num_rows($chk_del) == 0) {
 }
 
 $message = '';
+$category_id_val = 0;
+$subcategory_id_val = 0;
+
 if (isset($_POST['name']) && isset($_POST['price'])) {
     $name = mysqli_real_escape_string($connection, $_POST['name']);
     $price = floatval($_POST['price']);
     $reorder_level = isset($_POST['reorder_level']) ? intval($_POST['reorder_level']) : 0;
+    $category_id = !empty($_POST['category_id']) ? intval($_POST['category_id']) : "NULL";
+    $subcategory_id = !empty($_POST['subcategory_id']) ? intval($_POST['subcategory_id']) : "NULL";
 
-    $query = "INSERT INTO tbl_lubricant_products (name, price, reorder_level) VALUES ('$name', '$price', '$reorder_level')";
+    $query = "INSERT INTO tbl_lubricant_products (name, price, reorder_level, category_id, subcategory_id) 
+              VALUES ('$name', '$price', '$reorder_level', $category_id, $subcategory_id)";
     
     if (mysqli_query($connection, $query)) {
         header('Location: products-list.php');
@@ -41,6 +47,9 @@ if (isset($_POST['name']) && isset($_POST['price'])) {
         $message = '<div class="alert alert-danger">Error saving product: ' . mysqli_error($connection) . '</div>';
     }
 }
+
+// Fetch active categories
+$categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_categories WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') AND status = 'Active' ORDER BY name ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -82,25 +91,54 @@ if (isset($_POST['name']) && isset($_POST['price'])) {
 							<div class="row">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Product Name</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Category</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="text" name="name" class="form-control" placeholder="e.g. Grease (250g)" required>
+											<select name="category_id" id="category_id" class="form-control">
+												<option value="">-- Select Category (Optional) --</option>
+												<?php 
+												if ($categoriesList && mysqli_num_rows($categoriesList) > 0) {
+													while ($c = mysqli_fetch_assoc($categoriesList)) {
+														echo '<option value="' . $c['id'] . '">' . htmlspecialchars($c['name']) . '</option>';
+													}
+												}
+												?>
+											</select>
 										</div>
 									</div>
 								</div>
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Selling Price</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Subcategory</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<select name="subcategory_id" id="subcategory_id" class="form-control" disabled>
+												<option value="">-- Select Category First --</option>
+											</select>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-2">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Product Name <span class="text-danger">*</span></label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="text" name="name" class="form-control" placeholder="e.g. Helix HX7 10W-40 (4L)" required>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Selling Price <span class="text-danger">*</span></label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
 											<input type="number" step="0.01" min="0" name="price" class="form-control" placeholder="e.g. 350.00" required>
 										</div>
 									</div>
 								</div>
 							</div>
-							<div class="row mt-3">
+							<div class="row mt-2">
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label">Reordering Level</label>
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Reordering Level</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
 											<input type="number" step="1" min="0" name="reorder_level" class="form-control" placeholder="e.g. 10" value="0" required>
 										</div>
@@ -120,4 +158,37 @@ if (isset($_POST['name']) && isset($_POST['price'])) {
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
 	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script>
+    $(document).ready(function() {
+        $('#category_id').on('change', function() {
+            var catId = $(this).val();
+            var $subSelect = $('#subcategory_id');
+            $subSelect.empty();
+
+            if (!catId) {
+                $subSelect.append('<option value="">-- Select Category First --</option>');
+                $subSelect.prop('disabled', true);
+                return;
+            }
+
+            $subSelect.append('<option value="">Loading subcategories...</option>');
+            $subSelect.prop('disabled', true);
+
+            $.getJSON('../categories/ajax-get-subcategories.php', { category_id: catId }, function(data) {
+                $subSelect.empty();
+                $subSelect.append('<option value="">-- Select Subcategory (Optional) --</option>');
+                if (data && data.length > 0) {
+                    $.each(data, function(index, item) {
+                        $subSelect.append('<option value="' + item.id + '">' + item.name + '</option>');
+                    });
+                }
+                $subSelect.prop('disabled', false);
+            }).fail(function() {
+                $subSelect.empty();
+                $subSelect.append('<option value="">Error loading subcategories</option>');
+                $subSelect.prop('disabled', false);
+            });
+        });
+    });
+    </script>
 </html>

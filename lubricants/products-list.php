@@ -71,6 +71,8 @@ $canDelete = has_permission('items', 'delete');
 						<h4><i class="fas fa-boxes mr-2 text-primary"></i>Lubricant Products</h4>
 					</div>
 					<div class="col-md-6 text-right">
+						<a href="../categories/categories-list.php" class="btn btn-outline-secondary btn-sm mr-1"><i class="fas fa-tags mr-1"></i> Categories</a>
+						<a href="../categories/subcategories-list.php" class="btn btn-outline-secondary btn-sm mr-2"><i class="fas fa-tag mr-1"></i> Subcategories</a>
                         <?php if ($canAdd): ?>
 						<a href="add-product.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Product</a>
                         <?php endif; ?>
@@ -79,20 +81,27 @@ $canDelete = has_permission('items', 'delete');
 				<table id="productsListTable" class="table table-striped table-bordered">
 					<thead>
 						<tr>
-							<th>ID</th>
+							<th style="width: 50px;">ID</th>
 							<th>Product Name</th>
-							<th>Reorder Level</th>
-							<th>Selling Price (Rs.)</th>
-							<th>Created At</th>
-							<th>Updated At</th>
+							<th>Category</th>
+							<th>Subcategory</th>
+							<th style="width: 110px;">Reorder Level</th>
+							<th style="width: 130px;">Selling Price (Rs.)</th>
+							<th style="width: 150px;">Created At</th>
+							<th style="width: 150px;">Updated At</th>
                             <?php if ($canDelete): ?>
-							<th style="text-align: center;">Delete</th>
+							<th style="text-align: center; width: 70px;">Delete</th>
                             <?php endif; ?>
 						</tr>
 					</thead>
 					<tbody>
 						<?php 
-						$sql = "SELECT * FROM tbl_lubricant_products WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY id DESC";
+						$sql = "SELECT p.*, c.name AS category_name, sc.name AS subcategory_name 
+                                FROM tbl_lubricant_products p 
+                                LEFT JOIN tbl_product_categories c ON p.category_id = c.id 
+                                LEFT JOIN tbl_product_subcategories sc ON p.subcategory_id = sc.id 
+                                WHERE (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00') 
+                                ORDER BY p.id DESC";
 						$result = mysqli_query($connection, $sql);
 						if($result && mysqli_num_rows($result) > 0){
 							while($row = mysqli_fetch_assoc($result)){
@@ -100,10 +109,19 @@ $canDelete = has_permission('items', 'delete');
                                     ? '<a href="edit-product.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a>'
                                     : '<strong>'.htmlspecialchars($row['name']).'</strong>';
                                 $reorder_val = isset($row['reorder_level']) ? $row['reorder_level'] : ($row['shelf_quantity'] ?? 0);
+                                $catDisplay = !empty($row['category_name'])
+                                    ? '<span class="badge badge-light border text-dark"><i class="fas fa-folder mr-1 text-warning"></i>'.htmlspecialchars($row['category_name']).'</span>'
+                                    : '<span class="text-muted small">—</span>';
+                                $subDisplay = !empty($row['subcategory_name'])
+                                    ? '<span class="badge badge-light border text-info"><i class="fas fa-tag mr-1"></i>'.htmlspecialchars($row['subcategory_name']).'</span>'
+                                    : '<span class="text-muted small">—</span>';
+
 								echo' 
 									<tr>
 										<td>'.$row['id'].'</td>
 										<td>'.$productNameDisplay.'</td>
+										<td>'.$catDisplay.'</td>
+										<td>'.$subDisplay.'</td>
 										<td>'.number_format($reorder_val, 0).'</td>
 										<td>'.number_format($row['price'], 2).'</td>
 										<td>'.date("d-m-Y h:i A", strtotime($row['created_at'])).'</td>

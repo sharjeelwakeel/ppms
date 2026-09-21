@@ -414,26 +414,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <th>Date & Shift</th>
                                         <th>Nozzle / Item</th>
                                         <th>Trace No</th>
-                                        <th>Amount (Rs.)</th>
+                                        <th>Swipe Pure Sale (Rs.)</th>
                                         <th>Revenue Diff (+)</th>
-                                        <th>Fee Charge (-)</th>
-                                        <th>Net Total (Rs.)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="batchItemsBody">
                                     <tr>
-                                        <td colspan="8" class="text-muted text-center py-3">
+                                        <td colspan="6" class="text-muted text-center py-3">
                                             <i class="fas fa-search mr-1"></i> Select Card Machine and enter Batch No to load itemized transactions.
                                         </td>
                                     </tr>
                                 </tbody>
                                 <tfoot id="batchItemsFoot" style="display:none;" class="font-weight-bold bg-light">
                                     <tr>
-                                        <td colspan="4" class="text-right">SUM TOTALS:</td>
-                                        <td class="text-primary" id="footTotGross">Rs. 0.00</td>
-                                        <td class="text-info" id="footTotDiff">Rs. 0.00</td>
-                                        <td class="text-danger" id="footTotFee">-Rs. 0.00</td>
-                                        <td class="text-success" id="footTotNet">Rs. 0.00</td>
+                                        <td colspan="4" class="text-right text-uppercase">Total Pure Swipes:</td>
+                                        <td class="text-primary font-weight-bold" id="footTotGross">Rs. 0.00</td>
+                                        <td class="text-info font-weight-bold" id="footTotDiff">+Rs. 0.00</td>
+                                    </tr>
+                                    <tr class="bg-white text-muted small">
+                                        <td colspan="6" class="text-center py-2 font-weight-normal">
+                                            <i class="fas fa-info-circle text-primary mr-1"></i> Bank service charges are deducted on the batch total amount (e.g. on Total Rs. 400.00), not on individual swipe transactions.
+                                        </td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -599,7 +600,6 @@ function fetchBatchDetails(batchNo) {
                 var rowsHtml = '';
                 for (var j = 0; j < res.items.length; j++) {
                     var itm = res.items[j];
-                    var itmNet = (parseFloat(itm.amount) - parseFloat(itm.service_charges)).toFixed(2);
                     rowsHtml += '<tr>' +
                         '<td>' + (j + 1) + '</td>' +
                         '<td>' + itm.sale_date + ' <small class="text-muted">(' + itm.shift_name + ')</small></td>' +
@@ -607,16 +607,12 @@ function fetchBatchDetails(batchNo) {
                         '<td><span class="text-monospace font-weight-bold">' + (itm.trace_no || '-') + '</span></td>' +
                         '<td class="font-weight-bold text-primary">Rs. ' + itm.amount_fmt + '</td>' +
                         '<td class="font-weight-bold text-info">+Rs. ' + itm.difference_fmt + '</td>' +
-                        '<td class="text-danger">-Rs. ' + itm.service_charges_fmt + '</td>' +
-                        '<td class="font-weight-bold text-success">Rs. ' + itmNet + '</td>' +
                         '</tr>';
                 }
                 $('#batchItemsBody').html(rowsHtml);
                 $('#batchItemsFoot').show();
                 $('#footTotGross').text('Rs. ' + res.total_amount_fmt);
                 $('#footTotDiff').text('+Rs. ' + res.total_difference_fmt);
-                $('#footTotFee').text('-Rs. ' + res.service_charges_fmt);
-                $('#footTotNet').text('Rs. ' + res.total_fmt);
 
             } else {
                 $('#badgeMatchStatus').removeClass('badge-info badge-light badge-success').addClass('badge-warning').text('No Swipes Logged for Batch');

@@ -179,6 +179,12 @@ $canDelete = has_permission('card_sales', 'delete');
             <small class="text-white-50">Manage bank POS batch settlements, swipe counts, fee reconciliation, and net receivables</small>
         </div>
         <div class="d-flex align-items-center">
+            <a href="../accounts/card-sale-receivables.php" class="btn btn-warning text-dark mr-2 font-weight-bold" title="Reconcile Card Accounts Receivable">
+                <i class="fas fa-hand-holding-usd mr-1"></i> Accounts Receivable
+            </a>
+            <a href="../accounts/card-revenue-receivables.php" class="btn btn-info text-white mr-2 font-weight-bold" title="Card Surcharge Revenue Collection">
+                <i class="fas fa-chart-line mr-1"></i> Card Revenue
+            </a>
             <a href="card-sales-list.php" class="btn btn-outline-light mr-2 font-weight-bold" title="Go to Card Sale Reading">
                 <i class="fas fa-credit-card mr-1"></i> Card Sales List
             </a>

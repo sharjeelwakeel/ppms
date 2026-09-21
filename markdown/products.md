@@ -7,10 +7,46 @@ The **Lubricant Products & Inventory** module manages engine oils, lubricants, g
 
 ## 2. Database Schemas
 
-### 1. Products Table (`tbl_lubricant_products`)
+### 1. Product Categories Table (`tbl_product_categories`)
+```sql
+CREATE TABLE IF NOT EXISTS `tbl_product_categories` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(128) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `status` ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+### 2. Product Subcategories Table (`tbl_product_subcategories`)
+```sql
+CREATE TABLE IF NOT EXISTS `tbl_product_subcategories` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `category_id` INT(11) NOT NULL,
+  `name` VARCHAR(128) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `status` ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_category_id` (`category_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+### 3. Products Table (`tbl_lubricant_products`)
 ```sql
 CREATE TABLE IF NOT EXISTS `tbl_lubricant_products` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `category_id` INT(11) DEFAULT NULL,
+  `subcategory_id` INT(11) DEFAULT NULL,
   `name` VARCHAR(128) NOT NULL,
   `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,       -- Selling Price per unit
   `reorder_level` INT(11) NOT NULL DEFAULT 0,         -- Integer minimum inventory threshold
@@ -18,6 +54,8 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_products` (
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
+  KEY `idx_category_id` (`category_id`),
+  KEY `idx_subcategory_id` (`subcategory_id`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ```
@@ -109,9 +147,18 @@ $$\text{Stock Valuation (Rs.)} = \text{Current Stock} \times \text{Selling Price
 
 | File Path | Description |
 |---|---|
-| `lubricants/products-list.php` | Catalog of all lubricant products with integer reorder levels and selling prices |
-| `lubricants/add-product.php` | Form to create a new product with selling price and integer reorder level |
-| `lubricants/edit-product.php` | Form to update product details, pricing, and integer reorder level |
+| `categories/categories-list.php` | Product categories list showing active subcategory & product counts |
+| `categories/add-category.php` | Form to create a new high-level product category |
+| `categories/edit-category.php` | Form to edit category details and active/inactive status |
+| `categories/subcategories-list.php` | Product subcategories list with parent category filter and product counts |
+| `categories/add-subcategory.php` | Form to create a subcategory linked to a parent category |
+| `categories/edit-subcategory.php` | Form to edit subcategory details and parent category linkage |
+| `categories/ajax-get-subcategories.php` | JSON endpoint returning active subcategories for a selected category |
+| `include/deletecategory.php` | Soft-delete endpoint for categories with dependency guards |
+| `include/deletesubcategory.php` | Soft-delete endpoint for subcategories with product dependency guards |
+| `lubricants/products-list.php` | Catalog of all lubricant products with category, subcategory, reorder level, and selling price |
+| `lubricants/add-product.php` | Form to create a new product with category and dynamic cascading subcategory |
+| `lubricants/edit-product.php` | Form to update product details, category, subcategory, and reorder level |
 | `lubricants/purchases-list.php` | Inflow purchase list with Total Amount, Paid Amount, Remaining Balance, and Status |
 | `lubricants/add-purchase.php` | Form to record stock inflows with optional initial bank payment disbursement |
 | `lubricants/edit-purchase.php` | Manage purchase details, view financial KPIs, disburse partial bank payments, and view payment history |
@@ -130,3 +177,22 @@ $$\text{Stock Valuation (Rs.)} = \text{Current Stock} \times \text{Selling Price
 
 - **Post-Redirect-Get (PRG)**: Both purchase and payment forms redirect via `header("Location: edit-purchase.php?id=$id&msg=...")` after POST processing.
 - **Client AJAX Redirection**: `deletePayment()` executes a clean GET redirect upon receiving `'deleted'`, preventing browser form resubmission artifacts.
+
+---
+
+## 6. Product Categories & Subcategories Hierarchy & Rules
+
+1. **Master Classification Hierarchy**:
+   - **Category**: Top-level grouping (e.g. Engine Oil, Brake Fluid, Greases, Radiator Coolants).
+   - **Subcategory**: Secondary grouping linked to a specific Category (e.g. 20W-50, 10W-40, Synthetic, Mineral, DOT 3, DOT 4, Lithium Complex).
+   - **Product (`tbl_lubricant_products`)**: Assigned to a `category_id` with an optional `subcategory_id`.
+
+2. **Cascading Dropdowns**:
+   - On `add-product.php` and `edit-product.php`, selecting a Category triggers an AJAX call to `categories/ajax-get-subcategories.php?category_id=X`.
+   - The subcategory dropdown dynamically populates with active subcategories belonging strictly to that category.
+   - Subcategory is optional on products; selecting only a Category is valid.
+
+3. **Dependency Integrity Guards**:
+   - **Category Deletion**: A Category cannot be deleted if active subcategories or active products are linked to it.
+   - **Subcategory Deletion**: A Subcategory cannot be deleted if active products are linked to it.
+   - Both use soft-delete (`deleted_at = NOW()`).

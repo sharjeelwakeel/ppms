@@ -116,20 +116,27 @@ Each card transaction row records exactly 6 fields:
 5. **Amount (Rs.) \***: Total gross transaction swipe amount.
 6. **Difference (Rs.)**: Machine revenue difference charge.
 
-### 2. Difference & Net Bank Deposit Formulas
+### 2. Difference, Pure Sales & Batch Total Bank Service Fee Formulas
 - **Difference Calculation**:
   When a card machine is selected or the amount changes, Difference is automatically populated from the machine's configured `revenue_charge` %:
   $$\text{difference} = \text{amount} \times \left(\frac{\text{revenue\_charge}}{100}\right)$$
-  Operators can also manually adjust this difference field if necessary.
-- **Bank Service Charges (Commission Fee)**:
-  Computed automatically using the machine's 4-decimal POS percentage fee (`charges_percentage`):
-  $$\text{service\_charges} = \text{amount} \times \left(\frac{\text{charges\_percentage}}{100}\right)$$
-- **Net Bank Receivable**:
-  $$\text{net\_amount} = \text{amount} - \text{service\_charges}$$
+  Operators can also manually adjust this difference field if necessary. Difference represents the station's internal markup.
+
+- **Pure Sales on Individual Swipes (NO Per-Transaction Fee Deduction)**:
+  Individual card swipe transactions in `tbl_meter_reading_card_sales` represent pure gross fuel dispensed by nozzles:
+  $$\text{service\_charges} = 0.00, \quad \text{net\_amount} = \text{amount}$$
+  *Motorists pay the exact pump price for fuel. Individual nozzle logs never deduct bank commission fees.*
+
+- **Bank Service Charges Deducted Strictly on Batch Total (`tbl_card_sale_settlements`)**:
+  Bank processing commission (`charges_percentage`) is deducted **exclusively on the BATCH TOTAL** pure card sales:
+  $$\text{Total Pure Sales} = \sum \text{amount} \quad (\text{e.g. } 200.00 + 200.00 = \mathbf{Rs.\ 400.00})$$
+  $$\text{Batch Service Charges} = \text{Total Pure Sales} \times \left(\frac{\text{charges\_percentage}}{100}\right) \quad (\text{e.g. } 400.00 \times 0.30\% = \mathbf{Rs.\ 1.20})$$
+  $$\text{Net Bank Receivable} = \text{Total Pure Sales} - \text{Batch Service Charges} \quad (\text{e.g. } 400.00 - 1.20 = \mathbf{Rs.\ 398.80})$$
 
 > [!IMPORTANT]
-> **Revenue Charge Exclusion Rule**:
-> Revenue charges (`difference`) represent internal station revenue markup and are **STRICTLY NOT INCLUDED in the Net Settlement Total**. The Net Settlement Total accounts **ONLY for Bank Service Charges** deducted from Pure Sales ($\text{Net Total} = \text{Pure Sales} - \text{Bank Service Charges}$). Physical bank terminal settlement slips reconcile purely card sales less bank commission fees.
+> **Batch Total Fee Deduction & Revenue Charge Exclusion Rules**:
+> 1. **Batch Total Rule**: Bank service charges are **never deducted on individual card swipe transactions**. For instance, if two entries of Rs. 200.00 are swiped, the bank fee is calculated on the combined **Total Rs. 400.00**. This guarantees 100% precision matching the commercial POS terminal settlement slip without fractional penny rounding discrepancies.
+> 2. **Revenue Charge Exclusion**: Revenue charges (`difference`) represent internal station revenue markup and are **STRICTLY NOT INCLUDED in the Net Settlement Total**. Physical bank terminal settlements reconcile purely card sales less bank commission fees ($\text{Net Total} = \text{Pure Sales} - \text{Bank Service Charges}$).
 
 ### 3. Nozzle Reading Decoupling
 Physical nozzle meter counters and shift usage rely exclusively on Detail Meter Readings (`tbl_meter_reading_details` and shift closing readings). Card sales record monetary settlements and revenue differences without mutating nozzle running start readings.
@@ -251,7 +258,7 @@ When entering or selecting a Batch No, the system queries [`card-sales/ajax-get-
 - **Modal Popup On-Demand Display**: The 4 separated calculation metrics (**TOTAL AMOUNT**, **REVENUE CHARGES** with current rate %, **SERVICE CHARGES** with bank fee %, **NET SETTLEMENT TOTAL**) and the itemized card swipe records table are displayed inside a Bootstrap modal popup upon clicking the **"View Calculations & Swipes Popup"** button.
 - **Empty Settlement Amount Input**: The Settlement Amount field starts empty so the operator explicitly cross-verifies against the physical POS batch receipt and inputs the actual slip figure.
 - **Apply Total Button**: The popup modal includes an **"Apply Total to Settlement Amount"** button that automatically copies the calculated net total into the form's amount input and closes the modal.
-- **Itemized Swipes Table in Popup**: The modal contains a detailed table listing every swipe in that batch (`#`, `Date & Shift`, `Nozzle / Item`, `Trace No`, `Total Amount`, `Revenue Diff`, `Fee Charge`, `Net Amount`).
+- **Itemized Swipes Table in Popup**: The modal contains a detailed table listing every swipe in that batch (`#`, `Date & Shift`, `Nozzle / Item`, `Trace No`, `Pure Sale Amount`, `Revenue Diff`). Bank service charges are deducted on the batch total (e.g. on Total Rs. 400.00), not on individual swipe transactions.
 
 ### 5. Settlement Amount Mismatch Alert & Operator Override
 When an operator inputs a settlement amount and clicks **Save Settlement**:
