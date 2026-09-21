@@ -210,7 +210,7 @@ if ($isSearched) {
                     if ($q_ref && $r_ref = mysqli_fetch_assoc($q_ref)) {
                         $origQuota = floatval($r_ref['ref_bal']);
                         if ($origQuota <= 0) {
-                            $origQuota = max(0.00, floatval($r_ref['issue_quantity']) - floatval($r_ref['quantity']));
+                            $origQuota = max(0.00, floatval($r_ref['quantity']) - floatval($r_ref['issue_quantity']));
                         }
                     }
                 }
@@ -233,17 +233,19 @@ if ($isSearched) {
                 $row['orig_quota_settled']    = $origQuota;
                 $row['price_fluctuation_ltr'] = $priceFluctLtr;
             } else { // Permanent Slip
-                $dispensedQty = $baseQty;
-                $effIssue     = ($issueQty > 0) ? $issueQty : $baseQty;
+                // $baseQty is the authorized voucher quota (billed to customer)
+                // $issueQty is physical fuel pumped into vehicle right now (<= baseQty)
+                $dispensedQty = ($issueQty > 0 && $issueQty <= $baseQty) ? $issueQty : $baseQty;
 
                 // Direct charge amount from db (or fallback)
                 $chgAmt = floatval($row['charge_amount']);
                 if ($chgAmt <= 0) {
-                    $chgAmt = round(($effIssue * $rate) + ($wasoli * $tempRate), 2);
+                    $t_rate = ($tempRate > 0) ? $tempRate : $rate;
+                    $chgAmt = round(($baseQty * $rate) + ($wasoli * $t_rate), 2);
                 }
-                // Auto-compute balance if balance fields were 0 but effIssue > baseQty
-                if ($bal <= 0 && $effIssue > $baseQty) {
-                    $bal = max(0.00, round($effIssue - $baseQty, 2));
+                // Auto-compute balance if balance fields were 0 but issueQty was logged (<= baseQty)
+                if ($bal <= 0 && $issueQty > 0 && $baseQty >= $issueQty) {
+                    $bal = max(0.00, round($baseQty - $issueQty, 2));
                 }
 
                 $customers_ledger[$accNo]['permanent_fuel']    += $dispensedQty;
@@ -561,7 +563,7 @@ if ($isSearched) {
                                         <th style="width: 100px;">Vehicle No</th>
                                         <th>Nozzle / Fuel</th>
                                         <th style="width: 75px;" class="text-right">Rate</th>
-                                        <th style="width: 85px;" class="text-right">Issued (Ltr)</th>
+                                        <th style="width: 85px;" class="text-right">Slip Qty (Ltr)</th>
                                         <th style="width: 85px;" class="text-right text-primary">Pumped (Ltr)</th>
                                         <th style="width: 95px;" class="text-right">Balance Quota</th>
                                         <th style="width: 155px;" class="text-left text-warning">Temp. Receive</th>
@@ -579,9 +581,10 @@ if ($isSearched) {
                                         } elseif ($st === 'Temporary Slip') {
                                             $badgeClass = 'slip-badge-temp';
                                         }
-                                        $issVal = floatval($slip['issue_quantity']);
+                                        $baseVal = floatval($slip['quantity']);
+                                        $issVal  = floatval($slip['issue_quantity']);
                                         $dispVal = floatval($slip['dispensed_qty']);
-                                        $displayIssue = ($issVal > 0) ? $issVal : $dispVal;
+                                        $slipDisplayQty = ($st === 'Balanced Slip') ? (!empty($slip['orig_quota_settled']) ? floatval($slip['orig_quota_settled']) : $dispVal) : $baseVal;
                                     ?>
                                     <tr>
                                         <td class="text-center font-weight-bold text-muted"><?php echo $sn++; ?></td>
@@ -599,7 +602,7 @@ if ($isSearched) {
                                         </td>
                                         <td class="text-right"><?php echo number_format($slip['rate'], 2); ?></td>
                                         <td class="text-right font-weight-bold text-muted">
-                                            <?php echo number_format($displayIssue, 2); ?>
+                                            <?php echo number_format($slipDisplayQty, 2); ?>
                                         </td>
                                         <td class="text-right font-weight-bold text-primary">
                                             <?php echo number_format($dispVal, 2); ?>

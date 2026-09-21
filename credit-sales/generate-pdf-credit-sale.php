@@ -258,15 +258,10 @@ if ($res) {
     </table>
 
     <!-- Metrics Cards -->
-    <!-- Metrics Cards -->
     <div class="metric-cards">
         <div class="metric-cell">
             <div class="lbl">Total Fuel Volume</div>
             <div class="val"><?php echo number_format($tot_qty, 2); ?> Ltr</div>
-        </div>
-        <div class="metric-cell">
-            <div class="lbl">Gross Fuel Amount</div>
-            <div class="val">Rs. <?php echo number_format($tot_amt, 2); ?></div>
         </div>
         <div class="metric-cell" style="background: #fff5f5; border-color: #fca5a5;">
             <div class="lbl" style="color: #b91c1c;">Billable Charge (To Collect)</div>
@@ -291,7 +286,6 @@ if ($res) {
                 <th style="width: 80px;">Nozzle / Item</th>
                 <th style="width: 45px;">Qty</th>
                 <th style="width: 45px;">Rate</th>
-                <th style="width: 55px;">Fuel Rs.</th>
                 <th style="width: 55px;">Tmp. Rec</th>
                 <th style="width: 65px;">Charge Rs.</th>
                 <th style="width: 75px;">Status</th>
@@ -302,7 +296,7 @@ if ($res) {
             if (empty($slips)): 
             ?>
             <tr>
-                <td colspan="13" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
+                <td colspan="12" style="text-align: center; color: #94a3b8; padding: 15px;">No credit sales recorded for this date.</td>
             </tr>
             <?php 
             else: 
@@ -345,7 +339,6 @@ if ($res) {
                 <td style="text-align: center;"><?php echo htmlspecialchars($s['nozzle_name'] ?? ''); ?> <span style="color: #64748b; font-size: 8.5px;">(<?php echo htmlspecialchars($s['item_name'] ?? ''); ?>)</span></td>
                 <td style="text-align: right; font-weight: bold;"><?php echo number_format($qty, 2); ?></td>
                 <td style="text-align: right;"><?php echo number_format($rate, 2); ?></td>
-                <td style="text-align: right;"><?php echo number_format($amt, 2); ?></td>
                 <td style="text-align: right; font-weight: bold; color: #b45309;"><?php echo ($wasoli > 0) ? number_format($wasoli, 2) : '—'; ?></td>
                 <td style="text-align: right; font-weight: bold; color: #b91c1c;"><?php echo number_format($charge, 2); ?></td>
                 <td style="text-align: center;"><?php echo $statusHtml; ?></td>
@@ -355,7 +348,6 @@ if ($res) {
                 <td colspan="7" style="text-align: right; font-size: 10.5px;">TOTALS:</td>
                 <td style="text-align: right; color: #04204e; font-size: 10.5px;"><?php echo number_format($tot_qty, 2); ?></td>
                 <td style="text-align: right;">—</td>
-                <td style="text-align: right; font-size: 10.5px;">Rs. <?php echo number_format($tot_amt, 2); ?></td>
                 <td style="text-align: right; font-size: 10.5px; color: #b45309;"><?php echo ($tot_wasoli > 0) ? number_format($tot_wasoli, 2) : '—'; ?></td>
                 <td style="text-align: right; font-size: 11px; color: #b91c1c;">Rs. <?php echo number_format($tot_charge, 2); ?></td>
                 <td></td>

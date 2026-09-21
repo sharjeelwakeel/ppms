@@ -81,9 +81,9 @@ switch ($action) {
             $where .= " AND cs.account_number = '$cust_id'";
         }
 
-        $sql = "SELECT cs.id, cs.slip_no, cs.slip_date, cs.quantity, cs.rate, cs.amount, 
+        $sql = "SELECT cs.id, cs.slip_no, cs.slip_date, cs.quantity, cs.rate, cs.amount, cs.cash_rate,
                        cs.vehicle_number, cs.account_number,
-                       c.name AS customer_name, n.item_id, i.name AS item_name
+                       c.name AS customer_name, n.item_id, i.name AS item_name, i.cash_rate AS item_cash_rate
                 FROM tbl_meter_reading_credit_sales cs
                 LEFT JOIN tbl_customers c ON (cs.account_number = c.id)
                 LEFT JOIN tbl_nozzles n ON (cs.nozzle_id = n.id)
@@ -93,15 +93,24 @@ switch ($action) {
 
         $res = mysqli_query($connection, $sql);
         if ($res && $row = mysqli_fetch_assoc($res)) {
-            $qty  = floatval($row['quantity']);
-            $rate = floatval($row['rate']);
+            $qty       = floatval($row['quantity']);
+            $rate      = floatval($row['rate']);
+            $cash_rate = floatval($row['cash_rate']);
 
-            // Double check historical price for that date if stored rate was 0
-            if ($rate <= 0 && intval($row['item_id']) > 0) {
+            // Double check historical price for that date if stored rates are 0
+            if (intval($row['item_id']) > 0) {
                 $pr = get_price_for_date($connection, 'tbl_items', intval($row['item_id']), $row['slip_date']);
                 if ($pr) {
-                    $rate = floatval($pr['credit_rate']) > 0 ? floatval($pr['credit_rate']) : floatval($pr['cash_rate']);
+                    if ($rate <= 0) {
+                        $rate = floatval($pr['credit_rate']) > 0 ? floatval($pr['credit_rate']) : floatval($pr['cash_rate']);
+                    }
+                    if ($cash_rate <= 0) {
+                        $cash_rate = floatval($pr['cash_rate']);
+                    }
                 }
+            }
+            if ($cash_rate <= 0) {
+                $cash_rate = floatval($row['item_cash_rate'] ?? 0);
             }
 
             echo json_encode([
@@ -112,6 +121,7 @@ switch ($action) {
                 'slip_date'      => $row['slip_date'],
                 'quantity'       => $qty,
                 'rate'           => $rate,
+                'cash_rate'      => $cash_rate,
                 'value'          => round($qty * $rate, 2),
                 'vehicle_number' => $row['vehicle_number'],
                 'customer_name'  => $row['customer_name'] ?? 'Account #' . $row['account_number'],
@@ -199,8 +209,10 @@ switch ($action) {
             $orig_rate = floatval($row['rate']);
 
             if ($total_balance <= 0) {
-                // If balances are 0, check if issue_qty > qty
-                $calc_bal = max(0, floatval($row['issue_quantity']) - floatval($row['quantity']));
+                // If balances are 0, check if issue_qty was logged (< quantity)
+                $iss_q = floatval($row['issue_quantity']);
+                $tot_q = floatval($row['quantity']);
+                $calc_bal = ($iss_q > 0 && $tot_q >= $iss_q) ? max(0, $tot_q - $iss_q) : 0;
                 if ($calc_bal > 0) {
                     $total_balance = $calc_bal;
                     $bal1 = $calc_bal;
@@ -227,13 +239,19 @@ switch ($action) {
 
             // Resolve active price on the claim date based on customer policy
             $resolved_rate = 0.00;
+            $cash_rate     = 0.00;
             if ($item_id > 0) {
                 $p_info = get_price_for_date($connection, 'tbl_items', $item_id, $claim_date);
                 if ($p_info) {
                     $resolved_rate = ($cust_policy === 'Cash') ? floatval($p_info['cash_rate']) : floatval($p_info['credit_rate']);
+                    $cash_rate     = floatval($p_info['cash_rate']);
                 } else {
                     $resolved_rate = ($cust_policy === 'Cash') ? floatval($row['item_cash_rate']) : floatval($row['item_credit_rate']);
+                    $cash_rate     = floatval($row['item_cash_rate']);
                 }
+            }
+            if ($cash_rate <= 0) {
+                $cash_rate = floatval($row['item_cash_rate'] ?? 0);
             }
 
             if ($resolved_rate > 0) {
@@ -271,6 +289,7 @@ switch ($action) {
                 'original_rate'      => $orig_rate,
                 'prepaid_money'      => $prepaid_money,
                 'current_rate'       => $active_price,
+                'cash_rate'          => $cash_rate,
                 'adjusted_litres'    => $adjusted_litres,
                 'volume_diff'        => $volume_diff,
                 'price_diff'         => $price_diff,

@@ -183,7 +183,6 @@ if ($res_slips) {
                             <th>Shift</th>
                             <th>Total Slips</th>
                             <th>Total Dispensed (Ltr)</th>
-                            <th>Fuel Amount (Rs.)</th>
                             <th>Total Billable Charge (Rs.)</th>
                             <th>Giving Loan (Ltr)</th>
                             <th>Temp. Receive (Ltr)</th>
@@ -225,9 +224,6 @@ if ($res_slips) {
                             </td>
                             <td class="font-weight-bold text-dark">
                                 <?php echo number_format($row['total_qty'], 2); ?> Ltr
-                            </td>
-                            <td class="text-muted font-weight-bold">
-                                Rs. <?php echo number_format($row['total_amount'], 2); ?>
                             </td>
                             <td>
                                 <strong class="text-danger" style="font-size: 13.5px;">
@@ -310,7 +306,6 @@ if ($res_slips) {
                                 <th>Nozzle / Item</th>
                                 <th>Qty (Ltr)</th>
                                 <th>Rate (Rs.)</th>
-                                <th>Amount (Rs.)</th>
                                 <th>Temp. Receive</th>
                                 <th>Charge (Rs.)</th>
                                 <th>Status</th>
@@ -367,7 +362,7 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
     var html = '';
     
     if (slips.length === 0) {
-        html = '<tr><td colspan="13" class="text-muted py-3">No slip details available.</td></tr>';
+        html = '<tr><td colspan="12" class="text-muted py-3">No slip details available.</td></tr>';
     } else {
         var totQty = 0, totAmt = 0, totChg = 0, totWasoli = 0;
         for (var i = 0; i < slips.length; i++) {
@@ -419,7 +414,6 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
                 '<td>' + (s.nozzle_name || 'Nozzle') + ' <small class="text-muted">(' + (s.item_name || 'Fuel') + ')</small></td>' +
                 '<td class="font-weight-bold">' + q.toFixed(2) + '</td>' +
                 '<td>' + (parseFloat(s.rate) || 0).toFixed(2) + '</td>' +
-                '<td>Rs. ' + a.toFixed(2) + '</td>' +
                 '<td>' + wasoliCell + '</td>' +
                 '<td class="font-weight-bold text-danger">Rs. ' + c.toFixed(2) + '</td>' +
                 '<td>' + statusBadge + '</td>' +
@@ -430,7 +424,6 @@ function viewDaySlips(rawDate, shiftId, formattedDate, shiftName) {
             '<td colspan="7" class="text-right">SHIFT TOTALS:</td>' +
             '<td class="text-primary">' + totQty.toFixed(2) + ' Ltr</td>' +
             '<td>—</td>' +
-            '<td>Rs. ' + totAmt.toFixed(2) + '</td>' +
             '<td class="text-warning">' + (totWasoli > 0 ? totWasoli.toFixed(2) + ' Ltr' : '—') + '</td>' +
             '<td class="text-danger">Rs. ' + totChg.toFixed(2) + '</td>' +
             '<td></td>' +

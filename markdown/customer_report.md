@@ -71,18 +71,26 @@ The report handles all 4 transaction types identified in [`credit_sales.md`](cre
 
 ### Scenario 1: Standard Permanent Slip (Normal Credit Sale)
 - **Description**: Customer arrives with a fresh voucher, fills fuel, and is invoiced.
+- **Core Invariant**: **`issue_quantity` must always be less than or equal to `quantity`** ($\text{issue\_quantity} \le \text{quantity}$).
 - **Ledger Impact**:
-  - **Issued (Ltr)**: Voucher capacity (or pumped volume if no split balance).
-  - **Pumped (Ltr)**: Volume dispensed into tank (`quantity`).
-  - **Balance Quota**: If voucher is not fully pumped, shows badge `+X.XX Ltr Quota`.
-  - **Must Pay**: Full slip charge $\text{charge\_amount} = \text{issue\_quantity} \times \text{sale\_rate}$.
+  - **Slip Qty (Ltr)**: Authorized voucher capacity billed to customer (`quantity`).
+  - **Pumped (Ltr)**: Physical volume dispensed into vehicle tank right now (`issue_quantity` if $> 0$, else `quantity`).
+  - **Balance Quota**: If vehicle takes partial fuel, uncollected balance quota is generated:
+    $$\text{balance\_1} = \max(0, \text{quantity} - \text{issue\_quantity})$$
+    Shows badge `+X.XX Ltr Quota`.
+  - **Must Pay**: Full voucher slip charge:
+    $$\text{charge\_amount} = \text{quantity} \times \text{sale\_rate}$$
 
 ### Scenario 2: Permanent Slip Settling a Temporary Slip (Wasoli)
-- **Description**: Customer arrives with a permanent slip that settles an earlier loan chit (e.g. wasoli of 10.53 Ltr from Slip #4010).
+- **Description**: Customer arrives with a permanent voucher that settles an earlier loan chit (e.g. wasoli of 10.53 Ltr from Slip #4010) and takes fresh fuel.
+- **Core Invariant**: Fresh fuel issued today must satisfy $\text{issue\_quantity} \le \text{quantity}$.
 - **Ledger Impact**:
   - **Settling Permanent Slip**:
     - Displays green link badge: `🔗 Settles Temp #4010 (10.53 Ltr @ Rs. 285.00)`.
-    - **Must Pay**: Includes the settled loan charge $(\text{wasoli} \times \text{temp\_rate})$ in its `charge_amount`.
+    - **Slip Qty (Ltr)**: Fresh voucher volume (`quantity`).
+    - **Pumped (Ltr)**: Fresh physical fuel dispensed today (`issue_quantity`).
+    - **Must Pay**: Computes and sums both fresh voucher fuel and settled historical loan fuel:
+      $$\text{charge\_amount} = (\text{quantity} \times \text{rate}_{\text{today}}) + (\text{wasoli} \times \text{temp\_rate})$$
   - **Settled Temporary Slip**:
     - Displays status badge: `✅ Settled in Slip #<id>`.
     - **Must Pay**: Shows `Rs. 0.00` with subtext `Billed on Slip #<id>` to prevent double charging.
@@ -118,9 +126,9 @@ The itemized report table renders 12 standardized columns:
 | 5 | `Vehicle No` | `vehicle_number` | Registration plate (e.g. `LE-1234`, `LES-5678`) |
 | 6 | `Nozzle / Fuel` | `fuel_name` & `nozzle_name` | Fuel grade (Super / Diesel) and physical nozzle |
 | 7 | `Rate` | `sale_rate` | Historical unit price per litre |
-| 8 | `Issued (Ltr)` | `issue_quantity` | Capacity printed on voucher |
-| 9 | `Pumped (Ltr)` | `quantity` | Physical volume dispensed through nozzle |
-| 10 | `Balance Quota` | `balance_1 + balance_2` or `-quantity` | Quota generated (`+`) or quota claimed (`-`) |
+| 8 | `Slip Qty (Ltr)` | `quantity` | Authorized voucher quota billed to customer |
+| 9 | `Pumped (Ltr)` | `issue_quantity` or `quantity` | Physical volume dispensed into vehicle tank (<= slip qty) |
+| 10 | `Balance Quota` | `balance_1 + balance_2` or `-quantity` | Quota generated (`+`, quantity - issue_quantity) or quota claimed (`-`) |
 | 11 | `Temp. Receive` | `wasoli` & settlement status | Loan volume and whether settled or open |
 | 12 | `Must Pay (Rs.)` | `charge_amount` | Invoiced receivable billed to customer |
 

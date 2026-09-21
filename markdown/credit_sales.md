@@ -20,13 +20,13 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
   `slip_type` ENUM('Permanent Slip','Balanced Slip','Temporary Slip') NOT NULL DEFAULT 'Permanent Slip',
   `account_number` VARCHAR(128) NOT NULL,              -- Customer ID (tbl_customers.id)
   `vehicle_number` VARCHAR(64) NOT NULL,              -- Registration number
-  `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,      -- Physical litres pumped into car from nozzle
+  `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,      -- Voucher slip volume (billed to customer: qty * rate)
   `rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,          -- Sale rate per litre applied
   `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,        -- Gross fuel value (qty * rate)
   `charge_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- Amount billable to customer account
   `cash_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00,     -- Baseline cash rate for audit
-  `issue_quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,-- Slip authorized quota
-  `balance_1` DECIMAL(12,2) NOT NULL DEFAULT 0.00,     -- Uncollected balance slot 1
+  `issue_quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,-- Physical fuel pumped into vehicle tank (<= quantity)
+  `balance_1` DECIMAL(12,2) NOT NULL DEFAULT 0.00,     -- Remaining uncollected balance (quantity - issue_quantity)
   `balance_2` DECIMAL(12,2) NOT NULL DEFAULT 0.00,     -- Uncollected balance slot 2
   `wasoli` DECIMAL(12,2) NOT NULL DEFAULT 0.00,        -- Temp. Receive quantity
   `temp_slip_id` INT(11) DEFAULT NULL,                 -- Linked temporary slip ID settled
@@ -52,51 +52,66 @@ CREATE TABLE IF NOT EXISTS `tbl_meter_reading_credit_sales` (
 
 ## 3. The 4 Operational Scenarios & Real-World Examples
 
+> [!IMPORTANT]
+> ### 🛡️ Core System Invariant: `issue_quantity <= quantity` (Strict Rule)
+> Across the entire PPMS Credit Sales subsystem, **`issue_quantity` must ALWAYS be less than or equal to `quantity`** ($\text{issue\_quantity} \le \text{quantity}$):
+> 1. **`quantity` = Authorized Voucher Quota Billed**: Represents the credit volume approved on the physical voucher. The customer organization is billed for this volume ($\text{charge\_amount} = \text{quantity} \times \text{rate}$).
+> 2. **`issue_quantity` = Fuel Issued Today**: Represents the physical litres pumped into the vehicle tank right now at the station nozzle ($\Delta\text{nozzle} = \text{issue\_quantity}$).
+> 3. **Strict Validation**: A vehicle can **never** be issued more fuel than authorized by the slip. If $\text{issue\_quantity} > \text{quantity}$, client-side JavaScript (`validateCreditForm`) blocks submission with an alert and field focus, and server-side PHP enforces the check with a database rollback.
+> 4. **Automatic Balance**: Uncollected quota is automatically tracked: $\text{balance\_1} = \max(0, \text{quantity} - \text{issue\_quantity})$.
+> 5. **Dual-Fuel Settlement**: When settling an attached loan chit (`wasoli`) alongside fresh fuel (`quantity`): $\text{charge\_amount} = (\text{quantity} \times \text{rate}_{\text{today}}) + (\text{wasoli} \times \text{temp\_rate})$.
+
+---
+
 ### 📘 Scenario 1: Permanent Slip (Without Temp. Receive)
 
 #### Business Rule
-When a customer presents an authorized voucher for an issued volume (`issue_qty`), but the vehicle's fuel tank fills at a lower volume (`qty`):
-- **Customer Charge**: The customer is charged for the full voucher volume:
-  $$\text{charge\_amount} = \text{issue\_qty} \times \text{rate}$$
-- **Physical Nozzle Advance**: The nozzle meter advances strictly by the physical litres dispensed:
-  $$\Delta\text{nozzle} = \text{qty}$$
-- **Remaining Balance**: The uncollected litres remain on record for future collection:
-  $$\text{balance} = \max(0, \text{issue\_qty} - \text{qty}) \quad (\text{stored in } \texttt{balance\_1})$$
+When a customer presents an authorized credit voucher for a slip volume (`quantity`), but the vehicle's fuel tank is only issued a partial volume (`issue_quantity`):
+- **Core Rule**: **`issue_quantity` must always be less than or equal to `quantity`** ($\text{issue\_quantity} \le \text{quantity}$). A vehicle cannot be issued more fuel than authorized by the slip.
+- **Customer Charge**: The customer organization is billed for the voucher quantity:
+  $$\text{charge\_amount} = \text{quantity} \times \text{rate}$$
+- **Physical Fuel Dispensed & Nozzle Advance**: The nozzle meter advances strictly by the fuel issued to the vehicle today:
+  $$\Delta\text{nozzle} = (\text{issue\_quantity} > 0) \mathrel{?} \text{issue\_quantity} : \text{quantity}$$
+- **Remaining Balance Quota**: The uncollected litres remain on record for future collection:
+  $$\text{balance} = \max(0, \text{quantity} - \text{issue\_quantity}) \quad (\text{stored in } \texttt{balance\_1})$$
 - **Slip Date Pricing**:
   - If `slip_date < current_date`: System queries `tbl_prices` for the price effective on that historical voucher date.
   - If `slip_date >= current_date`: Uses the current active market price.
   - Rate tier policy (`tbl_customers.fuel_rate`: `Cash` vs `Credit`) is dynamically enforced.
 
 #### Numerical Example:
-- Voucher Slip `#SL-101` is issued for **50 Litres** (`issue_qty = 50.00`).
-- The vehicle tank fills at **40 Litres** (`qty = 40.00`).
+- Voucher Slip `#SL-101` is authorized for **50 Litres** (`quantity = 50.00`).
+- The vehicle tank takes **40 Litres** today (`issue_quantity = 40.00`, strictly $\le 50.00$).
 - Price on slip date is **Rs. 200.00 per Litre**.
-- **Customer Charge**: $50 \times 200 = \mathbf{Rs.\;10,000.00}$.
-- **Nozzle Meter Advance**: $\mathbf{+40.00\text{ Litres}}$.
-- **Remaining Balance**: $50 - 40 = \mathbf{10.00\text{ Litres}}$ (saved in `balance_1`).
+- **Customer Charge**: $50 \times 200 = \mathbf{Rs.\;10,000.00}$ (billed against voucher quantity).
+- **Physical Nozzle Advance**: $\mathbf{+40.00\text{ Litres}}$ (fuel issued to vehicle today).
+- **Remaining Balance Quota**: $50 - 40 = \mathbf{10.00\text{ Litres}}$ (saved in `balance_1`).
 
 ---
 
 ### 📗 Scenario 2: Permanent Slip (With Temp. Receive Settlement)
 
 #### Business Rule
-When a customer previously took fuel on loan (Temporary Slip) and now brings a Permanent Slip:
+When a customer previously took fuel on loan (Temporary Slip) and now brings a Permanent Slip, and also takes fresh fuel:
 - In the row's `Temp. Receive` column, checking the link trigger opens the **Temp. Receive Lookup Modal**.
 - The operator selects the unsettled Temporary Slip (by Slip No and Date).
-- The system fetches the loaned litres (`temp_qty`) and the rate effective on that loan date (`temp_rate`).
-- **Customer Charge Calculation**:
-  $$\text{charge\_amount} = (\text{issue\_qty} \times \text{rate}_{\text{today}}) + (\text{temp\_qty} \times \text{temp\_rate})$$
-- **Physical Nozzle Advance**: Only advances by today's pumped fuel (`qty`), because the loaned fuel (`temp_qty`) was already deducted from the station meter on the loan date:
-  $$\Delta\text{nozzle} = \text{qty}$$
+- The system fetches the loaned litres (`wasoli`) and the rate effective on that loan date (`temp_rate`).
+- The operator inputs the voucher slip quantity (`quantity`) and the fuel issued today (`issue_quantity` $\le \text{quantity}$).
+- **Customer Charge Calculation**: Both fresh voucher fuel and settled historical loan fuel are computed and summed together:
+  $$\text{charge\_amount} = (\text{quantity} \times \text{rate}_{\text{today}}) + (\text{wasoli} \times \text{temp\_rate})$$
+- **Physical Fuel Dispensed & Nozzle Advance**: Advances by today's issued fuel:
+  $$\Delta\text{nozzle} = (\text{issue\_quantity} > 0) \mathrel{?} \text{issue\_quantity} : \text{quantity}$$
+  *(Loaned fuel `wasoli` was already deducted from the station meter on its original loan date).*
 - **Settlement**: The temporary slip is marked `is_returned = 1`, `settled_in_slip_id = current_permanent_slip_id`, preventing double claims.
 
 #### Numerical Example:
 - **Two weeks ago (Aug 20)**: Driver took **25 Litres** on loan chit `#TMP-88`. Price on Aug 20 was **Rs. 240.00/L** (Prepaid Loan Value = $25 \times 240 = \text{Rs. } 6,000$).
-- **Today (Sep 06)**: Company issues Permanent Slip `#SL-500` for **50 Litres** at today's rate of **Rs. 260.00/L**.
-- Car takes **50 Litres** today (`qty = 50.00`, `issue_qty = 50.00`).
+- **Today (Sep 06)**: Company issues Permanent Slip `#SL-500` for **50 Litres** voucher quota at today's rate of **Rs. 260.00/L**.
+- Driver takes **15 Litres** fresh fuel today (`quantity = 50.00`, `issue_quantity = 15.00`).
 - **Total Charge**:
   $$(50 \times 260) + (25 \times 240) = 13,000 + 6,000 = \mathbf{Rs.\;19,000.00}$$
-- **Nozzle Meter Advance Today**: $\mathbf{+50.00\text{ Litres}}$.
+- **Remaining Balance Quota**: $50 - 15 = \mathbf{35.00\text{ Litres}}$ (saved in `balance_1`).
+- **Nozzle Meter Advance Today**: $\mathbf{+15.00\text{ Litres}}$.
 
 ---
 
@@ -176,8 +191,8 @@ When fuel is dispensed on loan without a formal voucher:
 
 | Scenario | Slip Type | Billed Charge Amount | Nozzle Meter Reading Advance | Temp. Receive Role | Balance Created / Drawn |
 |---|---|---|---|---|---|
-| **Scenario 1** | `Permanent Slip` | $\text{issue\_qty} \times \text{rate}$ | $\text{qty}$ | None (`0.00`) | Creates $\text{issue\_qty} - \text{qty}$ in `balance_1` |
-| **Scenario 2** | `Permanent Slip` | $(\text{issue\_qty} \times \text{rate}) + (\text{temp\_qty} \times \text{temp\_rate})$ | $\text{qty}$ | Invoices prior loan chit via modal | Creates $\text{issue\_qty} - \text{qty}$ |
+| **Scenario 1** | `Permanent Slip` | $\text{quantity} \times \text{rate}$ | $(\text{issue\_qty} > 0) \mathrel{?} \text{issue\_qty} : \text{quantity}$ | None (`0.00`) | Creates $\max(0, \text{quantity} - \text{issue\_qty})$ in `balance_1` ($\text{issue\_qty} \le \text{quantity}$) |
+| **Scenario 2** | `Permanent Slip` | $(\text{quantity} \times \text{rate}) + (\text{wasoli} \times \text{temp\_rate})$ | $(\text{issue\_qty} > 0) \mathrel{?} \text{issue\_qty} : \text{quantity}$ | Invoices prior loan chit via modal | Creates $\max(0, \text{quantity} - \text{issue\_qty})$ ($\text{issue\_qty} \le \text{quantity}$) |
 | **Scenario 3** | `Balanced Slip` | $\mathbf{Rs.\;0.00}$ | `Adjusted Litres` | Disabled (`0.00`) | Merges prior `balance_1 + balance_2`, adjusts for price |
 | **Scenario 4** | `Temporary Slip` | $\mathbf{Rs.\;0.00}$ | $\text{qty}$ | Disabled (`0.00`) | Saved as open loan chit (`is_returned = 0`) |
 
@@ -219,3 +234,36 @@ Every appearance of the legacy term `Wasoli` or `Wasooli` across PPMS is standar
    - Selecting or changing a vehicle (`onCreditVehicleInput`), nozzle (`updateCreditItem`), or slip date (`onSlipDateChange`) delegates to `resolveCreditRowRate($row)`. This invokes `ajax-credit-slip-lookup.php?action=get_price_for_date` to query `tbl_prices` for the effective price on that row's slip date, applying the customer's tariff policy without overwriting with current day station rates.
    - Balanced Slips preserve the rate established by the claimed balance voucher and are protected from general price lookups.
    - Initial population of existing rows in edit mode uses `skipPriceFetch = true` to preserve saved database rates against asynchronous race conditions.
+
+---
+
+## 7. UI Simplification & Field Standards
+
+1. **Fuel Amount Removal from UI (Pure Billing Focus)**:
+   - **User Interface Simplification**: The `Fuel Amt` / `Fuel Amount (Rs.)` column has been removed from all visible user interfaces:
+     - `add-credit-sale.php`: Spreadsheet grid header and column removed; bottom summary `Gross Fuel Amount` hidden.
+     - `edit-credit-sale.php`: Spreadsheet grid header and column removed; bottom summary `Gross Fuel Amount` hidden.
+     - `credit-sales-list.php`: Removed from main statement table and Day Slips detail modal.
+     - `generate-pdf-credit-sale.php`: Removed from PDF table and summary metrics.
+   - **Underlying Data Integrity Preserved**: The database column `tbl_meter_reading_credit_sales.amount` remains intact. The spreadsheet rows silently maintain `<input type="hidden" name="credit_amount[]" class="credit-amount-field">`, preserving mathematical calculations (`qty × rate`) and array synchronization without displaying redundant figures to the operator.
+   - **Reasoning**: In credit transactions, the critical financial metric owed by the customer is the **Billable Charge Amount (`charge_amount`)**. Displaying both raw fuel amount and billable charge caused confusion for station attendants when permanent slips had issue quota differences or when balanced slips had Rs. 0 charge.
+
+2. **Rate Field Placeholders (`Sale Rate` & `Cash Rate`)**:
+   - In both `add-credit-sale.php` and `edit-credit-sale.php`, the primary credit rate field (`credit_rate[]`) explicitly specifies `placeholder="Sale Rate"`, and the baseline cash rate field (`credit_cash_rate[]`) explicitly specifies `placeholder="Cash Rate"`.
+   - The dynamic pricing handler `resolveCreditRowRate()` resets placeholders to `"Sale Rate"` and `"Cash Rate"` rather than legacy `"Pick Date"` text, ensuring clear and consistent guidance to station operators even before a date is selected.
+   - When new or unpriced rows are added, default zero values are omitted (`value=""`), allowing browsers to render the `"Sale Rate"` and `"Cash Rate"` placeholders cleanly without displaying `0.00`.
+
+3. **Cash Rate Auto-Population (Balanced & Attached Slips)**:
+   - **Operational Rule**: When claiming a **Balanced Slip** or settling an **Attached Temporary Slip**, the baseline `Cash Rate` field (`credit_cash_rate[]`) is **automatically populated**:
+     - *Balanced Slips*: The lookup endpoint `ajax-credit-slip-lookup.php?action=find_balance_slip` resolves the effective market `cash_rate` for the fuel item on the **balance claim date** and auto-fills the `Cash Rate` field upon voucher selection (`applyBalanceSlipToRow`).
+     - *Attached Slips*: Attaching an unsettled loan chit via `attachTempSlipToRow` auto-populates the historical or shift `cash_rate`.
+     - *Dynamic Recalibration*: `resolveCreditRowRate()` automatically synchronizes the row's `Cash Rate` with `res.cash_rate` whenever nozzle, vehicle, or slip date changes, while safely protecting the adjusted sale rate (`credit_rate`) of claimed balanced slips from being overwritten.
+   - **Audit & Storage**: Station attendants no longer have to manually type the cash rate for balanced or attached rows; the accurate market baseline cash rate is recorded automatically alongside `0.00` charge amounts for full ledger consistency.
+
+4. **Permanent Slip Charging Basis & Invariant Enforcement**:
+   - **Billed Against Slip `Quantity`**: Permanent slips are billed against the authorized voucher volume (`quantity * rate`), reflecting the full credit amount approved by the customer organization.
+   - **Physical Delivery (`issue_quantity`) & Strict Invariant**: `issue_quantity` specifies how much fuel the vehicle physically takes at the nozzle right now. **`issue_quantity` must always be less than or equal to `quantity`** ($\text{issue\_quantity} \le \text{quantity}$).
+   - **Automatic Balance Tracking**: Any unpumped fuel remaining on the voucher automatically generates remaining balance quota for future claim:
+     $$\text{balance\_1} = \max(0, \text{quantity} - \text{issue\_quantity})$$
+   - **Temp Slip Dual-Fuel Price Addition**: When an unsettled loan slip is attached (`attachTempSlipToRow`) and additional fresh fuel is added (`quantity`), the UI spreadsheet and backend calculate both components and sum them into `charge_amount`:
+     $$\text{charge\_amount} = (\text{quantity} \times \text{rate}_{\text{today}}) + (\text{wasoli} \times \text{temp\_rate})$$

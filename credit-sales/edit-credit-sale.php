@@ -182,6 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valid = false;
                 break;
             }
+            $st_chk  = trim($slip_types[$i] ?? 'Permanent Slip');
+            $qty_chk = floatval($qtys_arr[$i] ?? 0);
+            $iss_chk = floatval($issue_qtys[$i] ?? 0);
+            if ($st_chk === 'Permanent Slip' && $iss_chk > $qty_chk) {
+                $error_msg = 'Row #' . ($i + 1) . ': Issue Quantity (' . number_format($iss_chk, 2) . ' Ltr) cannot be greater than Slip Quantity (' . number_format($qty_chk, 2) . ' Ltr). Issue quantity must always be less than or equal to quantity.';
+                $valid = false;
+                break;
+            }
         }
 
         if ($valid) {
@@ -259,10 +267,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
 
-                        $eff_issue = ($issue_qty > 0) ? $issue_qty : $qty;
-                        $bal1      = max(0.00, round($eff_issue - $qty, 2));
+                        $bal1      = ($issue_qty > 0 && $qty >= $issue_qty) ? max(0.00, round($qty - $issue_qty, 2)) : 0.00;
                         $t_rate    = ($temp_rate > 0) ? $temp_rate : $rate;
-                        $charge_amt = round(($eff_issue * $rate) + ($wasoli * $t_rate), 2);
+                        $new_fuel_charge = round($qty * $rate, 2);
+                        $temp_fuel_charge = ($wasoli > 0) ? round($wasoli * $t_rate, 2) : 0.00;
+                        $charge_amt = round($new_fuel_charge + $temp_fuel_charge, 2);
                     } elseif ($slip_type === 'Balanced Slip') {
                         $charge_amt = 0.00;
                         $bal1       = floatval($bal1_arr[$i] ?? 0);
@@ -445,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="p-3">
                 <div class="table-responsive">
-                    <table class="table table-bordered table-sm text-center mb-0" id="creditSalesTable" style="min-width: 2150px;">
+                    <table class="table table-bordered table-sm text-center mb-0" id="creditSalesTable" style="min-width: 2025px;">
                         <thead>
                             <tr style="background: var(--primary-color); color: #fff;">
                                 <th style="width: 180px; min-width: 180px;">Nozzle</th>
@@ -457,7 +466,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <th style="width: 125px; min-width: 125px;">Item</th>
                                 <th style="width: 105px; min-width: 105px;">Qty (Ltr)</th>
                                 <th style="width: 110px; min-width: 110px;">Sale Rate</th>
-                                <th style="width: 125px; min-width: 125px;">Fuel Amt</th>
                                 <th style="width: 125px; min-width: 125px;">Charge Amt</th>
                                 <th style="width: 110px; min-width: 110px;">Cash Rate</th>
                                 <th style="width: 105px; min-width: 105px;">Issue Qty</th>
@@ -484,7 +492,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <span class="text-muted small d-block font-weight-bold">TOTAL FUEL:</span>
                             <span class="text-dark font-weight-bold" id="lblTotalQty">0.00 Ltr</span>
                         </div>
-                        <div class="mr-3">
+                        <div class="mr-3" style="display:none;">
                             <span class="text-muted small d-block font-weight-bold">GROSS FUEL AMOUNT:</span>
                             <span class="text-dark font-weight-bold" id="lblTotalAmount">Rs. 0.00</span>
                         </div>
@@ -567,9 +575,11 @@ function addCreditRowWithData(data) {
     var accountVal       = data ? data.account_number : '';
     var qtyVal           = data ? parseFloat(data.quantity) : 0;
     var rateVal          = data ? parseFloat(data.rate) : 0;
+    var rateDisplay      = (rateVal > 0) ? rateVal.toFixed(2) : '';
     var amountVal        = data ? parseFloat(data.amount) : 0;
     var chargeVal        = data ? parseFloat(data.charge_amount) : 0;
-    var cashRateVal      = data ? parseFloat(data.cash_rate) : 0;
+    var rawCashRate      = data ? parseFloat(data.cash_rate) : 0;
+    var cashRateDisplay  = (rawCashRate > 0) ? rawCashRate.toFixed(2) : '';
     var issueVal         = data ? parseFloat(data.issue_quantity) : 0;
     var bal1Val          = data ? parseFloat(data.balance_1) : 0;
     var bal2Val          = data ? parseFloat(data.balance_2) : 0;
@@ -633,10 +643,9 @@ function addCreditRowWithData(data) {
         '<td><input type="text" name="credit_account_number[]" class="form-control form-control-sm credit-account-number font-weight-bold" placeholder="Cust ID" value="' + accountVal + '" readonly style="background-color:#e9ecef; cursor:not-allowed;"></td>' +
         '<td><input type="text" class="form-control form-control-sm credit-item-name" disabled></td>' +
         '<td><input type="number" step="0.01" name="credit_quantity[]" class="form-control form-control-sm credit-qty font-weight-bold text-primary" value="' + qtyVal + '" oninput="calculateCreditRow(this)"></td>' +
-        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate font-weight-bold" value="' + rateVal + '" oninput="calculateCreditRow(this)"></td>' +
-        '<td><input type="number" step="0.01" name="credit_amount[]" class="form-control form-control-sm credit-amount-field" value="' + amountVal + '" readonly style="background-color:#f8f9fa;"></td>' +
-        '<td><input type="number" step="0.01" name="credit_charge_amount[]" class="form-control form-control-sm credit-charge-amount-field font-weight-bold text-primary" value="' + chargeVal + '" readonly style="background-color:#eef2ff;"></td>' +
-        '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" value="' + cashRateVal + '"></td>' +
+        '<td><input type="number" step="0.01" name="credit_rate[]" class="form-control form-control-sm credit-rate font-weight-bold" placeholder="Sale Rate" value="' + rateDisplay + '" oninput="calculateCreditRow(this)"></td>' +
+        '<td><input type="number" step="0.01" name="credit_charge_amount[]" class="form-control form-control-sm credit-charge-amount-field font-weight-bold text-primary" value="' + chargeVal + '" readonly style="background-color:#eef2ff;"><input type="hidden" name="credit_amount[]" class="credit-amount-field" value="' + amountVal + '"></td>' +
+        '<td><input type="number" step="0.01" name="credit_cash_rate[]" class="form-control form-control-sm credit-cash-rate" placeholder="Cash Rate" value="' + cashRateDisplay + '"></td>' +
         '<td><input type="number" step="0.01" name="credit_issue_quantity[]" class="form-control form-control-sm credit-issue-qty" value="' + issueVal + '" oninput="calculateCreditRow(this)"></td>' +
         '<td><input type="number" step="0.01" name="credit_balance_1[]" class="form-control form-control-sm credit-bal1" value="' + bal1Val + '" readonly style="background-color:#f8f9fa;"></td>' +
         '<td><input type="number" step="0.01" name="credit_balance_2[]" class="form-control form-control-sm credit-bal2" value="' + bal2Val + '" readonly style="background-color:#f8f9fa;"></td>' +
@@ -678,8 +687,14 @@ function addCreditRowWithData(data) {
         if (issueVal > 0) {
             $newRow.find('.credit-issue-qty').val(issueVal);
         }
-        $newRow.find('.credit-rate').val(rateVal);
-        $newRow.find('.credit-cash-rate').val(cashRateVal);
+        if (rateVal > 0) {
+            $newRow.find('.credit-rate').val(rateVal.toFixed(2));
+        } else {
+            $newRow.find('.credit-rate').val('');
+        }
+        if (rawCashRate > 0) {
+            $newRow.find('.credit-cash-rate').val(rawCashRate.toFixed(2));
+        }
         $newRow.find('.credit-amount-field').val(amountVal);
         $newRow.find('.credit-charge-amount-field').val(chargeVal);
         calculateCreditRow($newRow.find('.credit-qty')[0]);
@@ -728,6 +743,7 @@ function onSlipTypeChange(radioElement, rowId) {
         $row.find('.credit-temp-slip-date').val('');
         $row.find('.credit-temp-rate').val(0);
         $issueQty.prop('readonly', false).css({'background-color': '', 'cursor': ''});
+        resolveCreditRowRate($row);
         openBalanceSlipModal(rowId);
     } else if (val === 'Temporary Slip') {
         $claimBtn.hide();
@@ -743,6 +759,7 @@ function onSlipTypeChange(radioElement, rowId) {
         $row.find('.credit-ref-slip-no').val('');
         $row.find('.credit-ref-slip-date').val('');
         $issueQty.prop('readonly', true).css({'background-color': '#e9ecef', 'cursor': 'not-allowed'}).val($qty.val());
+        resolveCreditRowRate($row);
     } else { // Permanent Slip
         $claimBtn.hide();
         $balInfo.hide().html('');
@@ -752,6 +769,7 @@ function onSlipTypeChange(radioElement, rowId) {
         $linkBtn.prop('disabled', false);
         $row.find('.credit-ref-slip-no').val('');
         $row.find('.credit-ref-slip-date').val('');
+        resolveCreditRowRate($row);
     }
 
     calculateCreditRow($row.find('.credit-qty')[0]);
@@ -759,12 +777,7 @@ function onSlipTypeChange(radioElement, rowId) {
 
 function resolveCreditRowRate($row, callback) {
     var slipType = $row.find('.credit-slip-type-val').val();
-    // Balanced Slip rate is determined by the claimed balance voucher, do not overwrite
-    if (slipType === 'Balanced Slip' && $row.find('.credit-ref-slip-no').val()) {
-        calculateCreditRow($row.find('.credit-qty')[0]);
-        if (callback) callback();
-        return;
-    }
+    var isClaimedBalancedSlip = (slipType === 'Balanced Slip' && $row.find('.credit-ref-slip-no').val());
 
     var slipDate = $row.find('.credit-slip-date').val() || '';
     var nzId = $row.find('.credit-nozzle-select').val();
@@ -773,8 +786,8 @@ function resolveCreditRowRate($row, callback) {
 
     if (!nz || !nz.item_id || !slipDate) {
         if (!slipDate) {
-            $row.find('.credit-rate').val('').attr('placeholder', 'Pick Date');
-            $row.find('.credit-cash-rate').val('').attr('placeholder', 'Pick Date');
+            $row.find('.credit-rate').val('').attr('placeholder', 'Sale Rate');
+            $row.find('.credit-cash-rate').val('').attr('placeholder', 'Cash Rate');
         }
         calculateCreditRow($row.find('.credit-qty')[0]);
         if (callback) callback();
@@ -788,13 +801,17 @@ function resolveCreditRowRate($row, callback) {
         policy: policy
     }, function(res) {
         if (res && res.status === 'success') {
-            $row.find('.credit-rate').val(parseFloat(res.applicable_rate).toFixed(2));
+            if (!isClaimedBalancedSlip) {
+                $row.find('.credit-rate').val(parseFloat(res.applicable_rate).toFixed(2));
+            }
             $row.find('.credit-cash-rate').val(parseFloat(res.cash_rate).toFixed(2));
         } else {
             var cr = parseFloat(nz.credit_rate) || 0;
             var ca = parseFloat(nz.cash_rate) || 0;
             var fallback = (policy === 'Cash') ? ca : (cr > 0 ? cr : ca);
-            $row.find('.credit-rate').val(fallback.toFixed(2));
+            if (!isClaimedBalancedSlip) {
+                $row.find('.credit-rate').val(fallback.toFixed(2));
+            }
             $row.find('.credit-cash-rate').val(ca.toFixed(2));
         }
         calculateCreditRow($row.find('.credit-qty')[0]);
@@ -886,15 +903,20 @@ function calculateCreditRow(element) {
     $row.find('.credit-amount-field').val(fuelAmount.toFixed(2));
 
     var chargeAmount = 0;
-    if (slipType === 'Permanent Slip') {
-        var effectiveIssue = (issueQty > 0) ? issueQty : qty;
-        var newFuelCharge = effectiveIssue * rate;
+    if ($row.find('.credit-slip-type-val').val() === 'Permanent Slip' || slipType === 'Permanent Slip') {
+        var newFuelCharge = qty * rate;
         var tempFuelCharge = (wasoli > 0) ? (wasoli * tempRate) : 0;
         chargeAmount = newFuelCharge + tempFuelCharge;
 
-        // Auto-calculate remaining balance
-        var remainingBal = Math.max(0, effectiveIssue - qty);
-        $row.find('.credit-bal1').val(remainingBal.toFixed(2));
+        // Invariant: issue_quantity must always be <= quantity
+        if (qty > 0 && issueQty > qty) {
+            $row.find('.credit-issue-qty').addClass('is-invalid');
+            $row.find('.credit-bal1').val('0.00');
+        } else {
+            $row.find('.credit-issue-qty').removeClass('is-invalid');
+            var remainingBal = (qty > 0 && issueQty > 0 && issueQty <= qty) ? (qty - issueQty) : 0;
+            $row.find('.credit-bal1').val(remainingBal.toFixed(2));
+        }
     } else if (slipType === 'Balanced Slip') {
         chargeAmount = 0.00;
     } else if (slipType === 'Temporary Slip') {
@@ -1013,6 +1035,16 @@ function attachTempSlipToRow() {
     $row.find('.credit-temp-slip-no').val(currentSelectedTempSlip.slip_no);
     $row.find('.credit-temp-slip-date').val(currentSelectedTempSlip.slip_date);
     $row.find('.credit-temp-rate').val(rate.toFixed(2));
+    var tempCashRate = parseFloat(currentSelectedTempSlip.cash_rate) || 0;
+    if (tempCashRate > 0 && (!$row.find('.credit-cash-rate').val() || parseFloat($row.find('.credit-cash-rate').val()) <= 0)) {
+        $row.find('.credit-cash-rate').val(tempCashRate.toFixed(2));
+    } else if (!$row.find('.credit-cash-rate').val()) {
+        var nzId = $row.find('.credit-nozzle-select').val();
+        var nz = nozzlesData.find(function(n) { return n.id == nzId; });
+        if (nz && parseFloat(nz.cash_rate) > 0) {
+            $row.find('.credit-cash-rate').val(parseFloat(nz.cash_rate).toFixed(2));
+        }
+    }
 
     $row.find('.temp-linked-badge').show().html(
         '<span class="badge badge-success text-white font-weight-bold" title="Settling Loan Slip ' + currentSelectedTempSlip.slip_date + '">' +
@@ -1020,6 +1052,12 @@ function attachTempSlipToRow() {
         '</span>'
     );
 
+    var curRate = parseFloat($row.find('.credit-rate').val()) || 0;
+    if (curRate <= 0) {
+        resolveCreditRowRate($row, function() {
+            calculateCreditRow($row.find('.credit-qty')[0]);
+        });
+    }
     calculateCreditRow($row.find('.credit-qty')[0]);
     $('#tempReceiveModal').modal('hide');
 }
@@ -1147,6 +1185,18 @@ function applyBalanceSlipToRow() {
 
     $row.find('.credit-qty').val(adjLitres.toFixed(2));
     $row.find('.credit-issue-qty').val(adjLitres.toFixed(2));
+
+    var balCashRate = parseFloat(currentSelectedBalSlip.cash_rate) || 0;
+    if (balCashRate > 0) {
+        $row.find('.credit-cash-rate').val(balCashRate.toFixed(2));
+    } else {
+        var nzId = $row.find('.credit-nozzle-select').val();
+        var nz = nozzlesData.find(function(n) { return n.id == nzId; });
+        if (nz && parseFloat(nz.cash_rate) > 0) {
+            $row.find('.credit-cash-rate').val(parseFloat(nz.cash_rate).toFixed(2));
+        }
+    }
+
     $row.find('.credit-bal1').val(parseFloat(currentSelectedBalSlip.balance_1).toFixed(2));
     $row.find('.credit-bal2').val(parseFloat(currentSelectedBalSlip.balance_2).toFixed(2));
 
@@ -1230,6 +1280,15 @@ function validateCreditForm() {
             valid = false;
             return false;
         }
+        var issueQty = parseFloat($(this).find('.credit-issue-qty').val()) || 0;
+        var slipType = $(this).find('.credit-slip-type-val').val();
+        if (slipType === 'Permanent Slip' && issueQty > qty) {
+            alert('Row #' + rowNum + ': Issue Quantity (' + issueQty.toFixed(2) + ' Ltr) cannot be greater than Slip Quantity (' + qty.toFixed(2) + ' Ltr). Issue quantity must always be less than or equal to quantity.');
+            $(this).find('.credit-issue-qty').focus().addClass('is-invalid');
+            valid = false;
+            return false;
+        }
+        $(this).find('.credit-issue-qty').removeClass('is-invalid');
     });
     return valid;
 }
