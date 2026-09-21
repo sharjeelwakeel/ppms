@@ -81,8 +81,8 @@ if (isset($_POST['product_id']) && isset($_POST['quantity']) && isset($_POST['pu
     }
 }
 
-// Fetch products
-$products_sql = "SELECT id, name FROM tbl_lubricant_products WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
+// Fetch products with active purchase rate
+$products_sql = "SELECT id, name, COALESCE(purchase_rate, 0) AS purchase_rate FROM tbl_lubricant_products WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
 $products_result = mysqli_query($connection, $products_sql);
 
 // Fetch active banks for payment disbursement
@@ -138,13 +138,18 @@ $banks_result = mysqli_query($connection, $banks_sql);
 									<div class="form-group row">
 										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Product</label>
 										<div class="col-lg-9 col-md-7 col-sm-8">
-											<select name="product_id" class="form-control" required>
+											<select name="product_id" id="productId" class="form-control" onchange="onProductSelect(this)" required>
                                                 <option value="">Select Product</option>
                                                 <?php 
+                                                $preselected_purchase_rate = 0;
                                                 if ($products_result && mysqli_num_rows($products_result) > 0) {
                                                     while ($product = mysqli_fetch_assoc($products_result)) {
-                                                        $selected = ($product['id'] == $preselected_product_id) ? 'selected' : '';
-                                                        echo '<option value="' . $product['id'] . '" ' . $selected . '>' . htmlspecialchars($product['name']) . '</option>';
+                                                        $is_selected = ($product['id'] == $preselected_product_id);
+                                                        $selected = $is_selected ? 'selected' : '';
+                                                        if ($is_selected) {
+                                                            $preselected_purchase_rate = floatval($product['purchase_rate']);
+                                                        }
+                                                        echo '<option value="' . $product['id'] . '" data-purchase-rate="' . floatval($product['purchase_rate']) . '" ' . $selected . '>' . htmlspecialchars($product['name']) . '</option>';
                                                     }
                                                 }
                                                 ?>
@@ -160,7 +165,7 @@ $banks_result = mysqli_query($connection, $banks_sql);
 									<div class="form-group row">
 										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label">Purchase Price</label>
 										<div class="col-lg-9 col-md-7 col-sm-8">
-											<input type="number" step="0.01" min="0" name="purchase_price" id="purchasePrice" class="form-control" placeholder="0.00" oninput="calculateTotal()" required>
+											<input type="number" step="0.01" min="0" name="purchase_price" id="purchasePrice" class="form-control" placeholder="0.00" value="<?php echo ($preselected_purchase_rate > 0) ? number_format($preselected_purchase_rate, 2, '.', '') : ''; ?>" oninput="calculateTotal()" required>
 										</div>
 									</div>
 								</div>
@@ -234,5 +239,27 @@ $banks_result = mysqli_query($connection, $banks_sql);
         var total = qty * price;
         $('#totalCostDisplay').val(total.toFixed(2));
     }
+
+    function onProductSelect(selectElem) {
+        var selectedOpt = $(selectElem).find('option:selected');
+        var rate = parseFloat(selectedOpt.data('purchase-rate')) || 0;
+        if (selectedOpt.val() !== '' && rate > 0) {
+            $('#purchasePrice').val(rate.toFixed(2));
+        } else if (selectedOpt.val() === '') {
+            $('#purchasePrice').val('');
+        }
+        calculateTotal();
+    }
+
+    $(document).ready(function() {
+        var selectedOpt = $('#productId option:selected');
+        if (selectedOpt.val() !== '') {
+            var rate = parseFloat(selectedOpt.data('purchase-rate')) || 0;
+            if (rate > 0 && (!$('#purchasePrice').val() || parseFloat($('#purchasePrice').val()) === 0)) {
+                $('#purchasePrice').val(rate.toFixed(2));
+            }
+        }
+        calculateTotal();
+    });
     </script>
 </html>

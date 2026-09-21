@@ -58,6 +58,54 @@ if (!function_exists('init_prices_table')) {
                 ");
             }
         }
+
+        // Auto-migrate tbl_lubricant_products: ensure cash_rate, credit_rate, and purchase_rate columns exist
+        $chk_lp = mysqli_query($connection, "SHOW TABLES LIKE 'tbl_lubricant_products'");
+        if ($chk_lp && mysqli_num_rows($chk_lp) > 0) {
+            $chk_cash = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'cash_rate'");
+            if ($chk_cash && mysqli_num_rows($chk_cash) === 0) {
+                mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN cash_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER name");
+                mysqli_query($connection, "UPDATE tbl_lubricant_products SET cash_rate = price WHERE cash_rate = 0.00 AND price > 0");
+            }
+            $chk_cred = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'credit_rate'");
+            if ($chk_cred && mysqli_num_rows($chk_cred) === 0) {
+                mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN credit_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER cash_rate");
+                mysqli_query($connection, "UPDATE tbl_lubricant_products SET credit_rate = price WHERE credit_rate = 0.00 AND price > 0");
+            }
+            $chk_pur = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'purchase_rate'");
+            if ($chk_pur && mysqli_num_rows($chk_pur) === 0) {
+                mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN purchase_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER credit_rate");
+            }
+
+            // Seed existing active products from tbl_lubricant_products if missing from tbl_prices
+            $seed_lp = mysqli_query($connection, "
+                SELECT p.id, 
+                       COALESCE(p.cash_rate, p.price, 0) AS cash_rate, 
+                       COALESCE(p.credit_rate, p.price, 0) AS credit_rate, 
+                       COALESCE(p.purchase_rate, 0) AS purchase_rate, 
+                       DATE(p.created_at) as cdate
+                FROM tbl_lubricant_products p
+                LEFT JOIN tbl_prices pr ON (pr.table_name = 'tbl_lubricant_products' AND pr.table_id = p.id)
+                WHERE (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+                  AND pr.id IS NULL
+            ");
+            if ($seed_lp && mysqli_num_rows($seed_lp) > 0) {
+                while ($prod = mysqli_fetch_assoc($seed_lp)) {
+                    $prodId     = intval($prod['id']);
+                    $cRate      = floatval($prod['cash_rate']);
+                    $crRate     = floatval($prod['credit_rate']);
+                    $pRate      = floatval($prod['purchase_rate']);
+                    $effDate    = !empty($prod['cdate']) ? $prod['cdate'] : date('Y-m-d');
+                    
+                    mysqli_query($connection, "
+                        INSERT INTO tbl_prices 
+                        (table_name, table_id, cash_rate, credit_rate, purchase_rate, effective_date, is_active, notes)
+                        VALUES 
+                        ('tbl_lubricant_products', '$prodId', '$cRate', '$crRate', '$pRate', '$effDate', 1, 'Initial baseline rate')
+                    ");
+                }
+            }
+        }
     }
 }
 
@@ -66,7 +114,7 @@ if (!function_exists('set_active_price')) {
      * Deactivate previous prices for the entity, insert new active price, and sync target table cache
      *
      * @param mysqli $connection
-     * @param string $table_name e.g. 'tbl_items' or 'tbl_products'
+     * @param string $table_name e.g. 'tbl_items' or 'tbl_lubricant_products'
      * @param int $table_id ID of item/product
      * @param float $cash_rate
      * @param float $credit_rate
@@ -123,7 +171,10 @@ if (!function_exists('set_active_price')) {
             } elseif ($table_name === 'tbl_lubricant_products' || $table_name === 'tbl_products') {
                 mysqli_query($connection, "
                     UPDATE tbl_lubricant_products 
-                    SET price = '$cash_rate',
+                    SET cash_rate = '$cash_rate',
+                        credit_rate = '$credit_rate',
+                        purchase_rate = '$purchase_rate',
+                        price = '$cash_rate',
                         updated_at = NOW()
                     WHERE id = '$table_id'
                 ");
@@ -240,7 +291,10 @@ if (!function_exists('soft_delete_price')) {
                 } elseif ($table_name === 'tbl_lubricant_products' || $table_name === 'tbl_products') {
                     mysqli_query($connection, "
                         UPDATE tbl_lubricant_products 
-                        SET price = '$new_cash',
+                        SET cash_rate = '$new_cash',
+                            credit_rate = '$new_credit',
+                            purchase_rate = '$new_purchase',
+                            price = '$new_cash',
                             updated_at = NOW()
                         WHERE id = '$table_id'
                     ");

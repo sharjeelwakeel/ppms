@@ -6462,6 +6462,29 @@ CREATE TABLE IF NOT EXISTS `tbl_product_subcategories` (
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE IF NOT EXISTS `tbl_lubricant_sale_invoices` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `invoice_no` VARCHAR(64) NOT NULL,
+  `date` DATE NOT NULL,
+  `payment_type` VARCHAR(32) NOT NULL DEFAULT 'Cash',
+  `card_machine_id` INT(11) DEFAULT NULL,
+  `bank_id` INT(11) DEFAULT NULL,
+  `details` TEXT DEFAULT NULL,
+  `total_items` INT(11) NOT NULL DEFAULT 0,
+  `total_quantity` INT(11) NOT NULL DEFAULT 0,
+  `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_by` INT(11) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  `deleted_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_invoice_no` (`invoice_no`),
+  KEY `idx_date` (`date`),
+  KEY `idx_card_machine_id` (`card_machine_id`),
+  KEY `idx_bank_id` (`bank_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

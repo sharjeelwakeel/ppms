@@ -2,12 +2,17 @@
 require '../include/session.php';
 if (!userloggedin()) {
     header('Location:../login.php');
+    exit;
 }
 require '../include/config.php';
 require '../include/permissions.php';
+require_once '../include/price_helper.php';
 
 // Enforce access check for adding lubricant products
 check_access('items', 'add');
+
+// Initialize polymorphic tbl_prices and table auto-migrations
+init_prices_table($connection);
 
 // Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
 $chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
@@ -30,17 +35,25 @@ $message = '';
 $category_id_val = 0;
 $subcategory_id_val = 0;
 
-if (isset($_POST['name']) && isset($_POST['price'])) {
-    $name = mysqli_real_escape_string($connection, $_POST['name']);
-    $price = floatval($_POST['price']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['name'])) {
+    $name = mysqli_real_escape_string($connection, trim($_POST['name']));
+    $cash_rate = isset($_POST['cash_rate']) ? floatval($_POST['cash_rate']) : floatval($_POST['price'] ?? 0);
+    $credit_rate = isset($_POST['credit_rate']) ? floatval($_POST['credit_rate']) : $cash_rate;
+    $purchase_rate = isset($_POST['purchase_rate']) ? floatval($_POST['purchase_rate']) : 0.00;
+    $price = $cash_rate;
     $reorder_level = isset($_POST['reorder_level']) ? intval($_POST['reorder_level']) : 0;
     $category_id = !empty($_POST['category_id']) ? intval($_POST['category_id']) : "NULL";
     $subcategory_id = !empty($_POST['subcategory_id']) ? intval($_POST['subcategory_id']) : "NULL";
+    $effective_date = !empty($_POST['effective_date']) ? mysqli_real_escape_string($connection, trim($_POST['effective_date'])) : date('Y-m-d');
+    $notes = !empty($_POST['notes']) ? mysqli_real_escape_string($connection, trim($_POST['notes'])) : 'Initial base price';
+    $user_id = intval($_SESSION['loggedInUser'] ?? 0);
 
-    $query = "INSERT INTO tbl_lubricant_products (name, price, reorder_level, category_id, subcategory_id) 
-              VALUES ('$name', '$price', '$reorder_level', $category_id, $subcategory_id)";
+    $query = "INSERT INTO tbl_lubricant_products (name, cash_rate, credit_rate, purchase_rate, price, reorder_level, category_id, subcategory_id) 
+              VALUES ('$name', '$cash_rate', '$credit_rate', '$purchase_rate', '$price', '$reorder_level', $category_id, $subcategory_id)";
     
     if (mysqli_query($connection, $query)) {
+        $product_id = mysqli_insert_id($connection);
+        set_active_price($connection, 'tbl_lubricant_products', $product_id, $cash_rate, $credit_rate, $purchase_rate, $effective_date, $notes, $user_id);
         header('Location: products-list.php');
         exit;
     } else {
@@ -58,23 +71,17 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" />
 		<link rel="stylesheet" href="../include/style.css?v=1.0.1" />
 		<style>
-		.m-top{
-			margin-top:20px;
-		}
-		.txt-center{
-			text-align:center;
-		}
+		.m-top{ margin-top:20px; }
+		.txt-center{ text-align:center; }
         .btn-primary {
             background: var(--primary-gradient) !important;
             border: none !important;
         }
-        .btn-primary:hover {
-            opacity: 0.9;
-        }
+        .btn-primary:hover { opacity: 0.9; }
 		</style>
 		<title>PPMS - Add Product</title>
 	</head>
@@ -84,9 +91,12 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
 		<main class="main">
 			<div class="container pt-4 pb-4">
 				<form action="add-product.php" method="POST">
-					<h4 class="mb-5"><i class="fas fa-boxes mr-2 text-primary"></i>Add Lubricant Product</h4>
+					<h4 class="mb-4"><i class="fas fa-boxes mr-2 text-primary"></i>Add Product &amp; Lubricant</h4>
                     <?php echo $message; ?>
-					<div class="card mb-5">
+					<div class="card mb-4 border-0 shadow-sm">
+						<div class="card-header text-white" style="background: var(--primary-color);">
+							<h6 class="mb-0 font-weight-bold"><i class="fas fa-info-circle mr-2"></i>Product Details &amp; Classification</h6>
+						</div>
 						<div class="card-body">
 							<div class="row">
 								<div class="col-md-6">
@@ -128,16 +138,6 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
 								</div>
 								<div class="col-md-6">
 									<div class="form-group row">
-										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Selling Price <span class="text-danger">*</span></label>
-										<div class="col-lg-8 col-md-7 col-sm-8">
-											<input type="number" step="0.01" min="0" name="price" class="form-control" placeholder="e.g. 350.00" required>
-										</div>
-									</div>
-								</div>
-							</div>
-							<div class="row mt-2">
-								<div class="col-md-6">
-									<div class="form-group row">
 										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold">Reordering Level</label>
 										<div class="col-lg-8 col-md-7 col-sm-8">
 											<input type="number" step="1" min="0" name="reorder_level" class="form-control" placeholder="e.g. 10" value="0" required>
@@ -147,6 +147,75 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
 							</div>
 						</div>	
 					</div>
+
+					<div class="card mb-4 border-0 shadow-sm">
+						<div class="card-header text-white" style="background: var(--primary-gradient);">
+							<h6 class="mb-0 font-weight-bold"><i class="fas fa-tags mr-2 text-warning"></i>Pricing Structure &amp; Tariffs</h6>
+						</div>
+						<div class="card-body">
+							<div class="row">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold text-success">
+											<i class="fas fa-money-bill-wave mr-1"></i> Cash Rate (Rs.) <span class="text-danger">*</span>
+										</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="number" step="0.01" min="0" name="cash_rate" id="cash_rate" class="form-control font-weight-bold text-success" placeholder="e.g. 350.00" required>
+											<small class="text-muted">Standard rate applied to cash sales.</small>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold text-primary">
+											<i class="fas fa-file-invoice-dollar mr-1"></i> Credit Rate (Rs.) <span class="text-danger">*</span>
+										</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="number" step="0.01" min="0" name="credit_rate" id="credit_rate" class="form-control font-weight-bold text-primary" placeholder="e.g. 360.00" required>
+											<small class="text-muted">Tariff applied to credit customers.</small>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-2">
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold text-muted">
+											<i class="fas fa-shopping-cart mr-1"></i> Purchase Rate (Rs.) <span class="text-danger">*</span>
+										</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="number" step="0.01" min="0" name="purchase_rate" id="purchase_rate" class="form-control font-weight-bold text-muted" placeholder="e.g. 310.00" value="0.00" required>
+											<small class="text-muted">Cost price per unit paid to supplier.</small>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="form-group row">
+										<label class="col-lg-4 col-md-5 col-sm-4 col-form-label font-weight-bold text-dark">
+											<i class="fas fa-calendar-day mr-1 text-primary"></i> Effective Date <span class="text-danger">*</span>
+										</label>
+										<div class="col-lg-8 col-md-7 col-sm-8">
+											<input type="date" name="effective_date" class="form-control font-weight-bold" value="<?php echo date('Y-m-d'); ?>" required>
+											<small class="text-muted">Date from which this price applies.</small>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="row mt-2">
+								<div class="col-md-12">
+									<div class="form-group row">
+										<label class="col-lg-2 col-md-3 col-sm-4 col-form-label font-weight-bold text-dark">
+											<i class="fas fa-sticky-note mr-1 text-info"></i> Price Notes
+										</label>
+										<div class="col-lg-10 col-md-9 col-sm-8">
+											<input type="text" name="notes" class="form-control" placeholder="e.g. Initial baseline product pricing">
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div class="txt-center">
 						<button type="submit" class="btn btn-primary m-top"><i class="fas fa-save mr-1"></i> Save Product</button>
                         <a href="products-list.php" class="btn btn-secondary m-top ml-2"><i class="fas fa-times mr-1"></i> Cancel</a>
@@ -156,8 +225,8 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
 		</main>
     </body>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
     <script>
     $(document).ready(function() {
         $('#category_id').on('change', function() {
@@ -188,6 +257,14 @@ $categoriesList = mysqli_query($connection, "SELECT id, name FROM tbl_product_ca
                 $subSelect.append('<option value="">Error loading subcategories</option>');
                 $subSelect.prop('disabled', false);
             });
+        });
+
+        // Quick helper: if credit rate is blank, mirror cash rate
+        $('#cash_rate').on('input', function() {
+            var val = $(this).val();
+            if ($('#credit_rate').val() === '') {
+                $('#credit_rate').val(val);
+            }
         });
     });
     </script>

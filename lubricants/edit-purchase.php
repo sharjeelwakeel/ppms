@@ -156,8 +156,8 @@ if (!$purchase) {
     exit;
 }
 
-// Fetch products
-$products_sql = "SELECT id, name FROM tbl_lubricant_products WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
+// Fetch products with active purchase rate
+$products_sql = "SELECT id, name, COALESCE(purchase_rate, 0) AS purchase_rate FROM tbl_lubricant_products WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC";
 $products_result = mysqli_query($connection, $products_sql);
 
 // Fetch active banks for payment dropdown
@@ -292,13 +292,13 @@ if (strcasecmp($purchase['payment_status'], 'paid') == 0 || $total_paid >= $tota
                                     <div class="form-group row">
                                         <label class="col-sm-4 col-form-label font-weight-bold">Product</label>
                                         <div class="col-sm-8">
-                                            <select name="product_id" class="form-control" required>
+                                            <select name="product_id" id="editProductId" class="form-control" onchange="onProductSelect(this)" required>
                                                 <option value="">Select Product</option>
                                                 <?php 
                                                 if ($products_result && mysqli_num_rows($products_result) > 0) {
                                                     while ($product = mysqli_fetch_assoc($products_result)) {
                                                         $selected = ($product['id'] == $purchase['product_id']) ? 'selected' : '';
-                                                        echo '<option value="' . $product['id'] . '" ' . $selected . '>' . htmlspecialchars($product['name']) . '</option>';
+                                                        echo '<option value="' . $product['id'] . '" data-purchase-rate="' . floatval($product['purchase_rate']) . '" ' . $selected . '>' . htmlspecialchars($product['name']) . '</option>';
                                                     }
                                                 }
                                                 ?>
@@ -437,6 +437,14 @@ if (strcasecmp($purchase['payment_status'], 'paid') == 0 || $total_paid >= $tota
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
 	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
     <script>
+    function onProductSelect(selectElem) {
+        var selectedOpt = $(selectElem).find('option:selected');
+        var rate = parseFloat(selectedOpt.data('purchase-rate')) || 0;
+        if (selectedOpt.val() !== '' && rate > 0) {
+            $('input[name="purchase_price"]').val(rate.toFixed(2));
+        }
+    }
+
     function deletePayment(id) {
         if (confirm('Are you sure you want to remove this payment entry? The purchase payment status will be recalculated.')) {
             $.ajax({
