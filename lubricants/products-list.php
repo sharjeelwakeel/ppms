@@ -71,8 +71,6 @@ $canDelete = has_permission('items', 'delete');
 						<h4><i class="fas fa-boxes mr-2 text-primary"></i>Lubricant Products</h4>
 					</div>
 					<div class="col-md-6 text-right">
-						<a href="../categories/categories-list.php" class="btn btn-outline-secondary btn-sm mr-1"><i class="fas fa-tags mr-1"></i> Categories</a>
-						<a href="../categories/subcategories-list.php" class="btn btn-outline-secondary btn-sm mr-2"><i class="fas fa-tag mr-1"></i> Subcategories</a>
                         <?php if ($canAdd): ?>
 						<a href="add-product.php" class="btn btn-primary"><i class="fas fa-plus mr-1"></i> Add New Product</a>
                         <?php endif; ?>

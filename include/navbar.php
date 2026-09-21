@@ -367,8 +367,6 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 <i class="fas fa-oil-can mr-1"></i> Stock &amp; Lubricants
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/categories-list.php"><i class="fas fa-tags mr-1 text-muted"></i> Product Categories</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>categories/subcategories-list.php"><i class="fas fa-tag mr-1 text-muted"></i> Product Subcategories</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php"><i class="fas fa-boxes mr-1 text-muted"></i> Products</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Purchases (Inflow)</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Sales (Outflow)</a>
