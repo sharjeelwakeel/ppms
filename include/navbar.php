@@ -368,8 +368,8 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkLubricants">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/products-list.php"><i class="fas fa-boxes mr-1 text-muted"></i> Products</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Purchases (Inflow)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Sales (Outflow)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/purchases-list.php"><i class="fas fa-arrow-down mr-1 text-success"></i> Product Purchases</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/sales-list.php"><i class="fas fa-arrow-up mr-1 text-danger"></i> Product Sales</a>
                 </div>
             </li>
             <?php endif; ?>
@@ -404,9 +404,9 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 <i class="fas fa-wallet mr-1"></i> Accounts
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkAccounts">
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/credit-sale-receivables.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Accounts Receivable (Credit Sale)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-sale-receivables.php"><i class="fas fa-credit-card mr-1 text-info"></i> Accounts Receivable (Card Sale)</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-revenue-receivables.php"><i class="fas fa-chart-line mr-1 text-primary"></i> Accounts Receivable (Card Revenue)</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/credit-sale-receivables.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Credit Receivable</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-sale-receivables.php"><i class="fas fa-credit-card mr-1 text-info"></i> Card Receivable</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>accounts/card-revenue-receivables.php"><i class="fas fa-chart-line mr-1 text-primary"></i> Card Revenue Receivable</a>
                 </div>
             </li>
             <?php endif; ?>
