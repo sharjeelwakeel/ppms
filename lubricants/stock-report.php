@@ -22,30 +22,50 @@ if (!empty($fromDate) && !empty($toDate)) {
     $escFrom = mysqli_real_escape_string($connection, $fromDate);
     $escTo   = mysqli_real_escape_string($connection, $toDate);
     $pur_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
-    $sal_date_cond = " AND date BETWEEN '$escFrom' AND '$escTo' ";
+    $sal_date_cond = " AND sal.date BETWEEN '$escFrom' AND '$escTo' ";
     $cum_pur_cond  = " AND date <= '$escTo' ";
-    $cum_sal_cond  = " AND date <= '$escTo' ";
+    $cum_sal_cond  = " AND sal.date <= '$escTo' ";
 }
 
 // Calculate overall summary metrics in date range
 $total_purchases_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $pur_date_cond);
 $total_purchases = floatval(mysqli_fetch_row($total_purchases_res)[0] ?? 0);
 
-$total_cash_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Cash' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
+$total_cash_sales_res = mysqli_query($connection, "SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE (sal.payment_type='Cash' OR sal.payment_type='Card') AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
 $total_cash_sales = floatval(mysqli_fetch_row($total_cash_sales_res)[0] ?? 0);
 
-$total_credit_sales_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE payment_type='Credit' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
+$total_credit_sales_res = mysqli_query($connection, "SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE sal.payment_type='Credit' AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
 $total_credit_sales = floatval(mysqli_fetch_row($total_credit_sales_res)[0] ?? 0);
 $total_sold_units = $total_cash_sales + $total_credit_sales;
 
-// Calculate overall revenue generated from product sales
-$total_revenue_res = mysqli_query($connection, "SELECT SUM(amount) FROM tbl_lubricant_sales WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
+// Calculate overall revenue generated from product sales (Excluding Balanced Slips which were pre-billed on original Permanent Slips)
+$total_revenue_res = mysqli_query($connection, "
+    SELECT SUM(sal.amount) 
+    FROM tbl_lubricant_sales sal
+    LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id)
+    WHERE (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
+      AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
+" . $sal_date_cond);
 $total_revenue = floatval(mysqli_fetch_row($total_revenue_res)[0] ?? 0);
 
-$total_cash_rev_res = mysqli_query($connection, "SELECT SUM(amount) FROM tbl_lubricant_sales WHERE payment_type='Cash' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
+$total_cash_rev_res = mysqli_query($connection, "
+    SELECT SUM(sal.amount) 
+    FROM tbl_lubricant_sales sal
+    LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id)
+    WHERE (sal.payment_type='Cash' OR sal.payment_type='Card')
+      AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
+      AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
+" . $sal_date_cond);
 $total_cash_revenue = floatval(mysqli_fetch_row($total_cash_rev_res)[0] ?? 0);
 
-$total_credit_rev_res = mysqli_query($connection, "SELECT SUM(amount) FROM tbl_lubricant_sales WHERE payment_type='Credit' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
+$total_credit_rev_res = mysqli_query($connection, "
+    SELECT SUM(sal.amount) 
+    FROM tbl_lubricant_sales sal
+    LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id)
+    WHERE sal.payment_type='Credit'
+      AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
+      AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
+" . $sal_date_cond);
 $total_credit_revenue = floatval(mysqli_fetch_row($total_credit_rev_res)[0] ?? 0);
 
 // Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
@@ -63,17 +83,29 @@ if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
 
 // Fetch products with cumulative and period metrics
 $sql = "
-    SELECT p.id, p.name, p.price, 
+    SELECT p.id, p.name, 
+           COALESCE(NULLIF(p.cash_rate, 0), p.price, 0) AS selling_price,
+           COALESCE(NULLIF(p.credit_rate, 0), p.price, 0) AS credit_rate,
+           COALESCE(p.purchase_rate, 0) AS purchase_rate,
+           p.price,
            COALESCE((SELECT reorder_level FROM tbl_lubricant_products WHERE id = p.id), 0) AS reorder_level,
-           -- Cumulative stock calculations up to To Date
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $cum_pur_cond . "), 0) AS cumulative_purchased,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $cum_sal_cond . "), 0) AS cumulative_sold,
-           
-           -- Period calculations based on date range
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $pur_date_cond . "), 0) AS period_purchased,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Cash' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond . "), 0) AS period_cash_sold,
-           COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id AND payment_type='Credit' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond . "), 0) AS period_credit_sold,
-           COALESCE((SELECT SUM(amount) FROM tbl_lubricant_sales WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond . "), 0) AS period_revenue
+            -- Cumulative stock calculations up to To Date
+            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $cum_pur_cond . "), 0) AS cumulative_purchased,
+            COALESCE((SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE sal.product_id = p.id AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $cum_sal_cond . "), 0) AS cumulative_sold,
+            
+            -- Period calculations based on date range
+            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $pur_date_cond . "), 0) AS period_purchased,
+            COALESCE((SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE sal.product_id = p.id AND (sal.payment_type='Cash' OR sal.payment_type='Card') AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond . "), 0) AS period_cash_sold,
+            COALESCE((SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE sal.product_id = p.id AND sal.payment_type='Credit' AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond . "), 0) AS period_credit_sold,
+           COALESCE((
+               SELECT SUM(sal.amount) 
+               FROM tbl_lubricant_sales sal
+               LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id)
+               WHERE sal.product_id = p.id 
+                 AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
+                 AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
+                 " . $sal_date_cond . "
+           ), 0) AS period_revenue
     FROM tbl_lubricant_products p
     WHERE (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
     ORDER BY p.name ASC
@@ -88,7 +120,8 @@ if ($result) {
         $row['current_stock'] = intval($row['cumulative_purchased']) - intval($row['cumulative_sold']);
         $row['reorder_level'] = intval($row['reorder_level'] ?? 0);
         $row['period_revenue'] = floatval($row['period_revenue'] ?? 0);
-        $row['stock_value']   = $row['current_stock'] * floatval($row['price']);
+        $selling_price        = floatval($row['selling_price'] ?? 0);
+        $row['stock_value']   = $row['current_stock'] * $selling_price;
         $total_valuation      += $row['stock_value'];
         $row['is_low_stock']  = ($row['reorder_level'] > 0 && $row['current_stock'] <= $row['reorder_level']) || ($row['current_stock'] <= 0);
         if ($row['is_low_stock']) {
@@ -412,7 +445,7 @@ $total_products = count($products_data);
                                             <td class="text-success">' . number_format($row['period_cash_sold'], 0) . '</td>
                                             <td class="text-warning font-weight-bold">' . number_format($row['period_credit_sold'], 0) . '</td>
                                             <td class="font-weight-bold" style="background:#f4fbf4; color:#28a745;">' . number_format($period_total_sales, 0) . '</td>
-                                            <td>' . number_format($row['price'], 2) . '</td>
+                                            <td class="font-weight-bold text-dark">Rs. ' . number_format($row['selling_price'], 2) . '</td>
                                             <td class="font-weight-bold text-success" style="background:#f0fff4;">Rs. ' . number_format($period_revenue, 2) . '</td>
                                             <td class="font-weight-bold">' . number_format($reorder_level, 0) . '</td>
                                             <td>' . $stock_badge . '</td>

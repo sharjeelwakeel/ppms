@@ -109,7 +109,8 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_sale_invoices` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `invoice_no` VARCHAR(64) NOT NULL,
   `date` DATE NOT NULL,
-  `payment_type` VARCHAR(32) NOT NULL DEFAULT 'Cash', -- Cash | Card
+  `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Operating shift (tbl_shifts.id)
+  `payment_type` VARCHAR(32) NOT NULL DEFAULT 'Cash', -- Cash | Card | Credit
   `card_machine_id` INT(11) DEFAULT NULL,             -- Selected POS machine (tbl_card_machines)
   `bank_id` INT(11) DEFAULT NULL,                     -- Destination bank account (tbl_banks)
   `details` TEXT DEFAULT NULL,                        -- Optional remarks
@@ -122,6 +123,7 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_sale_invoices` (
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_invoice_no` (`invoice_no`),
+  KEY `idx_shift_id` (`shift_id`),
   KEY `idx_date` (`date`),
   KEY `idx_card_machine_id` (`card_machine_id`),
   KEY `idx_bank_id` (`bank_id`),
@@ -142,12 +144,14 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
   `payment_type` VARCHAR(32) NOT NULL DEFAULT 'Cash',
   `details` TEXT DEFAULT NULL,
   `date` DATE NOT NULL,
+  `shift_id` INT(11) NOT NULL DEFAULT 0,              -- Operating shift (tbl_shifts.id)
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_invoice_id` (`invoice_id`),
   KEY `idx_invoice_no` (`invoice_no`),
+  KEY `idx_shift_id` (`shift_id`),
   KEY `idx_product_id` (`product_id`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -20,6 +20,7 @@ function get_system_modules() {
         'meter_readings' => 'Meter Readings',
         'credit_sales'   => 'Credit Sale Reading',
         'card_sales'     => 'Card Sale Reading',
+        'cash_sales'     => 'Cash Sale Reading',
         'tanks'          => 'Tanks & Dip Chart Log',
         'nozzles'        => 'Nozzles',
         'staff'          => 'Sales Staff',
@@ -92,8 +93,8 @@ function has_permission($module_slug, $action) {
         return intval($perm[$col_name]) === 1;
     }
 
-    // Fallback: If credit_sales, card_sales, or accounts is queried, inherit from meter_readings
-    if ($module_slug === 'credit_sales' || $module_slug === 'card_sales' || $module_slug === 'accounts') {
+    // Fallback: If credit_sales, card_sales, cash_sales, or accounts is queried, inherit from meter_readings
+    if ($module_slug === 'credit_sales' || $module_slug === 'card_sales' || $module_slug === 'cash_sales' || $module_slug === 'accounts') {
         $fb_res = mysqli_query($connection, "SELECT $col_name FROM tbl_role_permissions WHERE role_id = '$role_id' AND module_slug = 'meter_readings' LIMIT 1");
         if ($fb_res && ($fb_perm = mysqli_fetch_assoc($fb_res))) {
             return intval($fb_perm[$col_name]) === 1;

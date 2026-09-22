@@ -10,35 +10,6 @@ require '../include/permissions.php';
 // Enforce access check for viewing lubricant sales
 check_access('items', 'show');
 
-// Self-healing migration for tbl_lubricant_sale_invoices & tbl_lubricant_sales
-mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_lubricant_sale_invoices` (
-  `id` INT(11) NOT NULL AUTO_INCREMENT,
-  `invoice_no` VARCHAR(64) NOT NULL,
-  `date` DATE NOT NULL,
-  `payment_type` VARCHAR(32) NOT NULL DEFAULT 'Cash',
-  `details` TEXT DEFAULT NULL,
-  `total_items` INT(11) NOT NULL DEFAULT 0,
-  `total_quantity` INT(11) NOT NULL DEFAULT 0,
-  `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `created_by` INT(11) DEFAULT NULL,
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
-  `deleted_at` DATETIME DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_invoice_no` (`invoice_no`),
-  KEY `idx_date` (`date`),
-  KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
-
-$chk_inv_id = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE 'invoice_id'");
-if ($chk_inv_id && mysqli_num_rows($chk_inv_id) == 0) {
-    mysqli_query($connection, "ALTER TABLE tbl_lubricant_sales ADD COLUMN invoice_id INT(11) DEFAULT NULL AFTER id, ADD KEY `idx_invoice_id` (`invoice_id`)");
-}
-$chk_inv_no = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE 'invoice_no'");
-if ($chk_inv_no && mysqli_num_rows($chk_inv_no) == 0) {
-    mysqli_query($connection, "ALTER TABLE tbl_lubricant_sales ADD COLUMN invoice_no VARCHAR(64) DEFAULT NULL AFTER invoice_id, ADD KEY `idx_invoice_no` (`invoice_no`)");
-}
-
 $canAdd    = has_permission('items', 'add');
 $canEdit   = has_permission('items', 'edit');
 $canDelete = has_permission('items', 'delete');
@@ -69,6 +40,11 @@ $canDelete = has_permission('items', 'delete');
             background: var(--primary-color) !important;
             color: #fff !important;
             vertical-align: middle;
+            font-size: 13px;
+        }
+        #salesInvoicesTable td {
+            vertical-align: middle;
+            font-size: 13px;
         }
         @media print {
             body * { visibility: hidden; }
@@ -99,17 +75,18 @@ $canDelete = has_permission('items', 'delete');
                     <table id="salesInvoicesTable" class="table table-striped table-bordered text-center mb-0">
                         <thead>
                             <tr>
-                                <th style="width: 50px;">#</th>
-                                <th style="width: 160px;">Invoice #</th>
-                                <th style="width: 100px;">Date</th>
-                                <th style="text-align: left;">Remarks</th>
-                                <th style="width: 100px;">Payment</th>
-                                <th style="width: 110px;">Products</th>
-                                <th style="width: 110px;">Total Qty</th>
-                                <th style="width: 150px;">Grand Total</th>
-                                <th style="width: 100px;">Receipt</th>
+                                <th style="width: 40px;">#</th>
+                                <th style="width: 150px;">Invoice / Slip #</th>
+                                <th style="width: 90px;">Date</th>
+                                <th style="width: 85px;">Shift</th>
+                                <th style="text-align: left; min-width: 180px;">Customer / Vehicle / Remarks</th>
+                                <th style="width: 120px;">Payment / Type</th>
+                                <th style="width: 80px;">Products</th>
+                                <th style="width: 100px;">Total Qty</th>
+                                <th style="width: 130px;">Amount / Charge</th>
+                                <th style="width: 80px;">Receipt</th>
                                 <?php if ($canDelete): ?>
-                                <th style="width: 60px;">Delete</th>
+                                <th style="width: 50px;">Delete</th>
                                 <?php endif; ?>
                             </tr>
                         </thead>
@@ -117,18 +94,32 @@ $canDelete = has_permission('items', 'delete');
                             <?php 
                             // Unified query: Master Invoices + any legacy unlinked sales
                             $sql = "
-                                SELECT inv.id, inv.invoice_no, inv.date, inv.payment_type, inv.details, 
-                                       inv.total_items, inv.total_quantity, inv.total_amount, 
-                                       cm.name AS card_machine_name, b.name AS bank_name, 1 AS is_invoice
+                                SELECT inv.id, inv.invoice_no, inv.slip_no, inv.date, inv.shift_id, inv.slip_date, inv.payment_type, inv.slip_type,
+                                       inv.customer_id, inv.vehicle_number, inv.details, inv.ref_slip_no, inv.ref_slip_date,
+                                       inv.temp_slip_id, inv.temp_wasoli_amount, inv.is_returned,
+                                       inv.total_items, inv.total_quantity, inv.total_amount, inv.charge_amount, inv.payment_status,
+                                       cm.name AS card_machine_name, b.name AS bank_name, c.name AS customer_name,
+                                       sh.name AS shift_name,
+                                       (SELECT COALESCE(SUM(GREATEST(0, sal.balance_quantity - COALESCE((SELECT SUM(bsal.quantity) FROM tbl_lubricant_sales bsal JOIN tbl_lubricant_sale_invoices binv ON (bsal.invoice_id = binv.id) WHERE binv.slip_type = 'Balanced Slip' AND (binv.ref_slip_no = inv.slip_no OR binv.ref_slip_no = inv.invoice_no) AND bsal.product_id = sal.product_id AND (binv.deleted_at IS NULL OR binv.deleted_at = '0000-00-00 00:00:00') AND (bsal.deleted_at IS NULL OR bsal.deleted_at = '0000-00-00 00:00:00')), 0))), 0) FROM tbl_lubricant_sales sal WHERE sal.invoice_id = inv.id AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')) AS pending_balance,
+                                       1 AS is_invoice
                                 FROM tbl_lubricant_sale_invoices inv 
                                 LEFT JOIN tbl_card_machines cm ON inv.card_machine_id = cm.id
                                 LEFT JOIN tbl_banks b ON inv.bank_id = b.id
+                                LEFT JOIN tbl_customers c ON inv.customer_id = c.id
+                                LEFT JOIN tbl_shifts sh ON inv.shift_id = sh.id
                                 WHERE (inv.deleted_at IS NULL OR inv.deleted_at = '0000-00-00 00:00:00')
                                 UNION ALL
-                                SELECT sal.id, CONCAT('SALE-#', sal.id) AS invoice_no, sal.date, sal.payment_type, sal.details, 
-                                       1 AS total_items, sal.quantity AS total_quantity, sal.amount AS total_amount, 
-                                       NULL AS card_machine_name, NULL AS bank_name, 0 AS is_invoice
+                                SELECT sal.id, CONCAT('SALE-#', sal.id) AS invoice_no, '' AS slip_no, sal.date, sal.shift_id, sal.date AS slip_date,
+                                       sal.payment_type, 'Permanent Slip' AS slip_type,
+                                       NULL AS customer_id, '' AS vehicle_number, sal.details, NULL AS ref_slip_no, NULL AS ref_slip_date,
+                                       NULL AS temp_slip_id, 0.00 AS temp_wasoli_amount, 0 AS is_returned,
+                                       1 AS total_items, sal.quantity AS total_quantity, sal.amount AS total_amount, sal.amount AS charge_amount, 'Paid' AS payment_status,
+                                       NULL AS card_machine_name, NULL AS bank_name, NULL AS customer_name,
+                                       sh_sal.name AS shift_name,
+                                       0 AS pending_balance,
+                                       0 AS is_invoice
                                 FROM tbl_lubricant_sales sal 
+                                LEFT JOIN tbl_shifts sh_sal ON sal.shift_id = sh_sal.id
                                 WHERE sal.invoice_id IS NULL AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
                                 ORDER BY date DESC, id DESC
                             ";
@@ -136,18 +127,39 @@ $canDelete = has_permission('items', 'delete');
                             if($result && mysqli_num_rows($result) > 0){
                                 $counter = 1;
                                 while($row = mysqli_fetch_assoc($result)){
-                                    $isCard = ($row['payment_type'] === 'Card');
-                                    $paymentHtml = $isCard 
-                                        ? '<span class="badge badge-info px-2 py-1"><i class="fas fa-credit-card mr-1"></i>Card</span>'
-                                        : '<span class="badge badge-success px-2 py-1"><i class="fas fa-money-bill-wave mr-1"></i>Cash</span>';
-                                    
-                                    if ($isCard) {
+                                    $paymentType = $row['payment_type'];
+                                    $slipType    = $row['slip_type'] ?? 'Permanent Slip';
+
+                                    // Payment badge rendering
+                                    if ($paymentType === 'Card') {
+                                        $paymentHtml = '<span class="badge badge-info px-2 py-1"><i class="fas fa-credit-card mr-1"></i>Card</span>';
                                         if (!empty($row['card_machine_name'])) {
                                             $paymentHtml .= '<div class="small text-muted mt-1" style="font-size: 11px;"><i class="fas fa-calculator mr-1"></i>' . htmlspecialchars($row['card_machine_name']) . '</div>';
                                         }
                                         if (!empty($row['bank_name'])) {
                                             $paymentHtml .= '<div class="small text-muted" style="font-size: 11px;"><i class="fas fa-university mr-1"></i>' . htmlspecialchars($row['bank_name']) . '</div>';
                                         }
+                                    } elseif ($paymentType === 'Credit') {
+                                        if ($slipType === 'Balanced Slip') {
+                                            $paymentHtml = '<span class="badge badge-warning text-dark px-2 py-1"><i class="fas fa-history mr-1"></i>Balanced Slip</span>';
+                                            if (!empty($row['ref_slip_no'])) {
+                                                $paymentHtml .= '<div class="small text-muted mt-1" style="font-size: 11px;">Ref: #' . htmlspecialchars($row['ref_slip_no']) . '</div>';
+                                            }
+                                        } elseif ($slipType === 'Temporary Slip') {
+                                            $paymentHtml = '<span class="badge badge-secondary px-2 py-1"><i class="fas fa-hand-holding mr-1"></i>Temp Loan</span>';
+                                            if (!empty($row['is_returned'])) {
+                                                $paymentHtml .= '<div class="small text-success mt-1" style="font-size: 11px;"><i class="fas fa-check-circle mr-1"></i>Settled</div>';
+                                            } else {
+                                                $paymentHtml .= '<div class="small text-danger mt-1 font-weight-bold" style="font-size: 11px;"><i class="fas fa-clock mr-1"></i>Open Chit</div>';
+                                            }
+                                        } else {
+                                            $paymentHtml = '<span class="badge badge-primary px-2 py-1"><i class="fas fa-file-invoice mr-1"></i>Credit Voucher</span>';
+                                            if (!empty($row['temp_slip_id'])) {
+                                                $paymentHtml .= '<div class="small text-info mt-1" style="font-size: 11px;"><i class="fas fa-link mr-1"></i>Temp Receive</div>';
+                                            }
+                                        }
+                                    } else {
+                                        $paymentHtml = '<span class="badge badge-success px-2 py-1"><i class="fas fa-money-bill-wave mr-1"></i>Cash</span>';
                                     }
 
                                     $isInv = intval($row['is_invoice']);
@@ -157,24 +169,66 @@ $canDelete = has_permission('items', 'delete');
                                         ? '<a href="' . $editUrl . '" class="font-weight-bold" style="color: var(--primary-color); text-decoration: underline;" title="Edit Sale Invoice">' . $invNoSafe . '</a>'
                                         : '<span class="font-weight-bold" style="color: var(--primary-color);">' . $invNoSafe . '</span>';
 
+                                    if (!empty($row['slip_no'])) {
+                                        $invoiceDisplay .= '<div class="small text-muted font-italic mt-1"><i class="fas fa-tag mr-1 text-primary"></i>Slip: <strong>' . htmlspecialchars($row['slip_no']) . '</strong></div>';
+                                    }
+
+                                    // Customer / Vehicle / Remarks column
+                                    $custVehHtml = '';
+                                    if (!empty($row['customer_name'])) {
+                                        $custVehHtml .= '<div class="font-weight-bold text-dark"><i class="fas fa-user mr-1 text-primary"></i>' . htmlspecialchars($row['customer_name']) . '</div>';
+                                    }
+                                    if (!empty($row['vehicle_number'])) {
+                                        $custVehHtml .= '<div class="small text-muted"><i class="fas fa-truck mr-1"></i>' . htmlspecialchars($row['vehicle_number']) . '</div>';
+                                    }
+                                    if (!empty($row['details'])) {
+                                        $custVehHtml .= '<div class="small text-secondary font-italic">' . htmlspecialchars($row['details']) . '</div>';
+                                    }
+                                    if (empty($custVehHtml)) {
+                                        $custVehHtml = '<span class="text-muted">—</span>';
+                                    }
+
+                                    // Quantity & pending balance
+                                    $qtyDisplay = '<span class="font-weight-bold text-primary">' . number_format($row['total_quantity'], 0) . '</span>';
+                                    if (intval($row['pending_balance']) > 0) {
+                                        $qtyDisplay .= '<div class="small text-warning font-weight-bold mt-1" title="Uncollected balance pending"><i class="fas fa-clock mr-1"></i>' . intval($row['pending_balance']) . ' pending</div>';
+                                    }
+
+                                    // Amount / Charge display
+                                    if ($paymentType === 'Credit') {
+                                        if ($slipType === 'Balanced Slip') {
+                                            $amtDisplay = '<div class="text-muted small">Orig: Rs. ' . number_format($row['total_amount'], 2) . '</div><div class="font-weight-bold text-info" style="font-size: 13px;">Charge: Rs. 0.00</div>';
+                                        } elseif ($slipType === 'Temporary Slip') {
+                                            $amtDisplay = '<div class="text-muted small">Loan: Rs. ' . number_format($row['total_amount'], 2) . '</div><div class="font-weight-bold text-secondary" style="font-size: 13px;">Charge: Rs. 0.00</div>';
+                                        } else {
+                                            $amtDisplay = '<div class="font-weight-bold text-success" style="font-size: 13px;">Rs. ' . number_format(floatval($row['charge_amount']), 2) . '</div>';
+                                            if (floatval($row['temp_wasoli_amount']) > 0) {
+                                                $amtDisplay .= '<div class="small text-muted" style="font-size: 11px;">incl. Temp Receive: Rs. ' . number_format(floatval($row['temp_wasoli_amount']), 2) . '</div>';
+                                            }
+                                        }
+                                    } else {
+                                        $amtDisplay = '<div class="font-weight-bold text-success" style="font-size: 13px;">Rs. ' . number_format($row['total_amount'], 2) . '</div>';
+                                    }
+
                                     echo '<tr>
                                             <td>' . $counter++ . '</td>
                                             <td>' . $invoiceDisplay . '</td>
                                             <td class="text-nowrap">' . date("d-m-Y", strtotime($row['date'])) . '</td>
-                                            <td class="text-left">' . htmlspecialchars($row['details'] ?? '—') . '</td>
+                                            <td class="text-nowrap"><span class="badge badge-info px-2 py-1"><i class="fas fa-clock mr-1"></i>' . htmlspecialchars($row['shift_name'] ?? 'General') . '</span></td>
+                                            <td class="text-left">' . $custVehHtml . '</td>
                                             <td>' . $paymentHtml . '</td>
                                             <td><span class="badge badge-light border text-dark font-weight-bold"><i class="fas fa-boxes mr-1 text-primary"></i>' . number_format($row['total_items'], 0) . '</span></td>
-                                            <td class="font-weight-bold text-primary">' . number_format($row['total_quantity'], 0) . '</td>
-                                            <td class="font-weight-bold text-success">Rs. ' . number_format($row['total_amount'], 2) . '</td>
+                                            <td>' . $qtyDisplay . '</td>
+                                            <td>' . $amtDisplay . '</td>
                                             <td>
-                                                <button type="button" class="btn btn-sm btn-outline-info font-weight-bold" onclick="viewInvoiceModal(' . $row['id'] . ', ' . $isInv . ')" title="View Receipt Breakdown">
+                                                <button type="button" class="btn btn-sm btn-outline-info font-weight-bold py-1 px-2" style="font-size: 12px;" onclick="viewInvoiceModal(' . $row['id'] . ', ' . $isInv . ')" title="View Receipt Breakdown">
                                                     <i class="fas fa-receipt mr-1"></i> Receipt
                                                 </button>
                                             </td>';
                                     if ($canDelete) {
                                         echo '<td class="text-center">
                                                 <a class="btn btn-large btn-link p-0 text-danger" onclick="deleteSaleInvoice(' . $row['id'] . ', ' . $isInv . ')" title="Delete Sale">
-                                                    <i class="fas fa-trash-alt" style="font-size: 18px;"></i>
+                                                    <i class="fas fa-trash-alt" style="font-size: 16px;"></i>
                                                 </a>
                                               </td>';
                                     }
@@ -216,10 +270,17 @@ $canDelete = has_permission('items', 'delete');
                             </div>
                             <div class="row mt-3 text-muted small">
                                 <div class="col-sm-6">
+                                    <div id="receiptCustomerInfoRow" class="d-none">
+                                        <strong>Customer:</strong> <span id="receiptCustomerName" class="font-weight-bold text-dark">—</span><br>
+                                        <strong>Vehicle #:</strong> <span id="receiptVehicleNumber" class="font-weight-bold text-dark">—</span><br>
+                                        <strong>Slip #:</strong> <span id="receiptSlipNumber" class="font-weight-bold text-primary">—</span><br>
+                                    </div>
                                     <strong>Date:</strong> <span id="receiptDateText">—</span><br>
+                                    <strong>Shift:</strong> <span id="receiptShiftText" class="font-weight-bold text-dark">—</span><br>
                                     <strong>Remarks:</strong> <span id="receiptCustomerText">—</span>
                                 </div>
                                 <div class="col-sm-6 text-sm-right">
+                                    <strong>Slip Classification:</strong> <span id="receiptSlipTypeBadge" class="font-weight-bold text-dark">Standard Sale</span><br>
                                     <strong>Total Items:</strong> <span id="receiptItemCountText">0</span><br>
                                     <strong>Total Quantity:</strong> <span id="receiptTotalUnitsText">0</span> units
                                 </div>
@@ -228,25 +289,33 @@ $canDelete = has_permission('items', 'delete');
 
                         <!-- Itemized Products Table -->
                         <div class="table-responsive">
-                            <table class="table table-bordered table-sm text-center mb-0" style="font-size: 14px;">
+                            <table class="table table-bordered table-sm text-center mb-0" style="font-size: 13px;">
                                 <thead class="bg-light font-weight-bold">
                                     <tr>
-                                        <th style="width: 40px;">#</th>
+                                        <th style="width: 35px;">#</th>
                                         <th style="text-align: left;">Product Description</th>
-                                        <th style="width: 100px;">Quantity</th>
-                                        <th style="width: 120px;">Unit Rate</th>
-                                        <th style="width: 140px;">Line Total</th>
+                                        <th style="width: 80px;">Quota</th>
+                                        <th style="width: 80px;">Issued</th>
+                                        <th style="width: 80px;">Balance</th>
+                                        <th style="width: 110px;">Unit Rate</th>
+                                        <th style="width: 120px;">Line Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="receiptItemsTbody">
-                                    <tr><td colspan="5" class="py-3 text-muted">Loading invoice items...</td></tr>
+                                    <tr><td colspan="7" class="py-3 text-muted">Loading invoice items...</td></tr>
                                 </tbody>
                                 <tfoot>
-                                    <tr class="bg-light font-weight-bold" style="font-size: 15px;">
+                                    <tr class="bg-light font-weight-bold" style="font-size: 14px;">
                                         <td colspan="2" class="text-right align-middle">Overall Totals:</td>
+                                        <td class="align-middle text-secondary" id="receiptFooterQuota">0</td>
                                         <td class="align-middle text-primary" id="receiptFooterQty">0</td>
-                                        <td class="text-right align-middle text-muted small">Grand Total:</td>
-                                        <td class="text-right align-middle text-success font-weight-bold" id="receiptFooterGrandTotal">Rs. 0.00</td>
+                                        <td class="align-middle text-warning" id="receiptFooterBal">0</td>
+                                        <td class="text-right align-middle text-muted small">Voucher Value:</td>
+                                        <td class="text-right align-middle text-dark font-weight-bold" id="receiptFooterGrandTotal">Rs. 0.00</td>
+                                    </tr>
+                                    <tr class="table-totals-row font-weight-bold" style="font-size: 15px; background: #e8eaf6;">
+                                        <td colspan="6" class="text-right align-middle text-primary">Customer Receivable (Charge Amount):</td>
+                                        <td class="text-right align-middle text-success font-weight-bold" id="receiptFooterChargeAmount">Rs. 0.00</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -276,7 +345,7 @@ $canDelete = has_permission('items', 'delete');
 
     function viewInvoiceModal(id, isInvoice) {
         $('#modalReceiptInvNo').text('Loading...');
-        $('#receiptItemsTbody').html('<tr><td colspan="5" class="py-3 text-muted"><i class="fas fa-spinner fa-spin mr-1"></i> Loading details...</td></tr>');
+        $('#receiptItemsTbody').html('<tr><td colspan="7" class="py-3 text-muted"><i class="fas fa-spinner fa-spin mr-1"></i> Loading details...</td></tr>');
         $('#viewInvoiceModal').modal('show');
 
         var params = isInvoice ? { invoice_id: id } : { id: id };
@@ -294,12 +363,24 @@ $canDelete = has_permission('items', 'delete');
                     $('#modalReceiptInvNo').text(inv.invoice_no);
                     $('#receiptInvNoText').text(inv.invoice_no);
                     $('#receiptDateText').text(inv.date);
+                    $('#receiptShiftText').text(inv.shift_name || 'General');
                     $('#receiptCustomerText').text(inv.details ? inv.details : '—');
                     $('#receiptItemCountText').text(inv.total_items);
                     $('#receiptTotalUnitsText').text(inv.total_quantity);
 
+                    if (inv.customer_name) {
+                        $('#receiptCustomerInfoRow').removeClass('d-none');
+                        $('#receiptCustomerName').text(inv.customer_name);
+                        $('#receiptVehicleNumber').text(inv.vehicle_number || '—');
+                        $('#receiptSlipNumber').text(inv.slip_no || '—');
+                    } else {
+                        $('#receiptCustomerInfoRow').addClass('d-none');
+                    }
+
+                    $('#receiptSlipTypeBadge').text(inv.slip_type || 'Standard Sale');
+
                     if (inv.payment_type === 'Card') {
-                        $('#receiptPaymentBadge').removeClass('badge-success').addClass('badge-info').html('<i class="fas fa-credit-card mr-1"></i>Card');
+                        $('#receiptPaymentBadge').removeClass('badge-success badge-primary').addClass('badge-info').html('<i class="fas fa-credit-card mr-1"></i>Card');
                         var cardBankParts = [];
                         if (inv.card_machine_name) cardBankParts.push('POS: ' + inv.card_machine_name);
                         if (inv.bank_name) cardBankParts.push('Bank: ' + inv.bank_name + (inv.bank_account ? ' (' + inv.bank_account + ')' : ''));
@@ -308,42 +389,59 @@ $canDelete = has_permission('items', 'delete');
                         } else {
                             $('#receiptCardBankInfo').addClass('d-none');
                         }
+                    } else if (inv.payment_type === 'Credit') {
+                        $('#receiptPaymentBadge').removeClass('badge-success badge-info').addClass('badge-primary').html('<i class="fas fa-file-invoice mr-1"></i>Credit');
+                        $('#receiptCardBankInfo').addClass('d-none');
                     } else {
-                        $('#receiptPaymentBadge').removeClass('badge-info').addClass('badge-success').html('<i class="fas fa-money-bill-wave mr-1"></i>Cash');
+                        $('#receiptPaymentBadge').removeClass('badge-info badge-primary').addClass('badge-success').html('<i class="fas fa-money-bill-wave mr-1"></i>Cash');
                         $('#receiptCardBankInfo').addClass('d-none');
                     }
 
                     var tbodyHtml = '';
-                    var calcQty = 0;
+                    var calcQuota = 0;
+                    var calcIssued = 0;
+                    var calcBal = 0;
                     var calcAmt = 0;
 
                     for (var i = 0; i < items.length; i++) {
                         var itm = items[i];
-                        calcQty += parseInt(itm.quantity, 10) || 0;
-                        calcAmt += parseFloat(itm.amount) || 0;
+                        var qVal = parseInt(itm.quantity, 10) || 0;
+                        var issVal = parseInt(itm.issue_quantity, 10) || qVal;
+                        var balVal = parseInt(itm.balance_quantity, 10) || Math.max(0, qVal - issVal);
+                        var aVal = parseFloat(itm.amount) || 0;
+
+                        calcQuota += qVal;
+                        calcIssued += issVal;
+                        calcBal += balVal;
+                        calcAmt += aVal;
 
                         tbodyHtml += '<tr>' +
                             '<td>' + (i + 1) + '</td>' +
                             '<td class="text-left font-weight-bold">' + itm.product_name + '</td>' +
-                            '<td class="font-weight-bold text-primary">' + itm.quantity + '</td>' +
+                            '<td class="text-secondary">' + qVal + '</td>' +
+                            '<td class="font-weight-bold text-primary">' + issVal + '</td>' +
+                            '<td>' + (balVal > 0 ? '<span class="badge badge-warning">' + balVal + '</span>' : '<span class="text-muted">0</span>') + '</td>' +
                             '<td class="text-right">Rs. ' + parseFloat(itm.rate).toFixed(2) + '</td>' +
-                            '<td class="text-right font-weight-bold text-dark">Rs. ' + parseFloat(itm.amount).toFixed(2) + '</td>' +
+                            '<td class="text-right font-weight-bold text-dark">Rs. ' + aVal.toFixed(2) + '</td>' +
                         '</tr>';
                     }
 
                     if (items.length === 0) {
-                        tbodyHtml = '<tr><td colspan="5" class="py-3 text-muted">No product items found for this invoice.</td></tr>';
+                        tbodyHtml = '<tr><td colspan="7" class="py-3 text-muted">No product items found for this invoice.</td></tr>';
                     }
 
                     $('#receiptItemsTbody').html(tbodyHtml);
-                    $('#receiptFooterQty').text(inv.total_quantity || calcQty);
+                    $('#receiptFooterQuota').text(calcQuota);
+                    $('#receiptFooterQty').text(calcIssued);
+                    $('#receiptFooterBal').text(calcBal);
                     $('#receiptFooterGrandTotal').text('Rs. ' + parseFloat(inv.total_amount || calcAmt).toFixed(2));
+                    $('#receiptFooterChargeAmount').text('Rs. ' + parseFloat(inv.charge_amount || 0).toFixed(2));
                 } else {
-                    $('#receiptItemsTbody').html('<tr><td colspan="5" class="py-3 text-danger">' + (res.message || 'Error loading invoice') + '</td></tr>');
+                    $('#receiptItemsTbody').html('<tr><td colspan="7" class="py-3 text-danger">' + (res.message || 'Error loading invoice') + '</td></tr>');
                 }
             },
             error: function() {
-                $('#receiptItemsTbody').html('<tr><td colspan="5" class="py-3 text-danger">Error connecting to server.</td></tr>');
+                $('#receiptItemsTbody').html('<tr><td colspan="7" class="py-3 text-danger">Error connecting to server.</td></tr>');
             }
         });
     }
@@ -358,10 +456,10 @@ $canDelete = has_permission('items', 'delete');
 					location.reload();
 				},
 				error: function (data) {
-					alert('Error deleting sale.');
+					alert('Error communicating with server.');
 				}
 			});
 		}
 	}
-	</script>
+    </script>
 </html>

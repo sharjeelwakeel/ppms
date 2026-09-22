@@ -1,0 +1,360 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (!isset($_SESSION['loggedInUser'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
+require_once __DIR__ . '/../include/config.php';
+require_once __DIR__ . '/../include/permissions.php';
+require_once __DIR__ . '/../include/settings_helper.php';
+
+$station_settings = get_station_settings($connection);
+$hasLogo = !empty($station_settings['logo_path']) && file_exists(__DIR__ . '/../' . $station_settings['logo_path']);
+
+if (!has_permission('accounts', 'show') && !has_permission('credit_sales', 'show') && !has_permission('reports', 'show') && !has_permission('items', 'show')) {
+    echo 'Unauthorized access.';
+    exit;
+}
+
+$paymentId = intval($_GET['payment_id'] ?? 0);
+if ($paymentId <= 0) {
+    echo 'Error: Valid payment ID is required.';
+    exit;
+}
+
+// Fetch product payment details
+$sql = "SELECT p.*, 
+               c.name AS customer_name,
+               c.phone AS customer_phone,
+               c.fuel_rate AS customer_tier,
+               b.name AS bank_name,
+               b.account_number AS bank_account_no
+        FROM tbl_product_payments p
+        LEFT JOIN tbl_customers c ON (p.customer_id = c.id)
+        LEFT JOIN tbl_banks b ON (p.bank_id = b.id)
+        WHERE p.id = '$paymentId' AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+        LIMIT 1";
+
+$res = mysqli_query($connection, $sql);
+if (!$res || mysqli_num_rows($res) == 0) {
+    echo 'Product payment receipt not found or deleted.';
+    exit;
+}
+$payment = mysqli_fetch_assoc($res);
+
+// Fetch allocated product credit invoices
+$sql_alloc = "SELECT a.*, 
+                     s.invoice_no,
+                     s.slip_no, 
+                     s.slip_date, 
+                     s.vehicle_number, 
+                     s.charge_amount, 
+                     s.paid_amount,
+                     (SELECT GROUP_CONCAT(CONCAT(p.name, ' (', ls.quantity, ' ', IFNULL(p.unit, 'units'), ')') SEPARATOR ', ')
+                      FROM tbl_lubricant_sales ls
+                      JOIN tbl_lubricant_products p ON ls.product_id = p.id
+                      WHERE ls.invoice_id = s.id AND (ls.deleted_at IS NULL OR ls.deleted_at = '0000-00-00 00:00:00')
+                     ) AS products_summary
+              FROM tbl_product_payment_allocations a
+              LEFT JOIN tbl_lubricant_sale_invoices s ON (a.invoice_id = s.id)
+              WHERE a.payment_id = '$paymentId' AND (a.deleted_at IS NULL OR a.deleted_at = '0000-00-00 00:00:00')
+              ORDER BY a.id ASC";
+
+$res_alloc = mysqli_query($connection, $sql_alloc);
+$allocations = [];
+$total_allocated = 0.00;
+if ($res_alloc) {
+    while ($al = mysqli_fetch_assoc($res_alloc)) {
+        $allocations[] = $al;
+        $total_allocated += floatval($al['allocated_amount']);
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Product Payment Receipt - <?php echo htmlspecialchars($payment['receipt_no']); ?></title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700,900&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #fff;
+            color: #111;
+            margin: 0;
+            padding: 24px;
+            font-size: 12px;
+        }
+        .receipt-card {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #04204e;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: <?php echo $hasLogo ? 'space-between' : 'center'; ?>;
+            text-align: <?php echo $hasLogo ? 'left' : 'center'; ?>;
+            border-bottom: 2px solid #04204e;
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+            gap: 16px;
+        }
+        .header-logo {
+            max-height: 55px;
+            max-width: 140px;
+            object-fit: contain;
+        }
+        .header-content {
+            flex: 1;
+        }
+        .header h2 {
+            margin: 0 0 2px 0;
+            color: #04204e;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .header .tagline {
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 2px;
+        }
+        .header .contact-line {
+            font-size: 9.5px;
+            color: #64748b;
+            margin-bottom: 3px;
+        }
+        .header h4 {
+            margin: 3px 0 2px 0;
+            color: #0284c7;
+            font-size: 13.5px;
+            font-weight: 700;
+        }
+        .receipt-footer-policy {
+            margin-top: 18px;
+            padding-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+            font-size: 9.5px;
+            color: #64748b;
+            text-align: center;
+            font-style: italic;
+        }
+        .meta-grid {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .meta-col { width: 48%; line-height: 1.6; }
+        .meta-col strong { color: #04204e; }
+        .table-custom {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 18px;
+            font-size: 11px;
+        }
+        .table-custom th {
+            background: #04204e;
+            color: #fff;
+            padding: 8px;
+            text-align: center;
+            font-weight: 700;
+            border: 1px solid #04204e;
+        }
+        .table-custom td {
+            padding: 7px 8px;
+            border: 1px solid #cbd5e1;
+            text-align: center;
+        }
+        .table-custom tr:nth-child(even) { background: #f8fafc; }
+        .total-box {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+        }
+        .total-card {
+            width: 280px;
+            background: #e8f0fe;
+            border: 2px solid #04204e;
+            border-radius: 6px;
+            padding: 10px 16px;
+            text-align: right;
+        }
+        .sig-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+            padding-top: 20px;
+        }
+        .sig-box {
+            width: 38%;
+            border-top: 1px solid #444;
+            text-align: center;
+            padding-top: 6px;
+            font-weight: 700;
+            color: #444;
+            font-size: 11px;
+        }
+        .no-print-bar {
+            background: #04204e;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+        .btn-print {
+            background: #28a745;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        @media print {
+            .no-print-bar { display: none !important; }
+            body { padding: 0 !important; }
+            .receipt-card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print-bar">
+        <div><strong>PPMS</strong> &mdash; Product Payment Voucher Preview</div>
+        <div>
+            <button class="btn-print" onclick="window.print();">Print / Save as PDF</button>
+            <button onclick="window.close();" style="background:#6c757d; color:#fff; border:none; padding:6px 14px; border-radius:4px; font-weight:700; cursor:pointer; margin-left:6px;">Close</button>
+        </div>
+    </div>
+
+    <div class="receipt-card">
+        <!-- Letterhead -->
+        <div class="header">
+            <?php if ($hasLogo): ?>
+                <img src="../<?php echo htmlspecialchars($station_settings['logo_path']); ?>" alt="Logo" class="header-logo">
+            <?php endif; ?>
+            <div class="header-content">
+                <h2><?php echo htmlspecialchars($station_settings['pump_name']); ?></h2>
+                <?php if (!empty($station_settings['tagline'])): ?>
+                    <div class="tagline"><?php echo htmlspecialchars($station_settings['tagline']); ?></div>
+                <?php endif; ?>
+                <div class="contact-line">
+                    <?php if (!empty($station_settings['address'])): ?>
+                        <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($station_settings['address']); ?><?php echo !empty($station_settings['city']) ? ', ' . htmlspecialchars($station_settings['city']) : ''; ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($station_settings['phone'])): ?>
+                        <span> &nbsp;|&nbsp; <i class="fas fa-phone"></i> <?php echo htmlspecialchars($station_settings['phone']); ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($station_settings['ntn_no'])): ?>
+                        <span> &nbsp;|&nbsp; NTN: <?php echo htmlspecialchars($station_settings['ntn_no']); ?></span>
+                    <?php endif; ?>
+                </div>
+                <h4>PRODUCT / LUBRICANT PAYMENT ACKNOWLEDGMENT RECEIPT</h4>
+                <div style="font-size: 10px; color:#666;">Official Acknowledgment of Product Credit Sale Settlement</div>
+            </div>
+        </div>
+
+        <!-- Meta Details -->
+        <div class="meta-grid">
+            <div class="meta-col">
+                <div><strong>Receipt No:</strong> <span style="font-family:monospace; font-size:12.5px; font-weight:bold;"><?php echo htmlspecialchars($payment['receipt_no']); ?></span></div>
+                <div><strong>Receipt Date:</strong> <?php echo !empty($payment['receipt_date']) ? date('d-m-Y', strtotime($payment['receipt_date'])) : date('d-m-Y', strtotime($payment['payment_date'])); ?></div>
+                <div><strong>Payment Date:</strong> <?php echo date('d-m-Y', strtotime($payment['payment_date'])); ?></div>
+                <div><strong>Customer Name:</strong> <?php echo htmlspecialchars($payment['customer_name'] ?: 'Account #' . $payment['customer_id']); ?></div>
+                <div><strong>Phone:</strong> <?php echo htmlspecialchars($payment['customer_phone'] ?: '—'); ?></div>
+            </div>
+            <div class="meta-col" style="text-align:right;">
+                <div><strong>Payment Mode:</strong> <?php echo htmlspecialchars($payment['payment_mode']); ?></div>
+                <?php if ($payment['payment_mode'] === 'Online Payment'): ?>
+                    <div><strong>Bank:</strong> <?php echo htmlspecialchars($payment['bank_name'] ?? '—'); ?></div>
+                    <div><strong>Account #:</strong> <?php echo htmlspecialchars($payment['bank_account_no'] ?? '—'); ?></div>
+                    <?php if (!empty($payment['transaction_ref'])): ?>
+                        <div><strong>Ref / UTR:</strong> <?php echo htmlspecialchars($payment['transaction_ref']); ?></div>
+                    <?php endif; ?>
+                <?php elseif ($payment['payment_mode'] === 'Cheque'): ?>
+                    <div><strong>Cheque No:</strong> <?php echo htmlspecialchars($payment['cheque_no'] ?? '—'); ?></div>
+                    <?php if (!empty($payment['cheque_date'])): ?>
+                        <div><strong>Cheque Date:</strong> <?php echo date('d-m-Y', strtotime($payment['cheque_date'])); ?></div>
+                    <?php endif; ?>
+                <?php endif; ?>
+                <?php if (!empty($payment['remarks'])): ?>
+                    <div><strong>Remarks:</strong> <?php echo htmlspecialchars($payment['remarks']); ?></div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Settled Invoices Table -->
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th>
+                    <th>Slip / Invoice No</th>
+                    <th>Slip Date</th>
+                    <th>Vehicle No</th>
+                    <th style="text-align:left;">Products Breakdown</th>
+                    <th>Total Billed (Rs.)</th>
+                    <th>Amount Settled (Rs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $count = 1;
+                foreach ($allocations as $al): 
+                    $cut = floatval($al['allocated_amount']);
+                    $chg = floatval($al['charge_amount']);
+                ?>
+                <tr>
+                    <td><?php echo $count++; ?></td>
+                    <td style="font-family:monospace; font-weight:bold; color:#04204e;"><?php echo htmlspecialchars($al['slip_no'] ?: $al['invoice_no']); ?></td>
+                    <td><?php echo !empty($al['slip_date']) ? date('d-m-Y', strtotime($al['slip_date'])) : '—'; ?></td>
+                    <td style="font-family:monospace; text-transform:uppercase; font-weight:bold;"><?php echo htmlspecialchars($al['vehicle_number'] ?: '—'); ?></td>
+                    <td style="text-align:left;"><?php echo htmlspecialchars($al['products_summary'] ?: 'Lubricant / Product'); ?></td>
+                    <td>Rs. <?php echo number_format($chg, 2); ?></td>
+                    <td style="font-weight:bold; color:#04204e;">Rs. <?php echo number_format($cut, 2); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <!-- Total Box -->
+        <div class="total-box">
+            <div class="total-card">
+                <div style="font-size:11px; text-transform:uppercase; color:#555;">Total Amount Received:</div>
+                <div style="font-size:18px; font-weight:900; color:#04204e;">
+                    Rs. <?php echo number_format($payment['total_amount'], 2); ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signatures -->
+        <div class="sig-section">
+            <div class="sig-box">Customer Signature / Acknowledgment</div>
+            <div class="sig-box">Authorized Station Cashier / Manager</div>
+        </div>
+
+        <?php if (!empty($station_settings['receipt_footer'])): ?>
+            <div class="receipt-footer-policy">
+                <?php echo htmlspecialchars($station_settings['receipt_footer']); ?>
+            </div>
+        <?php endif; ?>
+    </div>
+
+</body>
+</html>

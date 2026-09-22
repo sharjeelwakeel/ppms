@@ -17,7 +17,7 @@ if ($product_id <= 0) {
 $purchases_query = mysqli_query($connection, "
     SELECT id, quantity, purchase_price AS rate, (quantity * purchase_price) AS amount, date, 'Purchase' AS type, CONCAT('Payment Status: ', UPPER(payment_status)) AS details 
     FROM tbl_lubricant_purchases 
-    WHERE product_id = $product_id
+    WHERE product_id = $product_id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
 ");
 $history = [];
 if ($purchases_query) {
@@ -27,11 +27,11 @@ if ($purchases_query) {
     }
 }
 
-// Fetch Sales
+// Fetch Sales (Using physical issue quantity for accurate stock ledger)
 $sales_query = mysqli_query($connection, "
-    SELECT id, quantity, rate, amount, date, 'Sale' AS type, CONCAT(payment_type, ' Sale', IF(details != '', CONCAT(' (', details, ')'), '')) AS details 
+    SELECT id, COALESCE(issue_quantity, quantity) AS quantity, rate, amount, date, 'Sale' AS type, CONCAT(payment_type, ' Sale', IF(details != '', CONCAT(' (', details, ')'), '')) AS details 
     FROM tbl_lubricant_sales 
-    WHERE product_id = $product_id
+    WHERE product_id = $product_id AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
 ");
 if ($sales_query) {
     while ($row = mysqli_fetch_assoc($sales_query)) {

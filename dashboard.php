@@ -21,7 +21,7 @@ if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
 
 // Fetch all products and evaluate real-time stock levels vs reorder level
 $sql = "
-    SELECT p.id, p.name, p.price, 
+    SELECT p.id, p.name, COALESCE(NULLIF(p.cash_rate, 0), p.price, 0) AS price, 
            COALESCE(p.reorder_level, 0) AS reorder_level,
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE product_id = p.id), 0) AS total_purchased,
            COALESCE((SELECT SUM(quantity) FROM tbl_lubricant_sales WHERE product_id = p.id), 0) AS total_sold
