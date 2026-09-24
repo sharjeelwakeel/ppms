@@ -64,7 +64,17 @@ CREATE TABLE IF NOT EXISTS `tbl_nozzles` (
 
 ---
 
-## 6. File Architecture
+## 6. Nozzle Expense Integration & Cost Tracking
+- **Recording on Behalf of Nozzles**:
+  - Dispensing equipment can accumulate operational, maintenance, or repair costs through the **Expenses Management** module (`markdown/expenses.md`).
+  - When the system category **"Nozzle Expense"** is selected, the form dynamically displays a dropdown listing **all active physical dispensing nozzles** (`tbl_nozzles`).
+  - The operator selects the target dispensing nozzle and enters the amount to record the expense directly **on behalf of that specific nozzle** (`tbl_expenses.nozzle_id = tbl_nozzles.id`).
+- **Audit & Profitability**:
+  - Allows station owners to filter expenses per nozzle (`expenses/expenses-list.php`), track equipment maintenance frequency, and analyze net operating efficiency per nozzle unit.
+
+---
+
+## 7. File Architecture
 
 | File Path | Description |
 |---|---|
@@ -78,7 +88,7 @@ CREATE TABLE IF NOT EXISTS `tbl_nozzles` (
 
 ---
 
-## 7. UI Theme & Icon Standards
+## 8. UI Theme & Icon Standards
 
 - **Theme Compliance (`markdown/theme.md`)**:
   - Primary color: `#04204e` (`var(--primary-color)`).

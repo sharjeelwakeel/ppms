@@ -23,6 +23,7 @@ $searchValue = isset($_POST['search']['value']) ? trim($_POST['search']['value']
 $from_date = isset($_REQUEST['from_date']) ? trim($_REQUEST['from_date']) : '';
 $to_date   = isset($_REQUEST['to_date']) ? trim($_REQUEST['to_date']) : '';
 $type_id   = isset($_REQUEST['type_id']) ? trim($_REQUEST['type_id']) : '';
+$nozzle_id = isset($_REQUEST['nozzle_id']) ? intval($_REQUEST['nozzle_id']) : 0;
 
 // Columns mapping for ordering
 $columns = ['e.id', 'e.expense_date', 't.name', 'e.amount', 'e.payment_method', 'e.reference_no', 'e.notes', 'e.created_at'];
@@ -53,10 +54,13 @@ if (!empty($type_id)) {
     $escapedType = mysqli_real_escape_string($connection, $type_id);
     $where .= " AND e.expense_type_id = '$escapedType' ";
 }
+if ($nozzle_id > 0) {
+    $where .= " AND e.nozzle_id = '$nozzle_id' ";
+}
 
 if ($searchValue !== '') {
     $escapedSearch = mysqli_real_escape_string($connection, $searchValue);
-    $where .= " AND (t.name LIKE '%$escapedSearch%' OR e.amount LIKE '%$escapedSearch%' OR e.reference_no LIKE '%$escapedSearch%' OR e.notes LIKE '%$escapedSearch%' OR e.payment_method LIKE '%$escapedSearch%') ";
+    $where .= " AND (t.name LIKE '%$escapedSearch%' OR n.name LIKE '%$escapedSearch%' OR e.amount LIKE '%$escapedSearch%' OR e.reference_no LIKE '%$escapedSearch%' OR e.notes LIKE '%$escapedSearch%' OR e.payment_method LIKE '%$escapedSearch%') ";
 }
 
 // Total records count
@@ -65,7 +69,10 @@ $totalRow = mysqli_fetch_assoc($totalRes);
 $totalRecords = intval($totalRow['total']);
 
 // Filtered records count
-$filteredQuery = "SELECT COUNT(*) AS total FROM tbl_expenses e LEFT JOIN tbl_expense_types t ON e.expense_type_id = t.id " . $where;
+$filteredQuery = "SELECT COUNT(*) AS total 
+                  FROM tbl_expenses e 
+                  LEFT JOIN tbl_expense_types t ON e.expense_type_id = t.id 
+                  LEFT JOIN tbl_nozzles n ON e.nozzle_id = n.id " . $where;
 $filteredRes = mysqli_query($connection, $filteredQuery);
 $filteredRow = mysqli_fetch_assoc($filteredRes);
 $filteredRecords = intval($filteredRow['total']);
@@ -75,7 +82,9 @@ $sumQuery = "SELECT
     SUM(e.amount) as total_sum, 
     SUM(CASE WHEN e.payment_method = 'Cash' THEN e.amount ELSE 0 END) as cash_sum,
     SUM(CASE WHEN e.payment_method != 'Cash' THEN e.amount ELSE 0 END) as bank_sum
-    FROM tbl_expenses e LEFT JOIN tbl_expense_types t ON e.expense_type_id = t.id " . $where;
+    FROM tbl_expenses e 
+    LEFT JOIN tbl_expense_types t ON e.expense_type_id = t.id 
+    LEFT JOIN tbl_nozzles n ON e.nozzle_id = n.id " . $where;
 $sumRes = mysqli_query($connection, $sumQuery);
 $sumRow = mysqli_fetch_assoc($sumRes);
 
@@ -88,10 +97,11 @@ if ($length < 0) {
     $length = 25;
 }
 
-$dataQuery = "SELECT e.*, t.name as category_name, b.name as bank_name 
+$dataQuery = "SELECT e.*, t.name as category_name, b.name as bank_name, n.name as nozzle_name 
               FROM tbl_expenses e 
               LEFT JOIN tbl_expense_types t ON e.expense_type_id = t.id 
               LEFT JOIN tbl_banks b ON e.bank_id = b.id 
+              LEFT JOIN tbl_nozzles n ON e.nozzle_id = n.id 
               $where 
               ORDER BY $columnName $columnSortOrder 
               LIMIT $length OFFSET $start";
@@ -103,8 +113,18 @@ if ($dataRes && mysqli_num_rows($dataRes) > 0) {
     $sn = $start + 1;
     while ($row = mysqli_fetch_assoc($dataRes)) {
         $id          = $row['id'];
-        $exp_date    = date("d-m-Y", strtotime($row['expense_date']));
+        $raw_date    = date("d-m-Y", strtotime($row['expense_date']));
+        $exp_date_display = $canEdit 
+            ? '<a href="edit-expense.php?id=' . $id . '" class="font-weight-bold text-nowrap" style="color: var(--primary-color);" title="Click to edit expense">' . $raw_date . '</a>'
+            : '<span class="font-weight-bold text-nowrap">' . $raw_date . '</span>';
+
         $category    = htmlspecialchars($row['category_name'] ?? 'Uncategorized');
+        
+        $categoryHtml = '<span class="badge badge-info">' . $category . '</span>';
+        if (!empty($row['nozzle_name'])) {
+            $categoryHtml .= '<br><span class="badge badge-warning mt-1" title="Dispensing Nozzle"><i class="fas fa-gas-pump mr-1"></i>' . htmlspecialchars($row['nozzle_name']) . '</span>';
+        }
+
         $amount      = '<strong>Rs. ' . number_format($row['amount'], 2) . '</strong>';
         $pay_method  = htmlspecialchars($row['payment_method']);
         if ($row['payment_method'] !== 'Cash' && !empty($row['bank_name'])) {
@@ -114,20 +134,17 @@ if ($dataRes && mysqli_num_rows($dataRes) > 0) {
         $notes       = htmlspecialchars($row['notes'] ?? '-');
 
         $actions = '';
-        if ($canEdit) {
-            $actions .= '<a href="edit-expense.php?id=' . $id . '" class="btn btn-sm btn-link text-primary p-0 mr-2" title="Edit"><i class="fas fa-edit" style="font-size: 16px;"></i></a>';
-        }
         if ($canDelete) {
-            $actions .= '<a class="btn btn-sm btn-link text-danger p-0" onclick="deleteExpense(' . $id . ')" title="Delete"><i class="fas fa-trash-alt" style="font-size: 16px;"></i></a>';
+            $actions .= '<a class="btn btn-sm btn-link text-danger p-0" onclick="deleteExpense(' . $id . ')" title="Delete Expense"><i class="fas fa-trash-alt" style="font-size: 16px;"></i></a>';
         }
         if (empty($actions)) {
-            $actions = '<span class="text-muted small">No Access</span>';
+            $actions = '<span class="text-muted small">—</span>';
         }
 
         $data[] = [
             $sn++,
-            $exp_date,
-            '<span class="badge badge-info">' . $category . '</span>',
+            $exp_date_display,
+            $categoryHtml,
             $amount,
             $pay_method,
             $ref_no,

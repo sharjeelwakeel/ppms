@@ -5050,10 +5050,18 @@ CREATE TABLE `tbl_expense_types` (
   `name` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT 1,
+  `is_system` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_expense_types`
+--
+
+INSERT INTO `tbl_expense_types` (`id`, `name`, `description`, `status`, `is_system`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Nozzle Expense', 'System-defined category for nozzle maintenance, repairs, and calibration expenses', 1, 1, '2026-09-24 12:00:00', '2026-09-24 12:00:00', NULL);
 
 -- --------------------------------------------------------
 
@@ -5843,7 +5851,8 @@ ALTER TABLE `tbl_expenses`
 -- Indexes for table `tbl_expense_types`
 --
 ALTER TABLE `tbl_expense_types`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_is_system` (`is_system`);
 
 --
 -- Indexes for table `tbl_items`

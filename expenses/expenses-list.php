@@ -29,7 +29,10 @@ if (isset($_GET['msg'])) {
 }
 
 // Fetch active categories for filter dropdown
-$types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types WHERE status = 'Active' AND deleted_at IS NULL ORDER BY name ASC");
+$types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types WHERE status = 'Active' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC");
+
+// Fetch active nozzles for filter dropdown
+$nozzles_res = mysqli_query($connection, "SELECT id, name FROM tbl_nozzles WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ORDER BY name ASC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -126,14 +129,14 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
             <div class="card shadow-sm mb-4">
                 <div class="card-body py-3 bg-light">
                     <form id="filterForm" class="form-row align-items-center">
-                        <div class="col-md-3 my-1">
+                        <div class="col-md-2 my-1">
                             <label class="sr-only">From Date</label>
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-calendar"></i></span></div>
                                 <input type="date" id="filterFromDate" class="form-control" placeholder="From Date">
                             </div>
                         </div>
-                        <div class="col-md-3 my-1">
+                        <div class="col-md-2 my-1">
                             <label class="sr-only">To Date</label>
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-calendar"></i></span></div>
@@ -150,9 +153,19 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
                                 <?php endif; ?>
                             </select>
                         </div>
-                        <div class="col-md-3 my-1 d-flex">
+                        <div class="col-md-3 my-1">
+                            <select id="filterNozzle" class="form-control">
+                                <option value="">All Nozzles (Dispensing Units)</option>
+                                <?php if ($nozzles_res && mysqli_num_rows($nozzles_res) > 0): ?>
+                                    <?php while ($noz = mysqli_fetch_assoc($nozzles_res)): ?>
+                                        <option value="<?php echo $noz['id']; ?>"><?php echo htmlspecialchars($noz['name']); ?></option>
+                                    <?php endwhile; ?>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2 my-1 d-flex">
                             <button type="button" id="btnFilter" class="btn btn-primary btn-block mr-2"><i class="fas fa-filter mr-1"></i> Filter</button>
-                            <button type="button" id="btnReset" class="btn btn-secondary"><i class="fas fa-redo"></i></button>
+                            <button type="button" id="btnReset" class="btn btn-secondary" title="Reset Filters"><i class="fas fa-redo"></i></button>
                         </div>
                     </form>
                 </div>
@@ -165,14 +178,14 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
                         <table id="expenseTable" class="table table-bordered table-hover w-100">
                             <thead>
                                 <tr>
-                                    <th width="5%">#</th>
-                                    <th width="12%">Date</th>
+                                    <th width="4%" class="text-center">#</th>
+                                    <th style="min-width: 105px; white-space: nowrap;">Date</th>
                                     <th width="18%">Category</th>
                                     <th width="15%">Amount</th>
-                                    <th width="18%">Payment Method</th>
+                                    <th width="16%">Payment Method</th>
                                     <th width="12%">Ref / Voucher</th>
                                     <th>Notes</th>
-                                    <th width="10%">Actions</th>
+                                    <th width="7%" class="text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -199,9 +212,10 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
                     "url": "expenses-ajax.php",
                     "type": "POST",
                     "data": function(d) {
-                        d.from_date = $('#filterFromDate').val();
-                        d.to_date   = $('#filterToDate').val();
-                        d.type_id   = $('#filterType').val();
+                        d.from_date  = $('#filterFromDate').val();
+                        d.to_date    = $('#filterToDate').val();
+                        d.type_id    = $('#filterType').val();
+                        d.nozzle_id  = $('#filterNozzle').val();
                     },
                     "dataSrc": function(json) {
                         if (json.totalSum !== undefined) {
@@ -224,6 +238,7 @@ $types_res = mysqli_query($connection, "SELECT id, name FROM tbl_expense_types W
                 $('#filterFromDate').val('');
                 $('#filterToDate').val('');
                 $('#filterType').val('');
+                $('#filterNozzle').val('');
                 table.ajax.reload();
             });
         });

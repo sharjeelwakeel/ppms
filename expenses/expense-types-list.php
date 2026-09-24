@@ -23,6 +23,10 @@ if (isset($_GET['msg'])) {
         $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Expense Type updated successfully!<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
     } elseif ($_GET['msg'] === 'deleted') {
         $alert_message = '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="fas fa-check-circle mr-1"></i> Expense Type deleted successfully!<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
+    } elseif ($_GET['msg'] === 'system_protected') {
+        $alert_message = '<div class="alert alert-warning alert-dismissible fade show" role="alert"><i class="fas fa-lock mr-1"></i> The "Nozzle Expense" system category is protected and cannot be deleted.<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
+    } elseif ($_GET['msg'] === 'system_edit_blocked') {
+        $alert_message = '<div class="alert alert-warning alert-dismissible fade show" role="alert"><i class="fas fa-lock mr-1"></i> System-generated categories are protected and cannot be edited.<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
     } elseif ($_GET['msg'] === 'error') {
         $alert_message = '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="fas fa-exclamation-triangle mr-1"></i> An error occurred processing your request.<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button></div>';
     }
@@ -31,19 +35,27 @@ if (isset($_GET['msg'])) {
 // Handle Add / Edit form submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'save_type') {
-        $type_id     = isset($_POST['type_id']) ? mysqli_real_escape_string($connection, trim($_POST['type_id'])) : '';
+        $type_id     = isset($_POST['type_id']) ? intval($_POST['type_id']) : 0;
         $name        = mysqli_real_escape_string($connection, trim($_POST['name']));
         $description = mysqli_real_escape_string($connection, trim($_POST['description']));
         $status      = isset($_POST['status']) && $_POST['status'] === 'Inactive' ? 'Inactive' : 'Active';
 
         if (!empty($name)) {
-            if (!empty($type_id) && $canEdit) {
+            if ($type_id > 0 && $canEdit) {
+                // System-generated categories cannot be edited
+                $chk_sys = mysqli_query($connection, "SELECT is_system, name FROM tbl_expense_types WHERE id = '$type_id' LIMIT 1");
+                $sys_row = mysqli_fetch_assoc($chk_sys);
+                if ($sys_row && ($sys_row['is_system'] == 1 || strtolower(trim($sys_row['name'])) === 'nozzle expense')) {
+                    header('Location: expense-types-list.php?msg=system_edit_blocked');
+                    exit;
+                }
+
                 $sql = "UPDATE tbl_expense_types SET name = '$name', description = '$description', status = '$status', updated_at = NOW() WHERE id = '$type_id'";
                 if (mysqli_query($connection, $sql)) {
                     header('Location: expense-types-list.php?msg=updated');
                     exit;
                 }
-            } elseif (empty($type_id) && $canAdd) {
+            } elseif ($type_id <= 0 && $canAdd) {
                 $sql = "INSERT INTO tbl_expense_types (name, description, status) VALUES ('$name', '$description', '$status')";
                 if (mysqli_query($connection, $sql)) {
                     header('Location: expense-types-list.php?msg=added');
@@ -144,24 +156,42 @@ $result = mysqli_query($connection, $query);
                                         $statusBadge = ($row['status'] === 'Active') 
                                             ? '<span class="badge badge-success">Active</span>' 
                                             : '<span class="badge badge-secondary">Inactive</span>';
+                                        $isSystem = (intval($row['is_system'] ?? 0) === 1 || strtolower(trim($row['name'])) === 'nozzle expense');
                                 ?>
                                 <tr>
                                     <td><?php echo $sn++; ?></td>
-                                    <td><strong><?php echo htmlspecialchars($row['name']); ?></strong></td>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($row['name']); ?></strong>
+                                        <?php if ($isSystem): ?>
+                                            <span class="badge badge-primary ml-1" title="System default category"><i class="fas fa-lock mr-1"></i>System</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($row['description'] ?? '-'); ?></td>
                                     <td><?php echo $statusBadge; ?></td>
                                     <td><?php echo date("d-m-Y h:i A", strtotime($row['created_at'])); ?></td>
                                     <td>
                                         <?php if ($canEdit): ?>
-                                        <button class="btn btn-sm btn-link text-primary p-0 mr-2" onclick='openEditModal(<?php echo json_encode($row); ?>)' title="Edit">
-                                            <i class="fas fa-edit" style="font-size: 16px;"></i>
-                                        </button>
+                                            <?php if ($isSystem): ?>
+                                                <button type="button" class="btn btn-sm btn-link text-muted p-0 mr-2" title="System Category cannot be modified" disabled style="cursor: not-allowed; opacity: 0.5;">
+                                                    <i class="fas fa-lock text-muted" style="font-size: 16px;"></i>
+                                                </button>
+                                            <?php else: ?>
+                                                <button class="btn btn-sm btn-link text-primary p-0 mr-2" onclick='openEditModal(<?php echo json_encode($row); ?>)' title="Edit">
+                                                    <i class="fas fa-edit" style="font-size: 16px;"></i>
+                                                </button>
+                                            <?php endif; ?>
                                         <?php endif; ?>
 
                                         <?php if ($canDelete): ?>
-                                        <a href="#" onclick="confirmDelete(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars(addslashes($row['name'])); ?>')" class="btn btn-sm btn-link text-danger p-0" title="Delete">
-                                            <i class="fas fa-trash-alt" style="font-size: 16px;"></i>
-                                        </a>
+                                            <?php if ($isSystem): ?>
+                                                <button type="button" class="btn btn-sm btn-link text-muted p-0" title="System Category cannot be deleted" disabled style="cursor: not-allowed; opacity: 0.5;">
+                                                    <i class="fas fa-trash-alt text-muted" style="font-size: 16px;"></i>
+                                                </button>
+                                            <?php else: ?>
+                                                <a href="#" onclick="confirmDelete(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars(addslashes($row['name'])); ?>')" class="btn btn-sm btn-link text-danger p-0" title="Delete">
+                                                    <i class="fas fa-trash-alt" style="font-size: 16px;"></i>
+                                                </a>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -229,7 +259,8 @@ $result = mysqli_query($connection, $query);
         function openAddModal() {
             $('#modalTitle').html('<i class="fas fa-tags mr-2"></i>Add Expense Category');
             $('#type_id').val('');
-            $('#name').val('');
+            $('#name').val('').prop('readonly', false);
+            $('#nameHelp').remove();
             $('#description').val('');
             $('#status').val('Active');
             $('#typeModal').modal('show');
@@ -241,6 +272,16 @@ $result = mysqli_query($connection, $query);
             $('#name').val(data.name);
             $('#description').val(data.description);
             $('#status').val(data.status);
+
+            $('#nameHelp').remove();
+            var isSys = (parseInt(data.is_system) === 1 || data.name.toLowerCase() === 'nozzle expense');
+            if (isSys) {
+                $('#name').prop('readonly', true);
+                $('#name').after('<small id="nameHelp" class="text-primary font-weight-bold"><i class="fas fa-lock mr-1"></i> System Category Name is protected and cannot be changed.</small>');
+            } else {
+                $('#name').prop('readonly', false);
+            }
+
             $('#typeModal').modal('show');
         }
 
