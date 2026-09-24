@@ -83,7 +83,9 @@ CREATE TABLE IF NOT EXISTS `tbl_nozzles` (
 | `nozzles/edit-nozzle.php` | Form to edit nozzle details with $\ge$ previous reading validation (allowing equal values) |
 | `include/deletenozzle.php` | Backend AJAX handler for soft-deleting nozzles (`deleted_at = NOW()`) |
 | `include/nozzle_daily_sync.php` | Centralized helper for real-time daily nozzle readings synchronization |
-| `markdown/daily_nozzle_readings.md` | Full architecture and lifecycle of day-to-day nozzle meter tracking |
+| `reports/nozzle-report.php` | Comprehensive Daily Nozzle Performance & Financial Report with reconciliation and expense tracking |
+| `reports/generate-pdf-nozzle-report.php` | Printable A4 PDF statement companion for nozzle audit |
+| `markdown/nozzle_report.md` | Complete architectural documentation for the Daily Nozzle Report |
 | `markdown/nozzles.md` | Module specification and complete documentation (this file) |
 
 ---

@@ -331,6 +331,9 @@ function onNozzleChange(selectElem) {
         itemIdInput.value = itemId;
         rateInput.value = rate.toFixed(2);
 
+        // Check if a cash reading already exists for this nozzle and shift
+        checkExistingCashSale(selectElem);
+
         // Recalculate based on existing amount or quantity
         const amountInput = tr.querySelector('.amount-input');
         const quantityInput = tr.querySelector('.quantity-input');
@@ -346,6 +349,63 @@ function onNozzleChange(selectElem) {
         rateInput.value = '';
     }
     updateSummaryTotals();
+}
+
+function checkExistingCashSale(selectElem) {
+    const saleDate = document.getElementById('sale_date').value;
+    const shiftId = document.getElementById('shift_id').value;
+    const nozzleId = selectElem.value;
+
+    if (!saleDate || !shiftId || !nozzleId) {
+        return;
+    }
+
+    fetch(`ajax-check-existing-cash.php?sale_date=${encodeURIComponent(saleDate)}&shift_id=${encodeURIComponent(shiftId)}&nozzle_id=${encodeURIComponent(nozzleId)}`)
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === 'success' && res.exists && res.data) {
+                const d = res.data;
+                const sourceBadge = (d.is_manual_override == 1) 
+                    ? '<span class="badge badge-warning text-dark"><i class="fas fa-user-edit mr-1"></i>Manual Override</span>'
+                    : (d.meter_reading_id > 0)
+                        ? '<span class="badge badge-info"><i class="fas fa-robot mr-1"></i>System Auto-Generated from Meter Reading #' + d.meter_reading_id + '</span>'
+                        : '<span class="badge badge-secondary">Recorded Entry</span>';
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Existing Reading Detected!',
+                    html: `
+                        <div class="text-left p-3 my-2" style="background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:13.5px; line-height:1.6;">
+                            <div><strong><i class="fas fa-gas-pump mr-1 text-primary"></i> Nozzle:</strong> ${d.nozzle_name} (${d.item_name})</div>
+                            <div><strong><i class="fas fa-calendar-alt mr-1 text-primary"></i> Date & Shift:</strong> ${d.sale_date} | ${d.shift_name}</div>
+                            <div class="mt-2 pt-2 border-top">
+                                <strong><i class="fas fa-tachometer-alt mr-1 text-success"></i> Existing Litres:</strong> 
+                                <span class="badge badge-success px-2 py-1" style="font-size:13px;">${parseFloat(d.quantity).toFixed(2)} Ltr</span>
+                                &nbsp;|&nbsp;
+                                <strong><i class="fas fa-money-bill-wave mr-1 text-primary"></i> Existing Amount:</strong> 
+                                <span class="badge badge-primary px-2 py-1" style="font-size:13px;">Rs. ${parseFloat(d.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            </div>
+                            <div class="mt-2 text-muted small"><strong>Source:</strong> ${sourceBadge}</div>
+                        </div>
+                        <p class="text-dark font-weight-bold mb-0 mt-3" style="font-size:14px;">
+                            A cash reading has already been recorded for this nozzle on this shift.<br>
+                            Would you like to <u>edit the existing reading</u> instead of adding another?
+                        </p>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonColor: '#04204e',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fas fa-edit mr-1"></i> Edit Existing Reading',
+                    cancelButtonText: '<i class="fas fa-plus mr-1"></i> Add Another Anyway',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = 'edit-cash-sale.php?id=' + d.id;
+                    }
+                });
+            }
+        })
+        .catch(err => console.error('Error checking existing cash sale:', err));
 }
 
 function onAmountInput(amountElem) {
@@ -432,10 +492,21 @@ function updateSummaryTotals() {
     document.getElementById('lblTotalAmount').textContent = 'Rs. ' + totalCash.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
-// Initialise with 1 empty row on page load
+// Initialise with 1 empty row on page load and attach shift/date listeners
 document.addEventListener('DOMContentLoaded', function() {
     addCashRow();
+
+    document.getElementById('sale_date').addEventListener('change', checkAllSelectedNozzles);
+    document.getElementById('shift_id').addEventListener('change', checkAllSelectedNozzles);
 });
+
+function checkAllSelectedNozzles() {
+    document.querySelectorAll('.nozzle-select').forEach(sel => {
+        if (sel.value) {
+            checkExistingCashSale(sel);
+        }
+    });
+}
 </script>
 </body>
 </html>

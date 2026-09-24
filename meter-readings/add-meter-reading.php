@@ -73,9 +73,12 @@ if (isset($_POST['submit'])) {
             }
 
             // Update grand total in header
-
-            // Update grand total in header
             mysqli_query($connection, "UPDATE tbl_meter_readings SET grand_total='$grand_total' WHERE id='$reading_id'");
+
+            // Automatically calculate & synchronize Cash Sales for this shift
+            require_once __DIR__ . '/../include/cash_automation_helper.php';
+            sync_shift_cash_sales($connection, $date, $shift_id);
+
             header('Location: view-meter-reading.php?id=' . $reading_id);
             exit;
         } else {

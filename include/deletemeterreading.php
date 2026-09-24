@@ -30,6 +30,9 @@ if (isset($_POST['id']) && !empty($_POST['id'])) {
     // Soft delete the meter reading header
     $sql = "UPDATE tbl_meter_readings SET deleted_at = NOW() WHERE id = '$id'";
     if (mysqli_query($connection, $sql)) {
+        // Soft delete any auto-generated cash sales for this meter reading
+        mysqli_query($connection, "UPDATE tbl_meter_reading_cash_sales SET deleted_at = NOW() WHERE meter_reading_id = '$id' AND (is_manual_override = 0 OR is_manual_override IS NULL)");
+
         // For each affected nozzle, sync start_reading to the latest active meter reading
         foreach ($affected_nozzles as $noz_id => $baseline_last_reading) {
             $latest_q = mysqli_query($connection, "

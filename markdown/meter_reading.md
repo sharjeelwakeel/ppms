@@ -85,7 +85,13 @@ For each nozzle row:
   - The record is soft-deleted (`UPDATE tbl_meter_readings SET deleted_at = NOW() WHERE id = '$id'`).
   - For each affected nozzle, the system queries the **latest active meter reading** remaining in the system (`WHERE deleted_at IS NULL ORDER BY date DESC, shift_id DESC, id DESC LIMIT 1`) and synchronizes `tbl_nozzles.start_reading = latest_reading.current_reading`.
   - If no active meter readings remain for that nozzle, `tbl_nozzles.start_reading` safely reverts to the baseline opening reading (`last_reading`).
+  - Automatically soft-deletes any system-generated cash sales linked to this meter reading (`meter_reading_id = $id`).
 
+### 5. Automated Cash Sale Synchronization (`include/cash_automation_helper.php`)
+- Whenever a meter reading is created or updated, the system automatically evaluates fuel settled via other channels and records the cash remainder:
+  $$\text{Cash Litres} = \max(\text{Net Sale Litres} - (\text{Credit Litres} + \text{Card Litres}),\ 0)$$
+  $$\text{Cash Amount (Rs.)} = \text{Cash Litres} \times \text{Fuel Rate}$$
+- Auto-syncs `tbl_meter_reading_cash_sales` in real-time, even when Credit or Card sales are entered or edited back-dated or hours later.
 
 ---
 

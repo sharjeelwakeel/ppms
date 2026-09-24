@@ -91,6 +91,14 @@ if (isset($_POST['submit'])) {
 
                 // Update grand total in header
                 mysqli_query($connection, "UPDATE tbl_meter_readings SET grand_total='$grand_total' WHERE id='$id'");
+
+                // Automatically calculate & synchronize Cash Sales for this shift
+                require_once __DIR__ . '/../include/cash_automation_helper.php';
+                if (!empty($header['date']) && !empty($header['shift_id']) && ($header['date'] != $date || $header['shift_id'] != $shift_id)) {
+                    sync_shift_cash_sales($connection, $header['date'], $header['shift_id']);
+                }
+                sync_shift_cash_sales($connection, $date, $shift_id);
+
                 header('Location: view-meter-reading.php?id=' . $id . '&msg=updated');
                 exit;
             } else {

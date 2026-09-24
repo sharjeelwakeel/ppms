@@ -284,7 +284,14 @@ $fuel_items = get_fuel_items($connection);
                                 <td class="text-right"><?php echo $rate_formatted; ?></td>
                                 <td class="text-right font-weight-bold text-success"><?php echo $qty_formatted; ?> Ltr</td>
                                 <td class="text-right font-weight-bold text-primary">Rs. <?php echo $amt_formatted; ?></td>
-                                <td class="text-left text-muted small"><?php echo htmlspecialchars($row['notes'] ?? ''); ?></td>
+                                <td class="text-left text-muted small">
+                                    <?php if (intval($row['is_manual_override'] ?? 0) === 1): ?>
+                                        <span class="badge badge-warning text-dark mr-1" title="Manually edited by user"><i class="fas fa-user-edit mr-1"></i>Manual</span>
+                                    <?php elseif (intval($row['meter_reading_id'] ?? 0) > 0): ?>
+                                        <span class="badge badge-info mr-1" title="System auto-calculated from Meter Reading #<?php echo $row['meter_reading_id']; ?>"><i class="fas fa-robot mr-1"></i>Auto</span>
+                                    <?php endif; ?>
+                                    <?php echo htmlspecialchars($row['notes'] ?? ''); ?>
+                                </td>
                                 <td>
                                     <div class="btn-group btn-group-sm" role="group">
                                         <button type="button" class="btn btn-outline-info" title="View Details" onclick="viewCashSaleModal(<?php echo htmlspecialchars(json_encode($row)); ?>)">

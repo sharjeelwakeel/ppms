@@ -6522,6 +6522,7 @@ CREATE TABLE IF NOT EXISTS `tbl_product_payment_allocations` (
 CREATE TABLE IF NOT EXISTS `tbl_meter_reading_cash_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `meter_reading_id` INT(11) NOT NULL DEFAULT 0,
+  `is_manual_override` TINYINT(1) NOT NULL DEFAULT 0,
   `sale_date` DATE NOT NULL,
   `shift_id` INT(11) NOT NULL DEFAULT 0,
   `staff_id` INT(11) NOT NULL DEFAULT 0,

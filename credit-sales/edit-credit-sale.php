@@ -317,6 +317,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 }
+
+                // Automatically recalculate Cash Sales for this shift if a meter reading exists
+                require_once __DIR__ . '/../include/cash_automation_helper.php';
+                sync_shift_cash_sales($connection, $date_safe, $current_shift_id);
+
                 mysqli_commit($connection);
                 header('Location: credit-sales-list.php?msg=updated');
                 exit;

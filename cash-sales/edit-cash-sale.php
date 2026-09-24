@@ -74,6 +74,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                         amount    = '$amount',
                         quantity  = '$quantity',
                         notes     = '$notes',
+                        is_manual_override = 1,
                         updated_at = NOW()
                     WHERE id = '$id'";
 
