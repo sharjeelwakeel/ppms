@@ -5130,6 +5130,11 @@ CREATE TABLE `tbl_leave_setup` (
 CREATE TABLE `tbl_lubricant_products` (
   `id` int(11) NOT NULL,
   `name` varchar(128) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  `subcategory_id` int(11) DEFAULT NULL,
+  `cash_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `credit_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `purchase_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `reorder_level` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -5163,8 +5168,12 @@ CREATE TABLE `tbl_lubricant_purchases` (
 
 CREATE TABLE `tbl_lubricant_sales` (
   `id` int(11) NOT NULL,
+  `invoice_id` int(11) DEFAULT NULL,
+  `invoice_no` varchar(64) DEFAULT NULL,
   `product_id` int(11) NOT NULL,
   `quantity` int(11) NOT NULL DEFAULT 0,
+  `issue_quantity` int(11) NOT NULL DEFAULT 0,
+  `balance_quantity` int(11) NOT NULL DEFAULT 0,
   `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',
@@ -5248,7 +5257,11 @@ CREATE TABLE `tbl_card_sale_settlements` (
   `service_charges` decimal(12,2) NOT NULL DEFAULT 0.00,
   `revenue_percentage` decimal(8,4) NOT NULL DEFAULT 0.0000,
   `revenue_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `revenue_paid_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `revenue_payment_status` enum('Unpaid','Partial','Paid') NOT NULL DEFAULT 'Unpaid',
   `net_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_status` enum('Unpaid','Partial','Paid') NOT NULL DEFAULT 'Unpaid',
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
@@ -5356,17 +5369,7 @@ INSERT INTO `tbl_nozzles` (`id`, `name`, `tank_id`, `item_id`, `start_reading`, 
 -- Table structure for table `tbl_lubricant_products`
 --
 
-CREATE TABLE IF NOT EXISTS `tbl_lubricant_products` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(128) NOT NULL,
-  `price` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `reorder_level` int(11) NOT NULL DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 -- --------------------------------------------------------
 
@@ -5374,21 +5377,7 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_products` (
 -- Table structure for table `tbl_lubricant_purchases`
 --
 
-CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchases` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `product_id` int(11) NOT NULL,
-  `quantity` int(11) NOT NULL DEFAULT 0,
-  `purchase_price` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `date` date NOT NULL,
-  `payment_status` varchar(32) NOT NULL DEFAULT 'unpaid',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_product_id` (`product_id`),
-  KEY `idx_payment_status` (`payment_status`),
-  KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 -- --------------------------------------------------------
 
@@ -5417,22 +5406,7 @@ CREATE TABLE IF NOT EXISTS `tbl_lubricant_purchase_payments` (
 -- Table structure for table `tbl_lubricant_sales`
 --
 
-CREATE TABLE IF NOT EXISTS `tbl_lubricant_sales` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `product_id` int(11) NOT NULL,
-  `quantity` int(11) NOT NULL DEFAULT 0,
-  `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `payment_type` varchar(32) NOT NULL DEFAULT 'Cash',
-  `details` text DEFAULT NULL,
-  `date` date NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_product_id` (`product_id`),
-  KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 -- --------------------------------------------------------
 
@@ -5898,19 +5872,31 @@ ALTER TABLE `tbl_leave_setup`
 -- Indexes for table `tbl_lubricant_products`
 --
 ALTER TABLE `tbl_lubricant_products`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_category_id` (`category_id`),
+  ADD KEY `idx_subcategory_id` (`subcategory_id`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
 
 --
 -- Indexes for table `tbl_lubricant_purchases`
 --
 ALTER TABLE `tbl_lubricant_purchases`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_product_id` (`product_id`),
+  ADD KEY `idx_payment_status` (`payment_status`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
 
 --
 -- Indexes for table `tbl_lubricant_sales`
 --
 ALTER TABLE `tbl_lubricant_sales`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_invoice_id` (`invoice_id`),
+  ADD KEY `idx_invoice_no` (`invoice_no`),
+  ADD KEY `idx_shift_id` (`shift_id`),
+  ADD KEY `idx_product_id` (`product_id`),
+  ADD KEY `idx_balance_quantity` (`balance_quantity`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
 
 --
 -- Indexes for table `tbl_meter_readings`
@@ -6340,31 +6326,7 @@ CREATE TABLE IF NOT EXISTS `tbl_settings` (
 INSERT INTO `tbl_settings` (`id`, `pump_name`, `tagline`, `phone`, `email`, `address`, `city`, `ntn_no`, `license_no`, `receipt_footer`, `logo_path`) VALUES
 (1, 'PPMS Petrol Pump', 'Authorized Petroleum & Lubricants Dealer', '+92 300 1234567', 'info@ppms.pk', 'Main Highway Road', 'City', '', '', 'Thank you for your business! Fuel once sold will not be returned.', '')
 ON DUPLICATE KEY UPDATE `id` = 1;
-CREATE TABLE IF NOT EXISTS `tbl_card_sale_settlements` (
-  `id` INT(11) NOT NULL AUTO_INCREMENT,
-  `card_machine_id` INT(11) NOT NULL,
-  `settlement_date` DATE NOT NULL,
-  `shift_id` INT(11) NOT NULL DEFAULT 0,
-  `batch_no` VARCHAR(64) NOT NULL,
-  `no_of_cards` INT(11) NOT NULL DEFAULT 1,
-  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `charges_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
-  `service_charges` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `revenue_percentage` DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
-  `revenue_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `net_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `paid_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  `payment_status` ENUM('Unpaid', 'Partial', 'Paid') NOT NULL DEFAULT 'Unpaid',
-  `notes` TEXT DEFAULT NULL,
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `deleted_at` DATETIME DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_card_machine_id` (`card_machine_id`),
-  KEY `idx_settlement_date` (`settlement_date`),
-  KEY `idx_shift_id` (`shift_id`),
-  KEY `idx_payment_status` (`payment_status`),
-  KEY `idx_deleted_at` (`deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 CREATE TABLE IF NOT EXISTS `tbl_card_settlement_payments` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -6546,6 +6508,8 @@ CREATE TABLE IF NOT EXISTS `tbl_product_payment_allocations` (
   KEY `idx_pmt` (`payment_id`),
   KEY `idx_inv` (`invoice_id`),
   KEY `idx_del` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE IF NOT EXISTS `tbl_meter_reading_cash_sales` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `meter_reading_id` INT(11) NOT NULL DEFAULT 0,

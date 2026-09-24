@@ -37,7 +37,7 @@ $canDelete = has_permission('items', 'delete');
 
 // Handle Price Revision from Modal
 $alert_msg = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_price') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_price') {
     check_access('items', 'edit');
     $up_prod_id   = intval($_POST['product_id'] ?? 0);
     $up_cash      = floatval($_POST['cash_rate'] ?? 0);

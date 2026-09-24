@@ -9,6 +9,36 @@ require '../include/permissions.php';
 // Enforce access check for viewing stock report
 check_access('items', 'show');
 
+// Self-healing schema migrations
+$sales_cols = [
+    'invoice_id'       => "ALTER TABLE tbl_lubricant_sales ADD COLUMN `invoice_id` INT(11) DEFAULT NULL AFTER `id`, ADD KEY `idx_invoice_id` (`invoice_id`)",
+    'invoice_no'       => "ALTER TABLE tbl_lubricant_sales ADD COLUMN `invoice_no` VARCHAR(64) DEFAULT NULL AFTER `invoice_id`, ADD KEY `idx_invoice_no` (`invoice_no`)",
+    'issue_quantity'   => "ALTER TABLE tbl_lubricant_sales ADD COLUMN `issue_quantity` INT(11) NOT NULL DEFAULT 0 AFTER `quantity`",
+    'balance_quantity' => "ALTER TABLE tbl_lubricant_sales ADD COLUMN `balance_quantity` INT(11) NOT NULL DEFAULT 0 AFTER `issue_quantity`, ADD KEY `idx_balance_quantity` (`balance_quantity`)",
+    'shift_id'         => "ALTER TABLE tbl_lubricant_sales ADD COLUMN `shift_id` INT(11) NOT NULL DEFAULT 0 AFTER `date`, ADD KEY `idx_shift_id` (`shift_id`)"
+];
+foreach ($sales_cols as $c_name => $c_sql) {
+    $chk = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_sales LIKE '$c_name'");
+    if ($chk && mysqli_num_rows($chk) == 0) {
+        mysqli_query($connection, $c_sql);
+    }
+}
+
+$prod_cols = [
+    'category_id'    => "ALTER TABLE tbl_lubricant_products ADD COLUMN `category_id` INT(11) DEFAULT NULL AFTER `name`, ADD KEY `idx_category_id` (`category_id`)",
+    'subcategory_id' => "ALTER TABLE tbl_lubricant_products ADD COLUMN `subcategory_id` INT(11) DEFAULT NULL AFTER `category_id`, ADD KEY `idx_subcategory_id` (`subcategory_id`)",
+    'cash_rate'      => "ALTER TABLE tbl_lubricant_products ADD COLUMN `cash_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER `subcategory_id`",
+    'credit_rate'    => "ALTER TABLE tbl_lubricant_products ADD COLUMN `credit_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER `cash_rate`",
+    'purchase_rate'  => "ALTER TABLE tbl_lubricant_products ADD COLUMN `purchase_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER `credit_rate`",
+    'reorder_level'  => "ALTER TABLE tbl_lubricant_products ADD COLUMN `reorder_level` INT(11) NOT NULL DEFAULT 0 AFTER `price`"
+];
+foreach ($prod_cols as $c_name => $c_sql) {
+    $chk = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE '$c_name'");
+    if ($chk && mysqli_num_rows($chk) == 0) {
+        mysqli_query($connection, $c_sql);
+    }
+}
+
 // Date filters
 $fromDate = isset($_GET['from_date']) ? $_GET['from_date'] : '';
 $toDate   = isset($_GET['to_date']) ? $_GET['to_date'] : '';
@@ -29,13 +59,13 @@ if (!empty($fromDate) && !empty($toDate)) {
 
 // Calculate overall summary metrics in date range
 $total_purchases_res = mysqli_query($connection, "SELECT SUM(quantity) FROM tbl_lubricant_purchases WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')" . $pur_date_cond);
-$total_purchases = floatval(mysqli_fetch_row($total_purchases_res)[0] ?? 0);
+$total_purchases = ($total_purchases_res && $row = mysqli_fetch_row($total_purchases_res)) ? floatval($row[0] ?? 0) : 0;
 
 $total_cash_sales_res = mysqli_query($connection, "SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE (sal.payment_type='Cash' OR sal.payment_type='Card') AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
-$total_cash_sales = floatval(mysqli_fetch_row($total_cash_sales_res)[0] ?? 0);
+$total_cash_sales = ($total_cash_sales_res && $row = mysqli_fetch_row($total_cash_sales_res)) ? floatval($row[0] ?? 0) : 0;
 
 $total_credit_sales_res = mysqli_query($connection, "SELECT SUM(CASE WHEN inv.slip_type = 'Balanced Slip' THEN sal.quantity WHEN sal.issue_quantity > 0 THEN sal.issue_quantity WHEN sal.balance_quantity > 0 THEN (sal.quantity - sal.balance_quantity) ELSE sal.quantity END) FROM tbl_lubricant_sales sal LEFT JOIN tbl_lubricant_sale_invoices inv ON (sal.invoice_id = inv.id) WHERE sal.payment_type='Credit' AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')" . $sal_date_cond);
-$total_credit_sales = floatval(mysqli_fetch_row($total_credit_sales_res)[0] ?? 0);
+$total_credit_sales = ($total_credit_sales_res && $row = mysqli_fetch_row($total_credit_sales_res)) ? floatval($row[0] ?? 0) : 0;
 $total_sold_units = $total_cash_sales + $total_credit_sales;
 
 // Calculate overall revenue generated from product sales (Excluding Balanced Slips which were pre-billed on original Permanent Slips)
@@ -46,7 +76,7 @@ $total_revenue_res = mysqli_query($connection, "
     WHERE (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
       AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
 " . $sal_date_cond);
-$total_revenue = floatval(mysqli_fetch_row($total_revenue_res)[0] ?? 0);
+$total_revenue = ($total_revenue_res && $row = mysqli_fetch_row($total_revenue_res)) ? floatval($row[0] ?? 0) : 0;
 
 $total_cash_rev_res = mysqli_query($connection, "
     SELECT SUM(sal.amount) 
@@ -56,7 +86,7 @@ $total_cash_rev_res = mysqli_query($connection, "
       AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
       AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
 " . $sal_date_cond);
-$total_cash_revenue = floatval(mysqli_fetch_row($total_cash_rev_res)[0] ?? 0);
+$total_cash_revenue = ($total_cash_rev_res && $row = mysqli_fetch_row($total_cash_rev_res)) ? floatval($row[0] ?? 0) : 0;
 
 $total_credit_rev_res = mysqli_query($connection, "
     SELECT SUM(sal.amount) 
@@ -66,20 +96,7 @@ $total_credit_rev_res = mysqli_query($connection, "
       AND (sal.deleted_at IS NULL OR sal.deleted_at = '0000-00-00 00:00:00')
       AND (inv.slip_type IS NULL OR inv.slip_type != 'Balanced Slip')
 " . $sal_date_cond);
-$total_credit_revenue = floatval(mysqli_fetch_row($total_credit_rev_res)[0] ?? 0);
-
-// Auto-migrate tbl_lubricant_products: ensure reorder_level column exists and deleted_at exists
-$chk_ro = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'reorder_level'");
-if ($chk_ro && mysqli_num_rows($chk_ro) == 0) {
-    $chk_sq = mysqli_query($connection, "SHOW COLUMNS FROM tbl_lubricant_products LIKE 'shelf_quantity'");
-    if ($chk_sq && mysqli_num_rows($chk_sq) > 0) {
-        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products CHANGE COLUMN shelf_quantity reorder_level INT(11) NOT NULL DEFAULT 0");
-    } else {
-        mysqli_query($connection, "ALTER TABLE tbl_lubricant_products ADD COLUMN reorder_level INT(11) NOT NULL DEFAULT 0 AFTER category");
-    }
-} else {
-    mysqli_query($connection, "ALTER TABLE tbl_lubricant_products MODIFY COLUMN reorder_level INT(11) NOT NULL DEFAULT 0");
-}
+$total_credit_revenue = ($total_credit_rev_res && $row = mysqli_fetch_row($total_credit_rev_res)) ? floatval($row[0] ?? 0) : 0;
 
 // Fetch products with cumulative and period metrics
 $sql = "
