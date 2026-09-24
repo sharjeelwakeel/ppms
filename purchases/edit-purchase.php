@@ -90,6 +90,27 @@ if (isset($_POST['add_payment'])) {
     } else {
         mysqli_begin_transaction($connection);
         try {
+            // Lock purchase row and verify remaining balance to prevent overpayment
+            $purch_lock = mysqli_query($connection, "SELECT quantity, price FROM tbl_purchases WHERE id = '$id' LIMIT 1 FOR UPDATE");
+            $purch_data = mysqli_fetch_assoc($purch_lock);
+            if (!$purch_data) {
+                throw new Exception("Purchase record not found.");
+            }
+            $total_cost = floatval($purch_data['quantity'] ?? 0) * floatval($purch_data['price'] ?? 0);
+
+            $sum_res = mysqli_query($connection, "SELECT COALESCE(SUM(amount), 0) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
+            $sum_row = mysqli_fetch_assoc($sum_res);
+            $current_paid = floatval($sum_row['total_paid'] ?? 0);
+            $remaining_balance = round($total_cost - $current_paid, 2);
+
+            if ($remaining_balance <= 0.001) {
+                throw new Exception("This purchase is already fully paid. No further payments can be added.");
+            }
+
+            if ($payment_amount > ($remaining_balance + 0.0001)) {
+                throw new Exception("Payment amount (Rs. " . number_format($payment_amount, 2) . ") exceeds the remaining balance of Rs. " . number_format($remaining_balance, 2) . ". Extra payment amount is strictly not allowed.");
+            }
+
             // 1. Insert Payment without tank attachment
             $insert_payment = "INSERT INTO tbl_purchase_payments (purchase_id, date, amount, bank_id) 
                                VALUES ('$id', '$payment_date', '$payment_amount', '$bank_id')";
@@ -98,21 +119,14 @@ if (isset($_POST['add_payment'])) {
                 throw new Exception(mysqli_error($connection));
             }
 
-            // 2. Fetch Purchase details for recalculating status
-            $purch_res = mysqli_query($connection, "SELECT quantity, price FROM tbl_purchases WHERE id = '$id' LIMIT 1");
-            $purch_row = mysqli_fetch_assoc($purch_res);
-            $total_cost = floatval($purch_row['quantity'] ?? 0) * floatval($purch_row['price'] ?? 0);
+            // 2. Fetch Sum of Payments after insert
+            $new_total_paid = $current_paid + $payment_amount;
 
-            // 3. Fetch Sum of Payments
-            $sum_res = mysqli_query($connection, "SELECT SUM(amount) as total_paid FROM tbl_purchase_payments WHERE purchase_id = '$id' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
-            $sum_row = mysqli_fetch_assoc($sum_res);
-            $total_paid = floatval($sum_row['total_paid'] ?? 0);
-
-            // 4. Update Purchase Status
+            // 3. Update Purchase Status
             $new_status = 'unpaid';
-            if ($total_paid >= $total_cost && $total_cost > 0) {
+            if ($new_total_paid >= ($total_cost - 0.0001) && $total_cost > 0) {
                 $new_status = 'paid';
-            } else if ($total_paid > 0) {
+            } else if ($new_total_paid > 0) {
                 $new_status = 'in process';
             }
 
@@ -126,7 +140,7 @@ if (isset($_POST['add_payment'])) {
             exit;
         } catch (Exception $e) {
             mysqli_rollback($connection);
-            $message = '<div class="alert alert-danger">Error recording payment: ' . $e->getMessage() . '</div>';
+            $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-1"></i> Error recording payment: ' . $e->getMessage() . '</div>';
         }
     }
 }
@@ -352,11 +366,15 @@ $remaining_amount = max(0, $total_cost - $total_paid);
 						</div>
 					</div>
 					<div class="col-lg-5">
+						<?php if ($remaining_amount > 0.001): ?>
 						<div class="card">
 							<div class="card-header bg-light">
 								<h5 class="card-title mb-0"><i class="fas fa-plus text-primary mr-2"></i>Add Partial Payment</h5>
 							</div>
 							<div class="card-body">
+								<div class="alert alert-info py-2 px-3 mb-3 small">
+									<i class="fas fa-info-circle mr-1"></i> Remaining Payable: <strong>Rs. <?php echo number_format($remaining_amount, 2); ?></strong>. Overpayment is strictly prevented.
+								</div>
 								<form action="edit-purchase.php?id=<?php echo $id; ?>" method="POST">
 									<div class="form-group row">
 										<label class="col-sm-4 col-form-label font-weight-bold">Date</label>
@@ -367,7 +385,13 @@ $remaining_amount = max(0, $total_cost - $total_paid);
 									<div class="form-group row">
 										<label class="col-sm-4 col-form-label font-weight-bold">Amount</label>
 										<div class="col-sm-8">
-											<input type="number" step="0.01" name="payment_amount" class="form-control" placeholder="0.00" min="0.01" required>
+											<div class="input-group">
+												<input type="number" step="0.01" name="payment_amount" id="payment_amount_input" class="form-control" placeholder="0.00" min="0.01" max="<?php echo number_format($remaining_amount, 2, '.', ''); ?>" required>
+												<div class="input-group-append">
+													<button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('payment_amount_input').value = '<?php echo number_format($remaining_amount, 2, '.', ''); ?>';">Full</button>
+												</div>
+											</div>
+											<small class="text-muted">Maximum allowed: Rs. <?php echo number_format($remaining_amount, 2); ?></small>
 										</div>
 									</div>
 									<div class="form-group row">
@@ -392,6 +416,18 @@ $remaining_amount = max(0, $total_cost - $total_paid);
 								</form>
 							</div>
 						</div>
+						<?php else: ?>
+						<div class="card border-success">
+							<div class="card-header bg-success text-white">
+								<h5 class="card-title mb-0"><i class="fas fa-check-double mr-2"></i>Fully Paid</h5>
+							</div>
+							<div class="card-body text-center py-4">
+								<div class="text-success mb-3" style="font-size: 3rem;"><i class="fas fa-check-circle"></i></div>
+								<h6 class="font-weight-bold text-success">This purchase is completely settled</h6>
+								<p class="text-muted small mb-0">Total cost of Rs. <?php echo number_format($total_cost, 2); ?> has been paid in full. Additional payments cannot be recorded.</p>
+							</div>
+						</div>
+						<?php endif; ?>
 					</div>
 				</div>
 			</div>
