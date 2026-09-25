@@ -72,6 +72,7 @@ When a user manually adds a cash sale for a date, shift, and nozzle that already
      - `[Edit Existing Reading]` $\rightarrow$ Redirects directly to `edit-cash-sale.php?id=...`.
      - `[Add Another Anyway]` $\rightarrow$ Dismisses prompt and allows manual override.
 3. **Manual Override Protection**: When manually edited, `is_manual_override = 1` is set so automated background sync will never silently overwrite custom management adjustments.
+4. **Current Reading Recalculation & Audit Remarks**: Saving edits in `edit-cash-sale.php` triggers `recalculate_meter_reading_from_sales()` to recompute the meter reading's `current_reading` and `tbl_nozzles.start_reading`, and appends an audit message to `tbl_meter_readings.remarks`.
 
 ### 3.4 Nozzle $\rightarrow$ Fuel Type & Rate Resolution
 1. The cashier selects a nozzle from the dropdown (e.g. `Nozzle 1 (Petrol)`).

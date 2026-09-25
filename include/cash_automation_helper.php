@@ -194,3 +194,165 @@ if (!function_exists('check_existing_cash_sale_for_shift')) {
         return null;
     }
 }
+
+if (!function_exists('recalculate_meter_reading_from_sales')) {
+    /**
+     * Recalculates the meter reading's current_reading for a nozzle based on the sum of all sales
+     * (Cash + Credit + Card), updates tbl_meter_reading_details, tbl_meter_readings.grand_total,
+     * tbl_nozzles.start_reading, and appends a timestamped audit note into tbl_meter_readings.remarks.
+     *
+     * @param mysqli $connection
+     * @param string $date (YYYY-MM-DD)
+     * @param int $shift_id
+     * @param int $nozzle_id
+     * @param string $reason (e.g. "Cash Sale update", "Credit Sale slip edit")
+     * @return bool
+     */
+    function recalculate_meter_reading_from_sales($connection, $date, $shift_id, $nozzle_id, $reason = 'Sales channel update') {
+        $date_safe = mysqli_real_escape_string($connection, trim($date));
+        $shift_id  = intval($shift_id);
+        $nozzle_id = intval($nozzle_id);
+
+        if (empty($date_safe) || $shift_id <= 0 || $nozzle_id <= 0) {
+            return false;
+        }
+
+        // 1. Locate active meter reading header
+        $mr_q = mysqli_query($connection, "
+            SELECT id, remarks, grand_total 
+            FROM tbl_meter_readings 
+            WHERE date = '$date_safe' AND shift_id = '$shift_id' 
+              AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+            ORDER BY id DESC LIMIT 1
+        ");
+        if (!$mr_q || mysqli_num_rows($mr_q) == 0) {
+            return false;
+        }
+        $mr_row = mysqli_fetch_assoc($mr_q);
+        $mr_id  = intval($mr_row['id']);
+
+        // 2. Locate detail row for this nozzle in this meter reading
+        $det_q = mysqli_query($connection, "
+            SELECT mrd.*, n.name AS nozzle_name 
+            FROM tbl_meter_reading_details mrd
+            LEFT JOIN tbl_nozzles n ON mrd.nozzle_id = n.id
+            WHERE mrd.meter_reading_id = '$mr_id' AND mrd.nozzle_id = '$nozzle_id'
+            LIMIT 1
+        ");
+        if (!$det_q || mysqli_num_rows($det_q) == 0) {
+            return false;
+        }
+        $det_row = mysqli_fetch_assoc($det_q);
+        $det_id  = intval($det_row['id']);
+        $nozzle_name = $det_row['nozzle_name'] ?? ('Nozzle #' . $nozzle_id);
+
+        $last_reading        = floatval($det_row['last_reading']);
+        $old_current_reading = floatval($det_row['current_reading']);
+        $test_reading        = floatval($det_row['test_reading']);
+        $price               = floatval($det_row['price']);
+
+        // 3. Sum active Cash Sales for this nozzle on this date & shift
+        $cs_q = mysqli_query($connection, "
+            SELECT SUM(quantity) AS total_cash_qty 
+            FROM tbl_meter_reading_cash_sales 
+            WHERE nozzle_id = '$nozzle_id' AND sale_date = '$date_safe' AND shift_id = '$shift_id' 
+              AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+        ");
+        $cash_qty = 0.00;
+        if ($cs_q && $cs_r = mysqli_fetch_assoc($cs_q)) {
+            $cash_qty = floatval($cs_r['total_cash_qty'] ?? 0);
+        }
+
+        // 4. Sum active Credit Sales for this nozzle on this date & shift
+        $cr_q = mysqli_query($connection, "
+            SELECT SUM(CASE WHEN issue_quantity > 0 THEN issue_quantity ELSE quantity END) AS total_credit_qty 
+            FROM tbl_meter_reading_credit_sales 
+            WHERE nozzle_id = '$nozzle_id' 
+              AND (sale_date = '$date_safe' OR (sale_date IS NULL AND slip_date = '$date_safe'))
+              AND shift_id = '$shift_id' 
+              AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+        ");
+        $credit_qty = 0.00;
+        if ($cr_q && $cr_r = mysqli_fetch_assoc($cr_q)) {
+            $credit_qty = floatval($cr_r['total_credit_qty'] ?? 0);
+        }
+
+        // 5. Sum active Card Sales for this nozzle on this date & shift
+        $cd_q = mysqli_query($connection, "
+            SELECT SUM(quantity) AS total_card_qty 
+            FROM tbl_meter_reading_card_sales 
+            WHERE nozzle_id = '$nozzle_id' AND sale_date = '$date_safe' AND shift_id = '$shift_id' 
+              AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+        ");
+        $card_qty = 0.00;
+        if ($cd_q && $cd_r = mysqli_fetch_assoc($cd_q)) {
+            $card_qty = floatval($cd_r['total_card_qty'] ?? 0);
+        }
+
+        // 6. Recalculate fuel quantities and new current reading
+        $total_sales_litres  = round($cash_qty + $credit_qty + $card_qty, 2);
+        $new_current_reading = round($last_reading + $test_reading + $total_sales_litres, 2);
+        $new_sale_reading    = round($new_current_reading - $last_reading, 2);
+        $new_net_sale        = round($new_sale_reading - $test_reading, 2);
+        $new_amount          = round($new_net_sale * $price, 2);
+
+        // Check if there is an actual difference
+        $diff = round($new_current_reading - $old_current_reading, 2);
+        if (abs($diff) >= 0.01) {
+            // Update tbl_meter_reading_details
+            $upd_det = "UPDATE tbl_meter_reading_details 
+                        SET current_reading = '$new_current_reading',
+                            sale_reading    = '$new_sale_reading',
+                            net_sale        = '$new_net_sale',
+                            amount          = '$new_amount',
+                            updated_at      = NOW()
+                        WHERE id = '$det_id'";
+            mysqli_query($connection, $upd_det);
+
+            // Recalculate grand_total for tbl_meter_readings
+            $sum_q = mysqli_query($connection, "SELECT SUM(amount) AS total_amt FROM tbl_meter_reading_details WHERE meter_reading_id = '$mr_id'");
+            $grand_total = 0.00;
+            if ($sum_q && $sum_r = mysqli_fetch_assoc($sum_q)) {
+                $grand_total = floatval($sum_r['total_amt'] ?? 0);
+            }
+
+            // Prepare audit remark
+            $now_str = date('d-m-Y H:i');
+            $diff_str = ($diff >= 0 ? '+' : '') . number_format($diff, 2) . ' Ltr';
+            $old_fmt = number_format($old_current_reading, 2);
+            $new_fmt = number_format($new_current_reading, 2);
+            $audit_entry = "[{$now_str}] {$nozzle_name}: Current reading recalculated from {$old_fmt} to {$new_fmt} ({$diff_str}) due to {$reason}.";
+
+            $existing_remarks = trim($mr_row['remarks'] ?? '');
+            $new_remarks = !empty($existing_remarks) ? ($existing_remarks . "\n" . $audit_entry) : $audit_entry;
+            $new_remarks_safe = mysqli_real_escape_string($connection, $new_remarks);
+
+            mysqli_query($connection, "
+                UPDATE tbl_meter_readings 
+                SET grand_total = '$grand_total',
+                    remarks     = '$new_remarks_safe',
+                    updated_at  = NOW()
+                WHERE id = '$mr_id'
+            ");
+
+            // Synchronize tbl_nozzles.start_reading if this is the latest meter reading
+            $latest_check = mysqli_query($connection, "
+                SELECT mr.id 
+                FROM tbl_meter_readings mr 
+                JOIN tbl_meter_reading_details mrd ON mr.id = mrd.meter_reading_id 
+                WHERE mrd.nozzle_id = '$nozzle_id' 
+                  AND (mr.deleted_at IS NULL OR mr.deleted_at = '0000-00-00 00:00:00')
+                ORDER BY mr.date DESC, mr.shift_id DESC, mr.id DESC 
+                LIMIT 1
+            ");
+            if ($latest_check && $latest_row = mysqli_fetch_assoc($latest_check)) {
+                if (intval($latest_row['id']) === $mr_id) {
+                    mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = '$new_current_reading' WHERE id = '$nozzle_id'");
+                }
+            }
+        }
+
+        return true;
+    }
+}
+

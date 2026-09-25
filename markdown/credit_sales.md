@@ -267,3 +267,18 @@ Every appearance of the legacy term `Wasoli` or `Wasooli` across PPMS is standar
      $$\text{balance\_1} = \max(0, \text{quantity} - \text{issue\_quantity})$$
    - **Temp Slip Dual-Fuel Price Addition**: When an unsettled loan slip is attached (`attachTempSlipToRow`) and additional fresh fuel is added (`quantity`), the UI spreadsheet and backend calculate both components and sum them into `charge_amount`:
      $$\text{charge\_amount} = (\text{quantity} \times \text{rate}_{\text{today}}) + (\text{wasoli} \times \text{temp\_rate})$$
+
+
+---
+
+## 8. Dynamic Meter Reading Current Reading Recalculation & Remarks Audit
+
+Whenever credit sales are logged ([`add-credit-sale.php`](../credit-sales/add-credit-sale.php)) or updated ([`edit-credit-sale.php`](../credit-sales/edit-credit-sale.php)):
+1. **Meter Reading Recalculation**: If an active meter reading exists for that date and shift, the system invokes `recalculate_meter_reading_from_sales()` to recompute the physical meter reading:
+   $$\mathbf{New\ Current\ Reading} = \text{Last Reading} + \text{Test Reading} + (\text{Cash Litres} + \text{Credit Litres} + \text{Card Litres})$$
+   $$\mathbf{New\ Net\ Sale} = \text{Cash Litres} + \text{Credit Litres} + \text{Card Litres}$$
+2. **Running Meter Sync**: Updates `tbl_nozzles.start_reading = New Current Reading`.
+3. **Audit Explanation in Remarks**: Appends a clear timestamped explanation to `tbl_meter_readings.remarks`:
+   ```text
+   [24-09-2026 16:55] Nozzle A: Current reading recalculated from 1,000.00 to 1,050.00 (+50.00 Ltr) due to Credit Sales update.
+   ```

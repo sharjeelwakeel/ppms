@@ -84,8 +84,21 @@ if (isset($_POST['submit'])) {
                             mysqli_query($connection, $insert_detail);
                         }
 
-                        // Update running start_reading in tbl_nozzles
-                        mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'");
+                        // Update running start_reading in tbl_nozzles ONLY IF this is the latest chronological active reading
+                        $latest_mr_check = mysqli_query($connection, "
+                            SELECT mr.id 
+                            FROM tbl_meter_readings mr 
+                            JOIN tbl_meter_reading_details mrd ON mr.id = mrd.meter_reading_id 
+                            WHERE mrd.nozzle_id = '$nozzle_id' 
+                              AND (mr.deleted_at IS NULL OR mr.deleted_at = '0000-00-00 00:00:00')
+                            ORDER BY mr.date DESC, mr.shift_id DESC, mr.id DESC 
+                            LIMIT 1
+                        ");
+                        if ($latest_mr_check && $latest_mr_row = mysqli_fetch_assoc($latest_mr_check)) {
+                            if (intval($latest_mr_row['id']) === intval($id)) {
+                                mysqli_query($connection, "UPDATE tbl_nozzles SET start_reading = '$current_reading' WHERE id = '$nozzle_id'");
+                            }
+                        }
                     }
                 }
 

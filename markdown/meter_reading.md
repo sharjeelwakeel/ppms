@@ -93,6 +93,22 @@ For each nozzle row:
   $$\text{Cash Amount (Rs.)} = \text{Cash Litres} \times \text{Fuel Rate}$$
 - Auto-syncs `tbl_meter_reading_cash_sales` in real-time, even when Credit or Card sales are entered or edited back-dated or hours later.
 
+### 6. Dynamic Current Reading Recalculation on Sales Channel Updates (`recalculate_meter_reading_from_sales`)
+- Whenever an operator manually updates the volume/amount of a **Cash Sale** or **Credit Sale** (e.g. in `cash-sales/edit-cash-sale.php`, `credit-sales/edit-credit-sale.php`, or adding backdated credit slips), the change impacts physical dispensed fuel.
+- The system automatically recalculates the physical meter counters:
+  $$\mathbf{Total\ Dispensed\ Litres} = \text{Cash Litres} + \text{Credit Litres} + \text{Card Litres}$$
+  $$\mathbf{New\ Current\ Reading} = \text{Last Reading} + \text{Test Reading} + \mathbf{Total\ Dispensed\ Litres}$$
+  $$\mathbf{New\ Net\ Sale} = \mathbf{Total\ Dispensed\ Litres}$$
+  $$\mathbf{New\ Line\ Amount} = \mathbf{New\ Net\ Sale} \times \text{Fuel Rate}$$
+- **Atomic Database Updates**:
+  1. Updates `tbl_meter_reading_details` (`current_reading`, `sale_reading`, `net_sale`, `amount`).
+  2. Updates `tbl_meter_readings.grand_total`.
+  3. Updates running nozzle meter `tbl_nozzles.start_reading = New Current Reading`.
+  4. **Audit Trail in Remarks**: Appends a clear timestamped explanation to `tbl_meter_readings.remarks` so cashiers and station managers always know why the reading changed:
+     ```text
+     [24-09-2026 16:55] Nozzle A: Current reading recalculated from 1,000.00 to 1,050.00 (+50.00 Ltr) due to Cash Sale #1 update.
+     ```
+
 ---
 
 ## 4. CRUD Workflow & Navigation

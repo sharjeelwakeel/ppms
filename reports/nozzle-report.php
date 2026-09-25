@@ -44,10 +44,9 @@ while ($srow = mysqli_fetch_assoc($shifts_q)) {
 }
 
 // Filter inputs
-$nozzleId = intval($_GET['nozzle_id'] ?? 0);
-$shiftId  = intval($_GET['shift_id'] ?? 0);
-$fromDate = trim($_GET['from_date'] ?? date('Y-m-d'));
-$toDate   = trim($_GET['to_date'] ?? date('Y-m-d'));
+$nozzleId   = intval($_GET['nozzle_id'] ?? 0);
+$shiftId    = intval($_GET['shift_id'] ?? 0);
+$reportDate = trim($_GET['date'] ?? date('Y-m-d'));
 
 $selected_nozzle = null;
 if ($nozzleId > 0) {
@@ -69,179 +68,17 @@ if ($shiftId > 0) {
     }
 }
 
-$isSearched = ($nozzleId > 0);
+$isSearched = true;
 
-// Initialize report metric accumulators
-$meter_rows = [];
-$total_meter_litres  = 0.00;
-$total_meter_revenue = 0.00;
-$total_test_litres   = 0.00;
-$min_opening_meter   = null;
-$max_closing_meter   = null;
+require_once __DIR__ . '/../include/nozzle_report_helper.php';
 
-$cash_rows = [];
-$total_cash_litres = 0.00;
-$total_cash_amount = 0.00;
-
-$credit_rows = [];
-$total_credit_issued_litres = 0.00;
-$total_credit_quota_litres  = 0.00;
-$total_credit_amount        = 0.00;
-
-$card_rows = [];
-$total_card_litres   = 0.00;
-$total_card_amount   = 0.00;
-$total_card_charges  = 0.00;
-$total_card_net      = 0.00;
-
-$expense_rows = [];
-$total_nozzle_expenses = 0.00;
-
-if ($isSearched && $selected_nozzle) {
-    $from_safe = mysqli_real_escape_string($connection, $fromDate);
-    $to_safe   = mysqli_real_escape_string($connection, $toDate);
-    $shift_filter = ($shiftId > 0) ? " AND mr.shift_id = '$shiftId'" : "";
-
-    // 1. Fetch Meter Readings for this nozzle
-    $sql_mr = "
-        SELECT mrd.*, mr.date, mr.shift_id, sh.name AS shift_name,
-               st.name AS staff_name
-        FROM tbl_meter_reading_details mrd
-        JOIN tbl_meter_readings mr ON mrd.meter_reading_id = mr.id
-        LEFT JOIN tbl_shifts sh ON mr.shift_id = sh.id
-        LEFT JOIN tbl_staff st ON mrd.staff_id = st.id
-        WHERE mrd.nozzle_id = '$nozzleId'
-          AND mr.date BETWEEN '$from_safe' AND '$to_safe'
-          $shift_filter
-          AND (mr.deleted_at IS NULL OR mr.deleted_at = '0000-00-00 00:00:00')
-        ORDER BY mr.date ASC, mr.shift_id ASC, mr.id ASC
-    ";
-    $res_mr = mysqli_query($connection, $sql_mr);
-    if ($res_mr) {
-        while ($row = mysqli_fetch_assoc($res_mr)) {
-            $meter_rows[] = $row;
-            $net_qty = floatval($row['net_sale']);
-            $amt     = floatval($row['amount']);
-            $tst     = floatval($row['test_reading']);
-            $last_m  = floatval($row['last_reading']);
-            $curr_m  = floatval($row['current_reading']);
-
-            $total_meter_litres  += $net_qty;
-            $total_meter_revenue += $amt;
-            $total_test_litres   += $tst;
-
-            if ($min_opening_meter === null || $last_m < $min_opening_meter) {
-                $min_opening_meter = $last_m;
-            }
-            if ($max_closing_meter === null || $curr_m > $max_closing_meter) {
-                $max_closing_meter = $curr_m;
-            }
-        }
-    }
-
-    // 2. Fetch Cash Sales for this nozzle
-    $shift_filter_cs = ($shiftId > 0) ? " AND cs.shift_id = '$shiftId'" : "";
-    $sql_cs = "
-        SELECT cs.*, sh.name AS shift_name, st.name AS staff_name
-        FROM tbl_meter_reading_cash_sales cs
-        LEFT JOIN tbl_shifts sh ON cs.shift_id = sh.id
-        LEFT JOIN tbl_staff st ON cs.staff_id = st.id
-        WHERE cs.nozzle_id = '$nozzleId'
-          AND cs.sale_date BETWEEN '$from_safe' AND '$to_safe'
-          $shift_filter_cs
-          AND (cs.deleted_at IS NULL OR cs.deleted_at = '0000-00-00 00:00:00')
-        ORDER BY cs.sale_date ASC, cs.shift_id ASC, cs.id ASC
-    ";
-    $res_cs = mysqli_query($connection, $sql_cs);
-    if ($res_cs) {
-        while ($row = mysqli_fetch_assoc($res_cs)) {
-            $cash_rows[] = $row;
-            $total_cash_litres += floatval($row['quantity']);
-            $total_cash_amount += floatval($row['amount']);
-        }
-    }
-
-    // 3. Fetch Credit Sales for this nozzle
-    $shift_filter_cr = ($shiftId > 0) ? " AND cr.shift_id = '$shiftId'" : "";
-    $sql_cr = "
-        SELECT cr.*, sh.name AS shift_name, c.name AS customer_name
-        FROM tbl_meter_reading_credit_sales cr
-        LEFT JOIN tbl_shifts sh ON cr.shift_id = sh.id
-        LEFT JOIN tbl_customers c ON cr.account_number = c.id
-        WHERE cr.nozzle_id = '$nozzleId'
-          AND (cr.sale_date BETWEEN '$from_safe' AND '$to_safe' 
-               OR (cr.sale_date IS NULL AND cr.slip_date BETWEEN '$from_safe' AND '$to_safe'))
-          $shift_filter_cr
-          AND (cr.deleted_at IS NULL OR cr.deleted_at = '0000-00-00 00:00:00')
-        ORDER BY COALESCE(cr.sale_date, cr.slip_date) ASC, cr.shift_id ASC, cr.id ASC
-    ";
-    $res_cr = mysqli_query($connection, $sql_cr);
-    if ($res_cr) {
-        while ($row = mysqli_fetch_assoc($res_cr)) {
-            $credit_rows[] = $row;
-            $iqty = floatval($row['issue_quantity'] > 0 ? $row['issue_quantity'] : $row['quantity']);
-            $bqty = floatval($row['quantity']);
-            $camt = floatval($row['amount']);
-
-            $total_credit_issued_litres += $iqty;
-            $total_credit_quota_litres  += $bqty;
-            $total_credit_amount        += $camt;
-        }
-    }
-
-    // 4. Fetch Card Sales for this nozzle
-    $shift_filter_cd = ($shiftId > 0) ? " AND cd.shift_id = '$shiftId'" : "";
-    $sql_cd = "
-        SELECT cd.*, sh.name AS shift_name, cm.name AS machine_name, cm.terminal_id
-        FROM tbl_meter_reading_card_sales cd
-        LEFT JOIN tbl_shifts sh ON cd.shift_id = sh.id
-        LEFT JOIN tbl_card_machines cm ON cd.card_machine_id = cm.id
-        WHERE cd.nozzle_id = '$nozzleId'
-          AND cd.sale_date BETWEEN '$from_safe' AND '$to_safe'
-          $shift_filter_cd
-          AND (cd.deleted_at IS NULL OR cd.deleted_at = '0000-00-00 00:00:00')
-        ORDER BY cd.sale_date ASC, cd.shift_id ASC, cd.id ASC
-    ";
-    $res_cd = mysqli_query($connection, $sql_cd);
-    if ($res_cd) {
-        while ($row = mysqli_fetch_assoc($res_cd)) {
-            $card_rows[] = $row;
-            $total_card_litres  += floatval($row['quantity']);
-            $total_card_amount  += floatval($row['amount']);
-            $total_card_charges += floatval($row['service_charges']);
-            $total_card_net     += floatval($row['net_amount'] > 0 ? $row['net_amount'] : $row['amount']);
-        }
-    }
-
-    // 5. Fetch Expenses recorded on behalf of this nozzle
-    $sql_exp = "
-        SELECT e.*, et.name AS expense_type_name, a.name AS creator_name
-        FROM tbl_expenses e
-        LEFT JOIN tbl_expense_types et ON e.expense_type_id = et.id
-        LEFT JOIN tbl_accounts a ON e.created_by = a.id
-        WHERE e.nozzle_id = '$nozzleId'
-          AND e.expense_date BETWEEN '$from_safe' AND '$to_safe'
-          AND (e.deleted_at IS NULL OR e.deleted_at = '0000-00-00 00:00:00')
-        ORDER BY e.expense_date ASC, e.id ASC
-    ";
-    $res_exp = mysqli_query($connection, $sql_exp);
-    if ($res_exp) {
-        while ($row = mysqli_fetch_assoc($res_exp)) {
-            $expense_rows[] = $row;
-            $total_nozzle_expenses += floatval($row['amount']);
-        }
-    }
+// Fetch report data: if nozzle selected, fetch single nozzle audit; otherwise fetch station-wide summary across all nozzles
+if ($nozzleId > 0 && $selected_nozzle) {
+    $report_data = get_daily_nozzle_report_data($connection, $nozzleId, $reportDate, $shiftId);
+} else {
+    $report_data = get_daily_station_report_data($connection, $reportDate, $shiftId);
 }
-
-// Financial and volumetric reconciliations
-$total_settled_litres = $total_cash_litres + $total_credit_issued_litres + $total_card_litres;
-$total_settled_amount = $total_cash_amount + $total_credit_amount + $total_card_amount;
-
-$volume_variance    = round($total_settled_litres - $total_meter_litres, 2);
-$financial_variance = round($total_settled_amount - $total_meter_revenue, 2);
-
-// Net Nozzle Operating Yield = Meter Gross Revenue - Nozzle Expenses
-$net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
+extract($report_data);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -321,13 +158,21 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
     <!-- Print Header -->
     <div class="print-header text-center">
         <h3 class="font-weight-bold mb-1" style="color:#04204e;">PETROL PUMP MANAGEMENT SYSTEM</h3>
-        <h5 class="font-weight-bold mb-1">Daily Nozzle Performance &amp; Settlement Report</h5>
+        <h5 class="font-weight-bold mb-1">
+            <?php echo ($selected_nozzle) ? 'Daily Nozzle Performance &amp; Settlement Report' : 'Station-Wide Daily Nozzle Summary &amp; Reconciliation Report'; ?>
+        </h5>
         <?php if ($selected_nozzle): ?>
         <p class="mb-1 font-weight-bold">
             Nozzle: <?php echo htmlspecialchars($selected_nozzle['name']); ?> 
             (<?php echo htmlspecialchars($selected_nozzle['item_name'] ?? 'Fuel'); ?> - Tank: <?php echo htmlspecialchars($selected_nozzle['tank_name'] ?? 'N/A'); ?>)
             &nbsp;|&nbsp; Shift: <?php echo htmlspecialchars($selected_shift_name); ?>
-            &nbsp;|&nbsp; Period: <?php echo date('d-m-Y', strtotime($fromDate)); ?> to <?php echo date('d-m-Y', strtotime($toDate)); ?>
+            &nbsp;|&nbsp; Date: <?php echo date('d-m-Y', strtotime($reportDate)); ?>
+        </p>
+        <?php else: ?>
+        <p class="mb-1 font-weight-bold">
+            Scope: All Dispensing Nozzles (Station Summary)
+            &nbsp;|&nbsp; Shift: <?php echo htmlspecialchars($selected_shift_name); ?>
+            &nbsp;|&nbsp; Date: <?php echo date('d-m-Y', strtotime($reportDate)); ?>
         </p>
         <?php endif; ?>
         <hr style="border-top:2px solid #04204e;">
@@ -336,24 +181,29 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
     <!-- Page Header & Action Bar -->
     <div class="page-header d-print-none">
         <div>
-            <h4><i class="fas fa-gas-pump mr-2 text-warning"></i> Daily Nozzle Report</h4>
+            <h4>
+                <i class="fas fa-gas-pump mr-2 text-warning"></i> 
+                <?php echo ($selected_nozzle) ? 'Daily Nozzle Report' : 'Daily Nozzle Report (All Nozzles)'; ?>
+            </h4>
             <div class="mt-1">
                 <?php if ($selected_nozzle): ?>
                     <span class="meta-pill"><i class="fas fa-tachometer-alt mr-1 text-warning"></i> Nozzle: <?php echo htmlspecialchars($selected_nozzle['name']); ?></span>
                     <span class="meta-pill"><i class="fas fa-oil-can mr-1 text-info"></i> Fuel: <?php echo htmlspecialchars($selected_nozzle['item_name'] ?? 'Fuel'); ?></span>
                     <span class="meta-pill"><i class="fas fa-database mr-1 text-success"></i> Tank: <?php echo htmlspecialchars($selected_nozzle['tank_name'] ?? 'N/A'); ?></span>
                     <span class="meta-pill"><i class="fas fa-clock mr-1 text-light"></i> Shift: <?php echo htmlspecialchars($selected_shift_name); ?></span>
+                    <span class="meta-pill"><i class="fas fa-calendar-day mr-1 text-warning"></i> Date: <?php echo date('d-m-Y', strtotime($reportDate)); ?></span>
                 <?php else: ?>
-                    <small class="text-white-50">Comprehensive single-nozzle performance: Net meter sales, settlement reconciliation (Cash, Credit, Card), and equipment expenses</small>
+                    <span class="meta-pill"><i class="fas fa-layer-group mr-1 text-warning"></i> Scope: All Dispensing Nozzles</span>
+                    <span class="meta-pill"><i class="fas fa-clock mr-1 text-light"></i> Shift: <?php echo htmlspecialchars($selected_shift_name); ?></span>
+                    <span class="meta-pill"><i class="fas fa-calendar-day mr-1 text-warning"></i> Date: <?php echo date('d-m-Y', strtotime($reportDate)); ?></span>
+                    <span class="meta-pill"><i class="fas fa-chart-pie mr-1 text-success"></i> Station Summary Mode</span>
                 <?php endif; ?>
             </div>
         </div>
         <div>
-            <?php if ($isSearched && $selected_nozzle): ?>
-            <a href="generate-pdf-nozzle-report.php?nozzle_id=<?php echo urlencode($nozzleId); ?>&shift_id=<?php echo urlencode($shiftId); ?>&from_date=<?php echo urlencode($fromDate); ?>&to_date=<?php echo urlencode($toDate); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
+            <a href="generate-pdf-nozzle-report.php?nozzle_id=<?php echo urlencode($nozzleId); ?>&shift_id=<?php echo urlencode($shiftId); ?>&date=<?php echo urlencode($reportDate); ?>" target="_blank" class="btn btn-danger font-weight-bold mr-2">
                 <i class="fas fa-file-pdf mr-1"></i> Export PDF
             </a>
-            <?php endif; ?>
             <button class="btn btn-outline-light font-weight-bold mr-2" onclick="window.print();">
                 <i class="fas fa-print mr-1"></i> Print
             </button>
@@ -363,15 +213,15 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
         </div>
     </div>
 
-    <!-- Filter Card: Nozzle (Required), Shift (Optional), From/To Dates -->
+    <!-- Filter Card: Nozzle (Optional), Shift (Optional), Single Date (Required) -->
     <div class="filter-card d-print-none">
         <form action="nozzle-report.php" method="GET" class="form-row align-items-end" id="filterForm">
-            <div class="col-xl-4 col-lg-4 col-md-6 col-sm-12 mb-2 mb-lg-0">
+            <div class="col-xl-5 col-lg-5 col-md-6 col-sm-12 mb-2 mb-lg-0">
                 <label class="font-weight-bold small text-dark mb-1">
-                    <i class="fas fa-gas-pump mr-1 text-primary"></i> Dispensing Nozzle <span class="text-danger">* (Required)</span>
+                    <i class="fas fa-gas-pump mr-1 text-primary"></i> Dispensing Nozzle <span class="text-muted">(Optional)</span>
                 </label>
-                <select name="nozzle_id" id="nozzle_id" class="form-control form-control-sm font-weight-bold" required>
-                    <option value="" disabled <?php echo ($nozzleId <= 0) ? 'selected' : ''; ?>>-- Select Dispensing Nozzle (Required) --</option>
+                <select name="nozzle_id" id="nozzle_id" class="form-control form-control-sm font-weight-bold">
+                    <option value="0" <?php echo ($nozzleId <= 0) ? 'selected' : ''; ?>>-- All Dispensing Nozzles (Station Summary) --</option>
                     <?php foreach ($all_nozzles as $n): ?>
                         <option value="<?php echo $n['id']; ?>" <?php echo ($nozzleId == $n['id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($n['name']); ?> (<?php echo htmlspecialchars($n['item_name'] ?? 'Fuel'); ?> - Tank: <?php echo htmlspecialchars($n['tank_name'] ?? 'N/A'); ?>)
@@ -379,7 +229,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 mb-2 mb-lg-0">
                 <label class="font-weight-bold small text-dark mb-1">
                     <i class="fas fa-clock mr-1 text-primary"></i> Shift <span class="text-muted">(Optional)</span>
                 </label>
@@ -394,15 +244,9 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             </div>
             <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
                 <label class="font-weight-bold small text-dark mb-1">
-                    <i class="fas fa-calendar-alt mr-1 text-primary"></i> From Date
+                    <i class="fas fa-calendar-day mr-1 text-primary"></i> Report Date <span class="text-danger">*</span>
                 </label>
-                <input type="date" name="from_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($fromDate); ?>">
-            </div>
-            <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 mb-2 mb-lg-0">
-                <label class="font-weight-bold small text-dark mb-1">
-                    <i class="fas fa-calendar-check mr-1 text-primary"></i> To Date
-                </label>
-                <input type="date" name="to_date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($toDate); ?>">
+                <input type="date" name="date" class="form-control form-control-sm font-weight-bold" value="<?php echo htmlspecialchars($reportDate); ?>" required>
             </div>
             <div class="col-xl-2 col-lg-2 col-md-12 col-sm-12">
                 <button type="submit" class="btn btn-primary btn-sm btn-block font-weight-bold shadow-sm">
@@ -412,17 +256,17 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
         </form>
     </div>
 
-    <?php if (!$isSearched || !$selected_nozzle): ?>
-        <!-- Mandatory Nozzle Selection Guidance -->
+    <?php if (empty($all_nozzles)): ?>
+        <!-- No Active Nozzles Warning -->
         <div class="card p-5 text-center shadow-sm border-0 d-print-none" style="border-radius:12px; background:#fff;">
             <div class="mb-3">
                 <span class="rounded-circle p-3 d-inline-block" style="background:#eef2ff;">
                     <i class="fas fa-gas-pump text-primary" style="font-size: 42px;"></i>
                 </span>
             </div>
-            <h5 class="font-weight-bold" style="color:#04204e;">Please Select a Dispensing Nozzle to View Report</h5>
+            <h5 class="font-weight-bold" style="color:#04204e;">No Dispensing Nozzles Configured</h5>
             <p class="text-muted mx-auto" style="max-width: 550px;">
-                The Daily Nozzle Report provides an itemized audit of fuel volume dispensed, payments settled (Cash, Credit, Card), and equipment-specific expenses. Select a nozzle from the dropdown above and click <strong>Generate Report</strong>.
+                No active dispensing nozzles were found in the database. Please add nozzles in Master Data to generate reports.
             </p>
         </div>
     <?php else: ?>
@@ -432,7 +276,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             <!-- 1. Total Net Sale (Meter) -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-dark">
-                    <div class="kpi-title"><i class="fas fa-tachometer-alt mr-1"></i> Net Sale (Meter)</div>
+                    <div class="kpi-title"><i class="fas fa-tachometer-alt mr-1"></i> <?php echo (!empty($is_station_summary)) ? 'Station Net Sale' : 'Net Sale (Meter)'; ?></div>
                     <div class="kpi-value text-dark"><?php echo number_format($total_meter_litres, 2); ?> <small style="font-size:13px;">Ltr</small></div>
                     <div class="kpi-sub text-primary font-weight-bold">Rs. <?php echo number_format($total_meter_revenue, 2); ?></div>
                     <div class="text-muted small mt-1">Gross Dispensed: <?php echo number_format($total_meter_litres + $total_test_litres, 2); ?> Ltr</div>
@@ -442,7 +286,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             <!-- 2. Cash Sale -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-primary">
-                    <div class="kpi-title"><i class="fas fa-money-bill-wave mr-1 text-primary"></i> Cash Sales</div>
+                    <div class="kpi-title"><i class="fas fa-money-bill-wave mr-1 text-primary"></i> <?php echo (!empty($is_station_summary)) ? 'Station Cash' : 'Cash Sales'; ?></div>
                     <div class="kpi-value text-primary"><?php echo number_format($total_cash_litres, 2); ?> <small style="font-size:13px;">Ltr</small></div>
                     <div class="kpi-sub font-weight-bold">Rs. <?php echo number_format($total_cash_amount, 2); ?></div>
                     <div class="text-muted small mt-1"><?php echo count($cash_rows); ?> Cash Transaction(s)</div>
@@ -452,7 +296,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             <!-- 3. Credit Sale -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-info">
-                    <div class="kpi-title"><i class="fas fa-file-invoice mr-1 text-info"></i> Credit Sales</div>
+                    <div class="kpi-title"><i class="fas fa-file-invoice mr-1 text-info"></i> <?php echo (!empty($is_station_summary)) ? 'Station Credit' : 'Credit Sales'; ?></div>
                     <div class="kpi-value text-info"><?php echo number_format($total_credit_issued_litres, 2); ?> <small style="font-size:13px;">Ltr</small></div>
                     <div class="kpi-sub font-weight-bold">Rs. <?php echo number_format($total_credit_amount, 2); ?></div>
                     <div class="text-muted small mt-1"><?php echo count($credit_rows); ?> Slip(s) Recorded</div>
@@ -462,30 +306,40 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             <!-- 4. Card Sale -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-warning">
-                    <div class="kpi-title"><i class="fas fa-credit-card mr-1 text-warning"></i> Card Sales</div>
+                    <div class="kpi-title"><i class="fas fa-credit-card mr-1 text-warning"></i> <?php echo (!empty($is_station_summary)) ? 'Station Card' : 'Card Sales'; ?></div>
                     <div class="kpi-value text-warning"><?php echo number_format($total_card_litres, 2); ?> <small style="font-size:13px;">Ltr</small></div>
                     <div class="kpi-sub font-weight-bold">Rs. <?php echo number_format($total_card_amount, 2); ?></div>
                     <div class="text-muted small mt-1">Net: Rs. <?php echo number_format($total_card_net, 2); ?></div>
                 </div>
             </div>
 
-            <!-- 5. Nozzle Expenses -->
+            <!-- 5. Expenses -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-danger">
-                    <div class="kpi-title"><i class="fas fa-tools mr-1 text-danger"></i> Nozzle Expenses</div>
+                    <div class="kpi-title"><i class="fas fa-tools mr-1 text-danger"></i> <?php echo (!empty($is_station_summary)) ? 'Station Expenses' : 'Nozzle Expenses'; ?></div>
                     <div class="kpi-value text-danger">Rs. <?php echo number_format($total_nozzle_expenses, 2); ?></div>
-                    <div class="kpi-sub text-muted font-weight-bold"><?php echo count($expense_rows); ?> Expense Item(s)</div>
-                    <div class="text-muted small mt-1">Maintenance &amp; Repairs</div>
+                    <div class="kpi-sub text-muted font-weight-bold">
+                        <?php if (!empty($is_station_summary)): ?>
+                            Nozzle: Rs. <?php echo number_format($station_nozzle_expenses, 2); ?>
+                        <?php else: ?>
+                            <?php echo count($expense_rows); ?> Expense Item(s)
+                        <?php endif; ?>
+                    </div>
+                    <div class="text-muted small mt-1">
+                        <?php echo (!empty($is_station_summary)) ? ('General: Rs. ' . number_format($station_general_expenses, 2)) : 'Maintenance &amp; Repairs'; ?>
+                    </div>
                 </div>
             </div>
 
-            <!-- 6. Net Nozzle Operating Yield -->
+            <!-- 6. Net Yield -->
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
                 <div class="kpi-card kpi-success">
-                    <div class="kpi-title"><i class="fas fa-chart-line mr-1 text-success"></i> Net Nozzle Yield</div>
+                    <div class="kpi-title"><i class="fas fa-chart-line mr-1 text-success"></i> <?php echo (!empty($is_station_summary)) ? 'Net Station Yield' : 'Net Nozzle Yield'; ?></div>
                     <div class="kpi-value text-success">Rs. <?php echo number_format($net_nozzle_yield, 2); ?></div>
                     <div class="kpi-sub text-muted font-weight-bold">Revenue &minus; Expenses</div>
-                    <div class="text-muted small mt-1">Net Contribution</div>
+                    <div class="text-muted small mt-1">
+                        <?php echo (!empty($is_station_summary)) ? 'Station Operating Yield' : 'Net Contribution'; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -497,7 +351,11 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <h6 class="font-weight-bold mb-1" style="color:#04204e;">
                         <i class="fas fa-balance-scale mr-2 text-primary"></i> Fuel Volume &amp; Settlement Reconciliation
                     </h6>
-                    <small class="text-muted">Comparing physical fuel recorded on meter counters vs. total recorded payment settlements (Cash + Credit + Card)</small>
+                    <small class="text-muted">
+                        <?php echo (!empty($is_station_summary)) 
+                            ? 'Comparing physical fuel recorded across all nozzle meter counters vs. total recorded payment settlements (Cash + Credit + Card)' 
+                            : 'Comparing physical fuel recorded on meter counters vs. total recorded payment settlements (Cash + Credit + Card)'; ?>
+                    </small>
                 </div>
                 <div>
                     <?php if (abs($volume_variance) < 0.05 && abs($financial_variance) < 1.00): ?>
@@ -536,6 +394,142 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             </div>
         </div>
 
+        <?php if (!empty($is_station_summary) && !empty($product_summaries)): ?>
+        <!-- Product-Wise Rollup Summary -->
+        <div class="card mb-4 border-0 shadow-sm" style="border-radius:10px; overflow:hidden;">
+            <div class="section-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #04204e 0%, #07347a 100%);">
+                <span><i class="fas fa-oil-can mr-2 text-warning"></i> Fuel Product Rollup Summary</span>
+                <span class="badge badge-light text-primary font-weight-bold"><?php echo count($product_summaries); ?> Fuel Type(s)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm table-custom mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fuel Product</th>
+                            <th>Active Nozzles</th>
+                            <th>Total Net Dispensed (Ltr)</th>
+                            <th>Gross Fuel Revenue (Rs.)</th>
+                            <th>Share of Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $prod_i = 1;
+                        foreach ($product_summaries as $ps): 
+                            $pct = ($total_meter_revenue > 0) ? ($ps['revenue'] / $total_meter_revenue * 100) : 0;
+                        ?>
+                        <tr>
+                            <td class="text-center"><?php echo $prod_i++; ?></td>
+                            <td class="font-weight-bold text-dark"><i class="fas fa-gas-pump mr-2 text-primary"></i><?php echo htmlspecialchars($ps['fuel_name']); ?></td>
+                            <td class="text-center"><span class="badge badge-secondary px-2 py-1"><?php echo intval($ps['nozzle_count']); ?> Nozzle(s)</span></td>
+                            <td class="text-right font-weight-bold text-success"><?php echo number_format($ps['meter_litres'], 2); ?> Ltr</td>
+                            <td class="text-right font-weight-bold text-primary">Rs. <?php echo number_format($ps['revenue'], 2); ?></td>
+                            <td class="text-center">
+                                <span class="badge badge-light border font-weight-bold"><?php echo number_format($pct, 1); ?>%</span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($is_station_summary) && !empty($nozzle_matrix)): ?>
+        <!-- All Dispensing Nozzles Performance & Reconciliation Matrix -->
+        <div class="card mb-4 border-0 shadow-sm" style="border-radius:10px; overflow:hidden;">
+            <div class="section-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #04204e 0%, #07347a 100%);">
+                <span><i class="fas fa-table mr-2 text-warning"></i> All Dispensing Nozzles Performance &amp; Reconciliation Matrix</span>
+                <span class="badge badge-light text-primary font-weight-bold"><?php echo count($nozzle_matrix); ?> Nozzle(s) Configured</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-sm table-custom mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nozzle Name</th>
+                            <th>Product &amp; Tank</th>
+                            <th>Opening Meter</th>
+                            <th>Closing Meter</th>
+                            <th>Net Sale (Ltr)</th>
+                            <th>Gross Revenue (Rs.)</th>
+                            <th>Cash (Rs.)</th>
+                            <th>Credit (Rs.)</th>
+                            <th>Card (Rs.)</th>
+                            <th>Total Settled (Rs.)</th>
+                            <th>Variance (Rs.)</th>
+                            <th>Status</th>
+                            <th class="d-print-none">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $nm_i = 1;
+                        foreach ($nozzle_matrix as $nm): 
+                            $op_txt = ($nm['min_opening_meter'] !== null) ? number_format($nm['min_opening_meter'], 2) : number_format($nm['start_reading'], 2);
+                            $cl_txt = ($nm['max_closing_meter'] !== null) ? number_format($nm['max_closing_meter'], 2) : '-';
+                        ?>
+                        <tr>
+                            <td class="text-center"><?php echo $nm_i++; ?></td>
+                            <td class="font-weight-bold text-dark">
+                                <a href="nozzle-report.php?nozzle_id=<?php echo $nm['nozzle_id']; ?>&shift_id=<?php echo urlencode($shiftId); ?>&date=<?php echo urlencode($reportDate); ?>" class="text-primary font-weight-bold" title="Click to view detailed report for this nozzle">
+                                    <i class="fas fa-gas-pump mr-1 text-warning"></i><?php echo htmlspecialchars($nm['nozzle_name']); ?>
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge badge-info"><?php echo htmlspecialchars($nm['item_name']); ?></span>
+                                <small class="text-muted d-block"><?php echo htmlspecialchars($nm['tank_name']); ?></small>
+                            </td>
+                            <td class="text-right"><?php echo $op_txt; ?></td>
+                            <td class="text-right font-weight-bold text-dark"><?php echo $cl_txt; ?></td>
+                            <td class="text-right font-weight-bold text-success"><?php echo number_format($nm['meter_litres'], 2); ?> Ltr</td>
+                            <td class="text-right font-weight-bold text-primary">Rs. <?php echo number_format($nm['meter_revenue'], 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($nm['cash_amount'], 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($nm['credit_amount'], 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($nm['card_amount'], 2); ?></td>
+                            <td class="text-right font-weight-bold text-dark">Rs. <?php echo number_format($nm['settled_amount'], 2); ?></td>
+                            <td class="text-right font-weight-bold <?php echo ($nm['financial_variance'] < -0.01) ? 'text-danger' : (($nm['financial_variance'] > 0.01) ? 'text-warning' : 'text-success'); ?>">
+                                <?php echo ($nm['financial_variance'] >= 0 ? '+' : '') . number_format($nm['financial_variance'], 2); ?>
+                            </td>
+                            <td class="text-center">
+                                <?php if ($nm['status'] === 'Balanced'): ?>
+                                    <span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i>Balanced</span>
+                                <?php elseif ($nm['status'] === 'Shortage'): ?>
+                                    <span class="badge badge-danger px-2 py-1"><i class="fas fa-arrow-down mr-1"></i>Shortage</span>
+                                <?php else: ?>
+                                    <span class="badge badge-warning px-2 py-1 text-dark"><i class="fas fa-arrow-up mr-1"></i>Surplus</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center d-print-none">
+                                <a href="nozzle-report.php?nozzle_id=<?php echo $nm['nozzle_id']; ?>&shift_id=<?php echo urlencode($shiftId); ?>&date=<?php echo urlencode($reportDate); ?>" class="btn btn-sm btn-outline-primary py-0 px-2 font-weight-bold" title="View Single Nozzle Audit">
+                                    <i class="fas fa-eye mr-1"></i> Audit
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <tr class="bg-light font-weight-bold" style="font-size:13px;">
+                            <td colspan="5" class="text-right">TOTAL STATION:</td>
+                            <td class="text-right text-success"><?php echo number_format($total_meter_litres, 2); ?> Ltr</td>
+                            <td class="text-right text-primary">Rs. <?php echo number_format($total_meter_revenue, 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($total_cash_amount, 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($total_credit_amount, 2); ?></td>
+                            <td class="text-right">Rs. <?php echo number_format($total_card_amount, 2); ?></td>
+                            <td class="text-right text-dark">Rs. <?php echo number_format($total_settled_amount, 2); ?></td>
+                            <td class="text-right <?php echo ($financial_variance < -0.01) ? 'text-danger' : (($financial_variance > 0.01) ? 'text-warning' : 'text-success'); ?>">
+                                <?php echo ($financial_variance >= 0 ? '+' : '') . number_format($financial_variance, 2); ?>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-dark"><?php echo htmlspecialchars($station_status ?? 'Balanced'); ?></span>
+                            </td>
+                            <td class="d-print-none"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- 1. Meter Readings Table -->
         <div class="card mb-4 border-0 shadow-sm" style="border-radius:10px; overflow:hidden;">
             <div class="section-header d-flex justify-content-between align-items-center">
@@ -547,6 +541,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <thead>
                         <tr>
                             <th>#</th>
+                            <?php if (!empty($is_station_summary)): ?><th>Nozzle</th><?php endif; ?>
                             <th>Date</th>
                             <th>Shift</th>
                             <th>Staff / Operator</th>
@@ -562,12 +557,17 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <tbody>
                         <?php if (empty($meter_rows)): ?>
                             <tr>
-                                <td colspan="11" class="text-center py-3 text-muted">No meter readings recorded for this nozzle in the selected period.</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '12' : '11'; ?>" class="text-center py-3 text-muted">No meter readings recorded for the selected period.</td>
                             </tr>
                         <?php else: ?>
                             <?php $m_i = 1; foreach ($meter_rows as $mr): ?>
                             <tr>
                                 <td class="text-center"><?php echo $m_i++; ?></td>
+                                <?php if (!empty($is_station_summary)): ?>
+                                    <td class="text-center font-weight-bold">
+                                        <span class="badge badge-dark"><?php echo htmlspecialchars($mr['nozzle_name'] ?? 'N/A'); ?></span>
+                                    </td>
+                                <?php endif; ?>
                                 <td class="text-center font-weight-bold"><?php echo date('d-m-Y', strtotime($mr['date'])); ?></td>
                                 <td class="text-center"><span class="badge badge-info px-2 py-1"><?php echo htmlspecialchars($mr['shift_name'] ?? 'General'); ?></span></td>
                                 <td><?php echo htmlspecialchars($mr['staff_name'] ?? 'Unassigned'); ?></td>
@@ -581,7 +581,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                             </tr>
                             <?php endforeach; ?>
                             <tr class="bg-light font-weight-bold">
-                                <td colspan="7" class="text-right">TOTAL:</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '8' : '7'; ?>" class="text-right">TOTAL:</td>
                                 <td class="text-right text-muted"><?php echo number_format($total_test_litres, 2); ?> Ltr</td>
                                 <td class="text-right text-success"><?php echo number_format($total_meter_litres, 2); ?> Ltr</td>
                                 <td></td>
@@ -604,6 +604,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <thead>
                         <tr>
                             <th>#</th>
+                            <?php if (!empty($is_station_summary)): ?><th>Nozzle</th><?php endif; ?>
                             <th>Date</th>
                             <th>Shift</th>
                             <th>Rate (Rs.)</th>
@@ -616,12 +617,17 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <tbody>
                         <?php if (empty($cash_rows)): ?>
                             <tr>
-                                <td colspan="8" class="text-center py-3 text-muted">No cash sale transactions found for this nozzle in the selected period.</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '9' : '8'; ?>" class="text-center py-3 text-muted">No cash sale transactions found for the selected period.</td>
                             </tr>
                         <?php else: ?>
                             <?php $c_i = 1; foreach ($cash_rows as $cs): ?>
                             <tr>
                                 <td class="text-center"><?php echo $c_i++; ?></td>
+                                <?php if (!empty($is_station_summary)): ?>
+                                    <td class="text-center font-weight-bold">
+                                        <span class="badge badge-dark"><?php echo htmlspecialchars($cs['nozzle_name'] ?? 'N/A'); ?></span>
+                                    </td>
+                                <?php endif; ?>
                                 <td class="text-center font-weight-bold"><?php echo date('d-m-Y', strtotime($cs['sale_date'])); ?></td>
                                 <td class="text-center"><span class="badge badge-info px-2 py-1"><?php echo htmlspecialchars($cs['shift_name'] ?? 'General'); ?></span></td>
                                 <td class="text-right">Rs. <?php echo number_format(floatval($cs['rate']), 2); ?></td>
@@ -640,7 +646,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                             </tr>
                             <?php endforeach; ?>
                             <tr class="bg-light font-weight-bold">
-                                <td colspan="4" class="text-right">TOTAL CASH:</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '5' : '4'; ?>" class="text-right">TOTAL CASH:</td>
                                 <td class="text-right text-success"><?php echo number_format($total_cash_litres, 2); ?> Ltr</td>
                                 <td class="text-right text-primary">Rs. <?php echo number_format($total_cash_amount, 2); ?></td>
                                 <td colspan="2"></td>
@@ -662,44 +668,84 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <thead>
                         <tr>
                             <th>#</th>
+                            <?php if (!empty($is_station_summary)): ?><th>Nozzle</th><?php endif; ?>
                             <th>Slip Date</th>
                             <th>Shift</th>
                             <th>Slip No</th>
-                            <th>Slip Type</th>
+                            <th>Slip Type &amp; Settlement</th>
                             <th>Customer Account</th>
                             <th>Vehicle No</th>
                             <th>Rate</th>
                             <th>Fuel Issued (Ltr)</th>
                             <th>Billed Quota (Ltr)</th>
-                            <th>Amount (Rs.)</th>
+                            <th>Fuel Value (Rs.)</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($credit_rows)): ?>
                             <tr>
-                                <td colspan="11" class="text-center py-3 text-muted">No credit sales slips recorded for this nozzle in the selected period.</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '12' : '11'; ?>" class="text-center py-3 text-muted">No credit sales slips recorded for the selected period.</td>
                             </tr>
                         <?php else: ?>
                             <?php $cr_i = 1; foreach ($credit_rows as $cr): 
                                 $s_date = !empty($cr['sale_date']) ? $cr['sale_date'] : $cr['slip_date'];
                                 $iqty = floatval($cr['issue_quantity'] > 0 ? $cr['issue_quantity'] : $cr['quantity']);
+                                $st = $cr['slip_type'];
+                                $wasoli = floatval($cr['wasoli'] ?? 0);
+                                $bal1 = floatval($cr['balance_1'] ?? 0);
+                                $chgAmt = floatval($cr['charge_amount'] ?? 0);
                             ?>
                             <tr>
                                 <td class="text-center"><?php echo $cr_i++; ?></td>
+                                <?php if (!empty($is_station_summary)): ?>
+                                    <td class="text-center font-weight-bold">
+                                        <span class="badge badge-dark"><?php echo htmlspecialchars($cr['nozzle_name'] ?? 'N/A'); ?></span>
+                                    </td>
+                                <?php endif; ?>
                                 <td class="text-center font-weight-bold"><?php echo date('d-m-Y', strtotime($s_date)); ?></td>
                                 <td class="text-center"><span class="badge badge-info px-2 py-1"><?php echo htmlspecialchars($cr['shift_name'] ?? 'General'); ?></span></td>
                                 <td class="font-weight-bold text-center"><?php echo htmlspecialchars($cr['slip_no']); ?></td>
-                                <td class="text-center"><span class="badge badge-secondary"><?php echo htmlspecialchars($cr['slip_type']); ?></span></td>
+                                <td class="text-center">
+                                    <?php if ($st === 'Balanced Slip'): ?>
+                                        <span class="badge badge-info px-2 py-1"><i class="fas fa-balance-scale mr-1"></i>Balanced Slip</span>
+                                        <?php if (!empty($cr['ref_slip_no'])): ?>
+                                            <div class="small text-muted font-weight-bold mt-1">From #<?php echo htmlspecialchars($cr['ref_slip_no']); ?></div>
+                                        <?php endif; ?>
+                                        <span class="badge badge-light border text-muted mt-1" title="Fuel prepaid on original voucher">Prepaid (Rs. 0 Charge)</span>
+                                    <?php elseif ($st === 'Temporary Slip'): ?>
+                                        <span class="badge badge-danger px-2 py-1"><i class="fas fa-hand-holding mr-1"></i>Temporary Slip</span>
+                                        <span class="badge badge-warning text-dark mt-1">Loan Fuel</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-primary px-2 py-1"><i class="fas fa-file-invoice mr-1"></i>Permanent Slip</span>
+                                        <?php if ($wasoli > 0): ?>
+                                            <div class="mt-1">
+                                                <span class="badge badge-warning text-dark" title="Settled past loan chit"><i class="fas fa-link mr-1"></i>Settled Loan #<?php echo htmlspecialchars($cr['temp_slip_no'] ?: $cr['temp_slip_id']); ?> (<?php echo number_format($wasoli, 2); ?>L)</span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($bal1 > 0): ?>
+                                            <div class="mt-1">
+                                                <span class="badge badge-secondary" title="Uncollected voucher balance"><i class="fas fa-hourglass-half mr-1"></i>Remaining: <?php echo number_format($bal1, 2); ?>L</span>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo htmlspecialchars($cr['customer_name'] ?? ('Account #' . $cr['account_number'])); ?></td>
                                 <td class="font-weight-bold text-center"><?php echo htmlspecialchars($cr['vehicle_number']); ?></td>
                                 <td class="text-right">Rs. <?php echo number_format(floatval($cr['rate']), 2); ?></td>
                                 <td class="text-right font-weight-bold text-success"><?php echo number_format($iqty, 2); ?> Ltr</td>
                                 <td class="text-right text-muted"><?php echo number_format(floatval($cr['quantity']), 2); ?> Ltr</td>
-                                <td class="text-right font-weight-bold text-primary">Rs. <?php echo number_format(floatval($cr['amount']), 2); ?></td>
+                                <td class="text-right font-weight-bold text-primary">
+                                    Rs. <?php echo number_format(floatval($cr['amount']), 2); ?>
+                                    <?php if ($st === 'Balanced Slip'): ?>
+                                        <div class="small text-muted font-italic">(Prepaid)</div>
+                                    <?php elseif ($chgAmt > 0 && abs($chgAmt - floatval($cr['amount'])) > 0.01): ?>
+                                        <div class="small text-danger font-weight-bold" title="Total billed including settled loan">Billed: Rs. <?php echo number_format($chgAmt, 2); ?></div>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                             <tr class="bg-light font-weight-bold">
-                                <td colspan="8" class="text-right">TOTAL CREDIT:</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '9' : '8'; ?>" class="text-right">TOTAL CREDIT:</td>
                                 <td class="text-right text-success"><?php echo number_format($total_credit_issued_litres, 2); ?> Ltr</td>
                                 <td class="text-right text-muted"><?php echo number_format($total_credit_quota_litres, 2); ?> Ltr</td>
                                 <td class="text-right text-primary">Rs. <?php echo number_format($total_credit_amount, 2); ?></td>
@@ -721,6 +767,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <thead>
                         <tr>
                             <th>#</th>
+                            <?php if (!empty($is_station_summary)): ?><th>Nozzle</th><?php endif; ?>
                             <th>Date</th>
                             <th>Shift</th>
                             <th>POS Terminal / Machine</th>
@@ -736,12 +783,17 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <tbody>
                         <?php if (empty($card_rows)): ?>
                             <tr>
-                                <td colspan="11" class="text-center py-3 text-muted">No card terminal transactions recorded for this nozzle in the selected period.</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '12' : '11'; ?>" class="text-center py-3 text-muted">No card terminal transactions recorded for the selected period.</td>
                             </tr>
                         <?php else: ?>
                             <?php $cd_i = 1; foreach ($card_rows as $cd): ?>
                             <tr>
                                 <td class="text-center"><?php echo $cd_i++; ?></td>
+                                <?php if (!empty($is_station_summary)): ?>
+                                    <td class="text-center font-weight-bold">
+                                        <span class="badge badge-dark"><?php echo htmlspecialchars($cd['nozzle_name'] ?? 'N/A'); ?></span>
+                                    </td>
+                                <?php endif; ?>
                                 <td class="text-center font-weight-bold"><?php echo date('d-m-Y', strtotime($cd['sale_date'])); ?></td>
                                 <td class="text-center"><span class="badge badge-info px-2 py-1"><?php echo htmlspecialchars($cd['shift_name'] ?? 'General'); ?></span></td>
                                 <td><?php echo htmlspecialchars($cd['machine_name'] ?? 'POS Machine'); ?></td>
@@ -755,7 +807,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                             </tr>
                             <?php endforeach; ?>
                             <tr class="bg-light font-weight-bold">
-                                <td colspan="7" class="text-right">TOTAL CARD:</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '8' : '7'; ?>" class="text-right">TOTAL CARD:</td>
                                 <td class="text-right text-success"><?php echo number_format($total_card_litres, 2); ?> Ltr</td>
                                 <td class="text-right text-primary">Rs. <?php echo number_format($total_card_amount, 2); ?></td>
                                 <td class="text-right text-danger">Rs. <?php echo number_format($total_card_charges, 2); ?></td>
@@ -767,10 +819,10 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
             </div>
         </div>
 
-        <!-- 5. Nozzle Expenses Table -->
+        <!-- 5. Expenses Table -->
         <div class="card mb-4 border-0 shadow-sm" style="border-radius:10px; overflow:hidden;">
             <div class="section-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);">
-                <span><i class="fas fa-tools mr-2"></i> Equipment Maintenance &amp; Nozzle Expenses</span>
+                <span><i class="fas fa-tools mr-2"></i> <?php echo (!empty($is_station_summary)) ? 'Equipment Maintenance &amp; Station Expenses' : 'Equipment Maintenance &amp; Nozzle Expenses'; ?></span>
                 <span class="badge badge-light text-danger font-weight-bold"><?php echo count($expense_rows); ?> Item(s)</span>
             </div>
             <div class="table-responsive">
@@ -778,6 +830,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <thead>
                         <tr>
                             <th>#</th>
+                            <?php if (!empty($is_station_summary)): ?><th>Nozzle / Scope</th><?php endif; ?>
                             <th>Expense Date</th>
                             <th>Expense Category</th>
                             <th>Payment Method</th>
@@ -789,14 +842,21 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                     <tbody>
                         <?php if (empty($expense_rows)): ?>
                             <tr>
-                                <td colspan="7" class="text-center py-3 text-muted">No equipment expenses recorded for this nozzle in the selected period.</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '8' : '7'; ?>" class="text-center py-3 text-muted">No expenses recorded for the selected period.</td>
                             </tr>
                         <?php else: ?>
                             <?php $e_i = 1; foreach ($expense_rows as $exp): ?>
                             <tr>
                                 <td class="text-center"><?php echo $e_i++; ?></td>
+                                <?php if (!empty($is_station_summary)): ?>
+                                    <td class="text-center">
+                                        <span class="badge <?php echo (!empty($exp['nozzle_name'])) ? 'badge-primary' : 'badge-secondary'; ?>">
+                                            <?php echo htmlspecialchars($exp['nozzle_name'] ?: 'Station General'); ?>
+                                        </span>
+                                    </td>
+                                <?php endif; ?>
                                 <td class="text-center font-weight-bold"><?php echo date('d-m-Y', strtotime($exp['expense_date'])); ?></td>
-                                <td class="font-weight-bold"><?php echo htmlspecialchars($exp['expense_type_name'] ?? 'Nozzle Expense'); ?></td>
+                                <td class="font-weight-bold"><?php echo htmlspecialchars($exp['expense_type_name'] ?? 'Expense'); ?></td>
                                 <td class="text-center"><span class="badge badge-secondary"><?php echo htmlspecialchars($exp['payment_method']); ?></span></td>
                                 <td class="text-center"><?php echo htmlspecialchars($exp['reference_no'] ?? '-'); ?></td>
                                 <td class="text-muted small"><?php echo htmlspecialchars($exp['notes'] ?? ''); ?></td>
@@ -804,7 +864,7 @@ $net_nozzle_yield = $total_meter_revenue - $total_nozzle_expenses;
                             </tr>
                             <?php endforeach; ?>
                             <tr class="bg-light font-weight-bold">
-                                <td colspan="6" class="text-right text-danger">TOTAL NOZZLE EXPENSES:</td>
+                                <td colspan="<?php echo (!empty($is_station_summary)) ? '7' : '6'; ?>" class="text-right text-danger">TOTAL EXPENSES:</td>
                                 <td class="text-right text-danger">Rs. <?php echo number_format($total_nozzle_expenses, 2); ?></td>
                             </tr>
                         <?php endif; ?>

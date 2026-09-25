@@ -79,6 +79,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     WHERE id = '$id'";
 
         if (mysqli_query($connection, $sql_upd)) {
+            // Recalculate meter reading current_reading, update nozzle running meter, & audit in remarks
+            require_once __DIR__ . '/../include/cash_automation_helper.php';
+            recalculate_meter_reading_from_sales($connection, $sale_date, $shift_id, $nozzle_id, "Cash Sale #{$id} update");
+
             $_SESSION['flash_success'] = 'Cash sale record updated successfully.';
             header('Location: cash-sales-list.php');
             exit;

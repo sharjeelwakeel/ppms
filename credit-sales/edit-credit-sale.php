@@ -322,6 +322,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once __DIR__ . '/../include/cash_automation_helper.php';
                 sync_shift_cash_sales($connection, $date_safe, $current_shift_id);
 
+                // Recalculate meter reading current_reading for affected nozzles & audit in remarks
+                $unique_nozzles = array_unique(array_filter(array_map('intval', $nozzles_arr)));
+                foreach ($unique_nozzles as $un_id) {
+                    recalculate_meter_reading_from_sales($connection, $date_safe, $current_shift_id, $un_id, "Credit Sales update");
+                }
+
                 mysqli_commit($connection);
                 header('Location: credit-sales-list.php?msg=updated');
                 exit;
