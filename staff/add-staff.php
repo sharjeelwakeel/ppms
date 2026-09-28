@@ -29,6 +29,7 @@ if (
     $joining_date = mysqli_real_escape_string($connection, $_POST['joining_date']);
     $shift_id = mysqli_real_escape_string($connection, $_POST['shift_id']);
     $salary = mysqli_real_escape_string($connection, $_POST['salary']);
+    $weekly_off = isset($_POST['weekly_off']) && !empty($_POST['weekly_off']) ? mysqli_real_escape_string($connection, $_POST['weekly_off']) : 'Friday';
     $experience = isset($_POST['experience']) && trim($_POST['experience']) !== '' ? mysqli_real_escape_string($connection, trim($_POST['experience'])) : NULL;
     $address = isset($_POST['address']) ? mysqli_real_escape_string($connection, $_POST['address']) : '';
     $phone = mysqli_real_escape_string($connection, $_POST['phone']);
@@ -39,8 +40,8 @@ if (
 
     mysqli_begin_transaction($connection);
     try {
-        $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, salary, experience, address, phone) 
-                  VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$salary', " . ($experience === NULL ? "NULL" : "'$experience'") . ", " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
+        $query = "INSERT INTO tbl_staff (first_name, last_name, role_id, joining_date, shift_id, weekly_off, salary, experience, address, phone) 
+                  VALUES ('$first_name', '$last_name', '$role_id', '$joining_date', '$shift_id', '$weekly_off', '$salary', " . ($experience === NULL ? "NULL" : "'$experience'") . ", " . ($address === '' ? "NULL" : "'$address'") . ", '$phone')";
         mysqli_query($connection, $query);
         $staff_id = mysqli_insert_id($connection);
 
@@ -158,6 +159,22 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
                                                 }
                                                 ?>
 											</select>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label font-weight-bold" style="color:var(--primary-color);">Weekly Holiday</label>
+										<div class="col-lg-9 col-md-7 col-sm-8">
+											<select name="weekly_off" class="form-control" required>
+                                                <option value="Friday" selected>Friday (Default Weekly Off)</option>
+                                                <option value="Sunday">Sunday</option>
+                                                <option value="Monday">Monday</option>
+                                                <option value="Tuesday">Tuesday</option>
+                                                <option value="Wednesday">Wednesday</option>
+                                                <option value="Thursday">Thursday</option>
+                                                <option value="Saturday">Saturday</option>
+                                                <option value="None">None / Rotating</option>
+											</select>
+											<small class="form-text text-muted">Weekly off day for attendance and paid rest day.</small>
 										</div>
 									</div>
 									<div class="form-group row">

@@ -424,14 +424,14 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkHR">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/staff-roles-list.php"><i class="fas fa-id-badge mr-1 text-info"></i> Staff Designations</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/attendance-list.php"><i class="fas fa-calendar-check mr-1"></i> Staff Attendance</a>
-                    <a class="dropdown-item" href="<?php echo $prefix; ?>staff/leave-setup.php"><i class="fas fa-calendar-minus mr-1"></i> Leave Setup</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>staff/leave-setup.php"><i class="fas fa-calendar-minus mr-1 text-warning"></i> Leave &amp; Holiday Policy</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>staff/salary-calculator.php"><i class="fas fa-money-check-alt mr-1"></i> Salary Calculator</a>
                 </div>
             </li>
             <?php endif; ?>
 
             <!-- Reports Menu -->
-            <?php if (has_permission('reports', 'show') || has_permission('customers', 'show') || has_permission('meter_readings', 'show')): ?>
+            <?php if (has_permission('reports', 'show') || has_permission('customers', 'show') || has_permission('meter_readings', 'show') || has_permission('staff', 'show')): ?>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLinkReports" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-chart-bar mr-1"></i> Reports
@@ -444,6 +444,7 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                     <a class="dropdown-item" href="<?php echo $prefix; ?>reports/card-report.php"><i class="fas fa-credit-card mr-1 text-primary"></i> Card Machine Report</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>reports/card-balance-report.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Card Recovery &amp; Balance</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php"><i class="fas fa-boxes mr-1 text-info"></i> Stock Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>reports/staff-salary-report.php"><i class="fas fa-file-invoice-dollar mr-1 text-success"></i> Staff Salary Report</a>
                 </div>
             </li>
             <?php endif; ?>

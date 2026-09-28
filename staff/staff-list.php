@@ -78,6 +78,7 @@ $canDelete = has_permission('staff', 'delete');
 							<th>Designation</th>
 							<th>Joining Date</th>
 							<th>Shift</th>
+							<th>Weekly Off</th>
 							<th>Salary</th>
 							<th>Phone</th>
 							<th>Guarantor</th>
@@ -110,6 +111,10 @@ $canDelete = has_permission('staff', 'delete');
                                     ? '<a href="edit-staff.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($fullName).'</a>'
                                     : '<strong>'.htmlspecialchars($fullName).'</strong>';
 
+                                $weeklyOffDisplay = !empty($row['weekly_off']) && $row['weekly_off'] !== 'None'
+                                    ? '<span class="badge badge-info px-2 py-1"><i class="fas fa-umbrella-beach mr-1"></i>'.htmlspecialchars($row['weekly_off']).'</span>'
+                                    : '<span class="badge badge-light border text-muted">None</span>';
+
 								echo' 
 									<tr>
 										<td>'.$row['id'].'</td>
@@ -117,6 +122,7 @@ $canDelete = has_permission('staff', 'delete');
 										<td>'.htmlspecialchars($row['role_name'] ?? 'N/A').'</td>
 										<td>'.date("d-m-Y", strtotime($row['joining_date'])).'</td>
 										<td>'.htmlspecialchars($row['shift_name'] ?? 'N/A').'</td>
+										<td>'.$weeklyOffDisplay.'</td>
 										<td>'.number_format($row['salary'], 2).'</td>
 										<td>'.htmlspecialchars($row['phone']).'</td>
 										<td>'.$guarantor_display.'</td>';

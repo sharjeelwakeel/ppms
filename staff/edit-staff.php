@@ -26,6 +26,7 @@ if (isset($_POST['submit'])) {
     $joining_date = mysqli_real_escape_string($connection, $_POST['joining_date']);
     $shift_id = mysqli_real_escape_string($connection, $_POST['shift_id']);
     $salary = mysqli_real_escape_string($connection, $_POST['salary']);
+    $weekly_off = isset($_POST['weekly_off']) && !empty($_POST['weekly_off']) ? mysqli_real_escape_string($connection, $_POST['weekly_off']) : 'Friday';
     $experience = isset($_POST['experience']) && trim($_POST['experience']) !== '' ? mysqli_real_escape_string($connection, trim($_POST['experience'])) : NULL;
     $address = isset($_POST['address']) ? mysqli_real_escape_string($connection, $_POST['address']) : '';
     $phone = mysqli_real_escape_string($connection, $_POST['phone']);
@@ -42,6 +43,7 @@ if (isset($_POST['submit'])) {
                     role_id='$role_id', 
                     joining_date='$joining_date', 
                     shift_id='$shift_id', 
+                    weekly_off='$weekly_off', 
                     salary='$salary', 
                     experience=" . ($experience === NULL ? "NULL" : "'$experience'") . ", 
                     address=" . ($address === '' ? "NULL" : "'$address'") . ", 
@@ -186,6 +188,23 @@ $shifts_result = mysqli_query($connection, $shifts_sql);
                                                 }
                                                 ?>
 											</select>
+										</div>
+									</div>
+									<div class="form-group row">
+										<label class="col-lg-3 col-md-5 col-sm-4 col-form-label font-weight-bold" style="color:var(--primary-color);">Weekly Holiday</label>
+										<div class="col-lg-9 col-md-7 col-sm-8">
+											<?php $curr_off = !empty($staff['weekly_off']) ? $staff['weekly_off'] : 'Friday'; ?>
+											<select name="weekly_off" class="form-control" required>
+                                                <option value="Friday" <?php echo ($curr_off === 'Friday') ? 'selected' : ''; ?>>Friday (Default Weekly Off)</option>
+                                                <option value="Sunday" <?php echo ($curr_off === 'Sunday') ? 'selected' : ''; ?>>Sunday</option>
+                                                <option value="Monday" <?php echo ($curr_off === 'Monday') ? 'selected' : ''; ?>>Monday</option>
+                                                <option value="Tuesday" <?php echo ($curr_off === 'Tuesday') ? 'selected' : ''; ?>>Tuesday</option>
+                                                <option value="Wednesday" <?php echo ($curr_off === 'Wednesday') ? 'selected' : ''; ?>>Wednesday</option>
+                                                <option value="Thursday" <?php echo ($curr_off === 'Thursday') ? 'selected' : ''; ?>>Thursday</option>
+                                                <option value="Saturday" <?php echo ($curr_off === 'Saturday') ? 'selected' : ''; ?>>Saturday</option>
+                                                <option value="None" <?php echo ($curr_off === 'None') ? 'selected' : ''; ?>>None / Rotating</option>
+											</select>
+											<small class="form-text text-muted">Weekly off day for attendance and paid rest day.</small>
 										</div>
 									</div>
 									<div class="form-group row">

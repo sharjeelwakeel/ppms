@@ -6,6 +6,9 @@ if (!userloggedin()) {
 }
 require '../include/config.php';
 require '../include/permissions.php';
+require '../include/salary_payment_helper.php';
+
+auto_migrate_salary_payment_tables($connection);
 
 // Enforce access check for viewing staff attendance
 check_access('staff', 'show');
@@ -26,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $staff_id = (int)$staff_id;
         $status = mysqli_real_escape_string($connection, $status);
         
-        if ($staff_id > 0 && in_array($status, ['Present', 'Absent', 'Late', 'Leave'])) {
+        if ($staff_id > 0 && in_array($status, ['Present', 'Absent', 'Late', 'Leave', 'Holiday'])) {
             $query = "INSERT INTO tbl_staff_attendance (staff_id, date, status) 
                       VALUES ($staff_id, '$post_date', '$status') 
                       ON DUPLICATE KEY UPDATE status = '$status'";
@@ -55,11 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Fetch all active staff members
-$staff_sql = "SELECT s.id, s.first_name, s.last_name, r.name as role_name, sh.name as shift_name
+// Fetch all active staff members with their weekly_off day
+$staff_sql = "SELECT s.id, s.first_name, s.last_name, s.weekly_off, r.name as role_name, sh.name as shift_name
               FROM tbl_staff s
               LEFT JOIN tbl_staff_roles r ON s.role_id = r.id
               LEFT JOIN tbl_shifts sh ON s.shift_id = sh.id
+              WHERE (s.deleted_at IS NULL OR s.deleted_at = '0000-00-00 00:00:00')
               ORDER BY s.id DESC";
 $staff_result = mysqli_query($connection, $staff_sql);
 
@@ -165,6 +169,12 @@ if ($att_result) {
             color: #383d41;
             border-color: #d6d8db;
         }
+        /* Holiday Colors */
+        .att-radio-h input:checked ~ .att-label {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
         
         .att-radio:hover .att-label {
             border-color: #bbb;
@@ -205,6 +215,9 @@ if ($att_result) {
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0 text-muted">Attendance Sheet for: <strong><?php echo date('d-M-Y (l)', strtotime($date)); ?></strong></h5>
                         <div>
+                            <button type="button" class="btn btn-sm btn-outline-info mr-2" onclick="applyWeeklyHolidays('<?php echo date('l', strtotime($date)); ?>')">
+                                <i class="fas fa-umbrella-beach mr-1"></i>Pre-fill Today's Off
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-success mr-2" onclick="markAll('Present')">Mark All Present</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAll()">Clear All</button>
                         </div>
@@ -213,41 +226,62 @@ if ($att_result) {
                     <table class="table table-bordered table-striped" style="width:100%;">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">ID</th>
+                                <th style="width: 70px;">ID</th>
                                 <th>Staff Name</th>
                                 <th>Role</th>
-                                <th>Shift</th>
-                                <th style="width: 450px; text-align: center;">Attendance Status</th>
+                                <th>Shift &amp; Weekly Off</th>
+                                <th style="width: 500px; text-align: center;">Attendance Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if ($staff_result && mysqli_num_rows($staff_result) > 0): ?>
-                                <?php while ($row = mysqli_fetch_assoc($staff_result)): 
+                                <?php 
+                                $dayOfWeek = date('l', strtotime($date));
+                                while ($row = mysqli_fetch_assoc($staff_result)): 
                                     $fullName = $row['first_name'] . ' ' . $row['last_name'];
                                     $staff_id = $row['id'];
+                                    $weekly_off = !empty($row['weekly_off']) ? $row['weekly_off'] : 'Friday';
                                     $status = isset($attendance_marked[$staff_id]) ? $attendance_marked[$staff_id] : '';
+
+                                    // Auto-select Holiday if it's the employee's weekly day off and not yet marked
+                                    if (empty($status)) {
+                                        if (strcasecmp($weekly_off, $dayOfWeek) === 0) {
+                                            $status = 'Holiday';
+                                        } else {
+                                            $status = 'Present';
+                                        }
+                                    }
                                 ?>
-                                    <tr>
+                                    <tr data-staff-id="<?php echo $staff_id; ?>" data-weekly-off="<?php echo htmlspecialchars($weekly_off); ?>">
                                         <td><strong>#<?php echo $staff_id; ?></strong></td>
-                                        <td><?php echo htmlspecialchars($fullName); ?></td>
+                                        <td><strong><?php echo htmlspecialchars($fullName); ?></strong></td>
                                         <td><?php echo htmlspecialchars($row['role_name'] ?? 'N/A'); ?></td>
-                                        <td><?php echo htmlspecialchars($row['shift_name'] ?? 'N/A'); ?></td>
+                                        <td>
+                                            <?php echo htmlspecialchars($row['shift_name'] ?? 'N/A'); ?><br>
+                                            <span class="badge badge-light border text-muted" style="font-size:10.5px;">
+                                                <i class="fas fa-umbrella-beach mr-1 text-info"></i>Off: <?php echo htmlspecialchars($weekly_off); ?>
+                                            </span>
+                                        </td>
                                         <td style="text-align: center;">
                                             <label class="att-radio att-radio-p">
                                                 <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Present" class="radio-present" <?php echo ($status === 'Present') ? 'checked' : ''; ?> required>
                                                 <span class="att-label"><i class="fas fa-check-circle mr-1"></i>Present</span>
                                             </label>
-                                            <label class="att-radio att-radio-a">
-                                                <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Absent" class="radio-absent" <?php echo ($status === 'Absent') ? 'checked' : ''; ?>>
-                                                <span class="att-label"><i class="fas fa-times-circle mr-1"></i>Absent</span>
-                                            </label>
                                             <label class="att-radio att-radio-l">
                                                 <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Late" class="radio-late" <?php echo ($status === 'Late') ? 'checked' : ''; ?>>
                                                 <span class="att-label"><i class="fas fa-clock mr-1"></i>Late</span>
                                             </label>
+                                            <label class="att-radio att-radio-h">
+                                                <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Holiday" class="radio-holiday" <?php echo ($status === 'Holiday') ? 'checked' : ''; ?>>
+                                                <span class="att-label"><i class="fas fa-umbrella-beach mr-1"></i>Holiday</span>
+                                            </label>
                                             <label class="att-radio att-radio-le">
                                                 <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Leave" class="radio-leave" <?php echo ($status === 'Leave') ? 'checked' : ''; ?>>
                                                 <span class="att-label"><i class="fas fa-plane-departure mr-1"></i>Leave</span>
+                                            </label>
+                                            <label class="att-radio att-radio-a">
+                                                <input type="radio" name="attendance[<?php echo $staff_id; ?>]" value="Absent" class="radio-absent" <?php echo ($status === 'Absent') ? 'checked' : ''; ?>>
+                                                <span class="att-label"><i class="fas fa-times-circle mr-1"></i>Absent</span>
                                             </label>
                                         </td>
                                     </tr>
@@ -280,6 +314,14 @@ if ($att_result) {
             if (status === 'Present') {
                 $('.radio-present').prop('checked', true);
             }
+        }
+        function applyWeeklyHolidays(todayDay) {
+            $('tr[data-weekly-off]').each(function() {
+                var off = $(this).data('weekly-off');
+                if (off && off.toLowerCase() === todayDay.toLowerCase()) {
+                    $(this).find('.radio-holiday').prop('checked', true);
+                }
+            });
         }
         function clearAll() {
             $('input[type="radio"]').prop('checked', false);
