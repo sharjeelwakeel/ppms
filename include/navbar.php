@@ -439,7 +439,10 @@ if (isset($_SESSION['loggedInUser']) && intval($_SESSION['loggedInUser']) > 0) {
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLinkReports">
                     <a class="dropdown-item" href="<?php echo $prefix; ?>reports/customer-report.php"><i class="fas fa-user-tag mr-1 text-primary"></i> Customer Report Fuel</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>reports/customer-product-report.php"><i class="fas fa-oil-can mr-1 text-warning"></i> Customer Product Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>reports/customer-monthly-bill.php"><i class="fas fa-file-invoice-dollar mr-1 text-danger"></i> Customer Monthly Credit Bill</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>reports/nozzle-report.php"><i class="fas fa-gas-pump mr-1 text-success"></i> Daily Nozzle Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>reports/card-report.php"><i class="fas fa-credit-card mr-1 text-primary"></i> Card Machine Report</a>
+                    <a class="dropdown-item" href="<?php echo $prefix; ?>reports/card-balance-report.php"><i class="fas fa-hand-holding-usd mr-1 text-success"></i> Card Recovery &amp; Balance</a>
                     <a class="dropdown-item" href="<?php echo $prefix; ?>lubricants/stock-report.php"><i class="fas fa-boxes mr-1 text-info"></i> Stock Report</a>
                 </div>
             </li>

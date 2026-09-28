@@ -56,6 +56,7 @@ function reset_test_date_data($connection, $test_date) {
     mysqli_query($connection, "DELETE FROM tbl_meter_reading_cash_sales WHERE sale_date = '$date_safe'");
     mysqli_query($connection, "DELETE FROM tbl_meter_reading_credit_sales WHERE sale_date = '$date_safe' OR slip_date = '$date_safe'");
     mysqli_query($connection, "DELETE FROM tbl_meter_reading_card_sales WHERE sale_date = '$date_safe'");
+    mysqli_query($connection, "DELETE FROM tbl_card_sale_settlements WHERE settlement_date = '$date_safe'");
     mysqli_query($connection, "DELETE FROM tbl_expenses WHERE expense_date = '$date_safe'");
 }
 
