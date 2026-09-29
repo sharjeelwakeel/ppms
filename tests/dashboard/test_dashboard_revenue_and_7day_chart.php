@@ -147,6 +147,116 @@ try {
     assert_true(strpos($dashboard_src, 'include/js/chart.min.js') !== false, "dashboard.php references locally hosted include/js/chart.min.js");
     assert_true(strpos($dashboard_src, 'cdn.jsdelivr.net/npm/chart.js') === false, "dashboard.php has eliminated external Chart.js CDN dependency");
 
+    // -----------------------------------------------------------------
+    // Part 7: 7-Day Fuel Payment Channels Grouped Bar Chart (Cash, Credit & Card)
+    // -----------------------------------------------------------------
+    // Seed test cash, credit, card fuel sales for today
+    $ins_cash = mysqli_query($connection, "INSERT INTO tbl_meter_reading_cash_sales (sale_date, shift_id, nozzle_id, amount, quantity)
+        VALUES ('$today_date', 1, 1, 15000.00, 75.00)");
+    $cash_test_id = mysqli_insert_id($connection);
+
+    $ins_credit = mysqli_query($connection, "INSERT INTO tbl_meter_reading_credit_sales (sale_date, slip_date, shift_id, nozzle_id, slip_no, amount, quantity)
+        VALUES ('$today_date', '$today_date', 1, 1, 'TEST-CR-CHART', 25000.00, 125.00)");
+    $credit_test_id = mysqli_insert_id($connection);
+
+    $ins_card = mysqli_query($connection, "INSERT INTO tbl_meter_reading_card_sales (sale_date, shift_id, nozzle_id, amount, quantity)
+        VALUES ('$today_date', 1, 1, 10000.00, 50.00)");
+    $card_test_id = mysqli_insert_id($connection);
+
+    $pay_breakdown = get_seven_days_fuel_payment_breakdown($connection, $today_date);
+    assert_eq(count($pay_breakdown['days']), 7, "Payment breakdown contains exactly 7 continuous days");
+    assert_eq(count($pay_breakdown['labels']), 7, "Payment breakdown contains exactly 7 labels");
+    assert_eq(count($pay_breakdown['cash_series']), 7, "Payment breakdown contains exactly 7 cash values");
+    assert_eq(count($pay_breakdown['credit_series']), 7, "Payment breakdown contains exactly 7 credit values");
+    assert_eq(count($pay_breakdown['card_series']), 7, "Payment breakdown contains exactly 7 card values");
+
+    // Today's slot (index 6) must reflect seeded values
+    $today_slot = $pay_breakdown['days'][6];
+    assert_true($today_slot['cash_amount'] >= 15000.00, "Today cash fuel sale includes seeded Rs. 15,000 (Actual: {$today_slot['cash_amount']})");
+    assert_true($today_slot['credit_amount'] >= 25000.00, "Today credit fuel sale includes seeded Rs. 25,000 (Actual: {$today_slot['credit_amount']})");
+    assert_true($today_slot['card_amount'] >= 10000.00, "Today card fuel sale includes seeded Rs. 10,000 (Actual: {$today_slot['card_amount']})");
+    assert_true($pay_breakdown['grand_total'] >= 50000.00, "7-day grand total includes seeded payments (Rs. 15k+25k+10k = 50k)");
+
+    // Soft delete test credit sale and verify exclusion
+    mysqli_query($connection, "UPDATE tbl_meter_reading_credit_sales SET deleted_at = NOW() WHERE id = $credit_test_id");
+    $post_del_pay = get_seven_days_fuel_payment_breakdown($connection, $today_date);
+    $today_slot_post = $post_del_pay['days'][6];
+    assert_true($today_slot_post['credit_amount'] < $today_slot['credit_amount'], "Soft-deleted credit fuel sale is strictly excluded from payment channels chart");
+
+    // Verify dashboard HTML & JS integration
+    assert_true(strpos($dashboard_src, 'id="paymentChannelsBarChart"') !== false, "dashboard.php contains #paymentChannelsBarChart canvas");
+    assert_true(strpos($dashboard_src, 'get_seven_days_fuel_payment_breakdown') !== false, "dashboard.php invokes get_seven_days_fuel_payment_breakdown");
+    assert_true(strpos($dashboard_src, 'Cash Sale') !== false, "dashboard.php renders Cash Sale dataset");
+    assert_true(strpos($dashboard_src, 'Credit Sale') !== false, "dashboard.php renders Credit Sale dataset");
+    assert_true(strpos($dashboard_src, 'Card Sale') !== false, "dashboard.php renders Card Sale dataset");
+
+    // Clean up test payment records
+    mysqli_query($connection, "DELETE FROM tbl_meter_reading_cash_sales WHERE id = $cash_test_id");
+    mysqli_query($connection, "DELETE FROM tbl_meter_reading_credit_sales WHERE id = $credit_test_id");
+    mysqli_query($connection, "DELETE FROM tbl_meter_reading_card_sales WHERE id = $card_test_id");
+
+    // -----------------------------------------------------------------
+    // Part 8: Multi-Period Analytics & 4-Chart Dashboard Integration
+    // Periods: Days, Week, Month (No numbers in period labels)
+    // -----------------------------------------------------------------
+    $multi = get_dashboard_multi_period_charts_data($connection, $today_date);
+    assert_true(isset($multi['days']), "Multi-period data contains 'days' horizon");
+    assert_true(isset($multi['weeks']), "Multi-period data contains 'weeks' horizon");
+    assert_true(isset($multi['months']), "Multi-period data contains 'months' horizon");
+
+    assert_eq(count($multi['days']['labels']), 7, "Days horizon contains exactly 7 labels");
+    assert_eq(count($multi['weeks']['labels']), 4, "Weeks horizon contains exactly 4 labels");
+    assert_eq(count($multi['months']['labels']), 12, "Months horizon contains exactly 12 labels");
+
+    // Seed test expense record for today
+    $ins_exp = mysqli_query($connection, "INSERT INTO tbl_expenses (expense_type_id, amount, expense_date, notes, created_at)
+        VALUES (1, 3500.00, '$today_date', 'TEST-DSH-EXPENSE', NOW())");
+    assert_true($ins_exp, "Test expense inserted successfully");
+    $test_exp_id = mysqli_insert_id($connection);
+
+    // Seed test lubricant product sale for today
+    $ins_psale = mysqli_query($connection, "INSERT INTO tbl_lubricant_sales (date, product_id, quantity, rate, amount, payment_type, created_at)
+        VALUES ('$today_date', 1, 2.0, 2100.00, 4200.00, 'Cash', NOW())");
+    assert_true($ins_psale, "Test product sale inserted successfully");
+    $test_psale_id = mysqli_insert_id($connection);
+
+    $multi_with_seeded = get_dashboard_multi_period_charts_data($connection, $today_date);
+
+    // Verify today's index in Days horizon (index 6) contains seeded values
+    assert_true($multi_with_seeded['days']['expense_series'][6] >= 3500.00, "Today expense slot reflects seeded Rs. 3,500");
+    assert_true($multi_with_seeded['days']['total_expenses'] >= 3500.00, "Days total expenses includes seeded Rs. 3,500");
+
+    assert_true($multi_with_seeded['days']['product_sales_series'][6] >= 4200.00, "Today product sales slot reflects seeded Rs. 4,200");
+    assert_true($multi_with_seeded['days']['product_qty_series'][6] >= 2.0, "Today product qty slot reflects seeded 2 units");
+    assert_true($multi_with_seeded['days']['total_product_sales'] >= 4200.00, "Days total product sales includes seeded Rs. 4,200");
+
+    // Verify Soft-Delete Exclusion for Expense and Product Sales
+    mysqli_query($connection, "UPDATE tbl_expenses SET deleted_at = NOW() WHERE id = $test_exp_id");
+    mysqli_query($connection, "UPDATE tbl_lubricant_sales SET deleted_at = NOW() WHERE id = $test_psale_id");
+
+    $multi_post_del = get_dashboard_multi_period_charts_data($connection, $today_date);
+    assert_true($multi_post_del['days']['expense_series'][6] < $multi_with_seeded['days']['expense_series'][6], "Soft-deleted expense is strictly excluded from expense chart");
+    assert_true($multi_post_del['days']['product_sales_series'][6] < $multi_with_seeded['days']['product_sales_series'][6], "Soft-deleted product sale is strictly excluded from product sales chart");
+
+    // Clean up test expense and sale records
+    mysqli_query($connection, "DELETE FROM tbl_expenses WHERE id = $test_exp_id");
+    mysqli_query($connection, "DELETE FROM tbl_lubricant_sales WHERE id = $test_psale_id");
+
+    // Verify Dashboard UI Markup & Client Script for All 4 Charts
+    $fresh_dashboard_src = file_get_contents(__DIR__ . '/../../dashboard.php');
+    assert_true(strpos($fresh_dashboard_src, 'id="periodFilterDropdown"') !== false, "dashboard.php contains #periodFilterDropdown element");
+    assert_true(strpos($fresh_dashboard_src, 'data-period="days"') !== false, "dashboard.php contains 'days' period option");
+    assert_true(strpos($fresh_dashboard_src, 'data-period="weeks"') !== false, "dashboard.php contains 'weeks' period option");
+    assert_true(strpos($fresh_dashboard_src, 'data-period="months"') !== false, "dashboard.php contains 'months' period option");
+    assert_true(strpos($fresh_dashboard_src, 'id="expensesBarChart"') !== false, "dashboard.php contains #expensesBarChart canvas");
+    assert_true(strpos($fresh_dashboard_src, 'id="productSalesBarChart"') !== false, "dashboard.php contains #productSalesBarChart canvas");
+    assert_true(strpos($fresh_dashboard_src, 'updateChartsForPeriod') !== false, "dashboard.php contains dynamic updateChartsForPeriod function");
+
+    // Verify period labels do not mention numbers (Days, Week, Month only)
+    assert_true(strpos($fresh_dashboard_src, 'data-label="Days"') !== false, "Dropdown option labels Days");
+    assert_true(strpos($fresh_dashboard_src, 'data-label="Week"') !== false, "Dropdown option labels Week");
+    assert_true(strpos($fresh_dashboard_src, 'data-label="Month"') !== false, "Dropdown option labels Month");
+
 } finally {
     // Clean up test meter reading records
     if (!empty($test_mr_ids)) {

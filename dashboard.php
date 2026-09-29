@@ -27,7 +27,14 @@ $today_stats = get_today_meter_revenue($connection);
 // 2. Fetch 7-Day Net Sales and Volume Stats for Chart.js Bar Chart
 $seven_days = get_seven_days_revenue_stats($connection);
 
-// 3. Fetch ONLY products that need restocking (Current Stock <= Reorder Level or <= 0)
+// 3. Fetch 7-Day Fuel Sales Breakdown by Payment Channel (Cash, Credit & Card)
+$seven_days_payments = get_seven_days_fuel_payment_breakdown($connection);
+
+// 4. Fetch Multi-Period Analytics Data (Days, Week, Month) for all 4 Dashboard Charts
+$multi_charts_data = get_dashboard_multi_period_charts_data($connection);
+$init_days_data    = $multi_charts_data['days'];
+
+// 5. Fetch ONLY products that need restocking (Current Stock <= Reorder Level or <= 0)
 $restock_items = get_restock_needed_products($connection);
 $restock_count = count($restock_items);
 ?>
@@ -110,6 +117,15 @@ $restock_count = count($restock_items);
             box-shadow: 0 4px 18px rgba(0,0,0,0.06);
             margin-bottom: 24px;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 24px);
+        }
+        .chart-card .card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         .chart-card-header {
             padding: 16px 22px;
@@ -164,33 +180,150 @@ $restock_count = count($restock_items);
     <main class="main">
         <div class="container-fluid px-lg-5 pt-4 pb-5">
             
-            <!-- Page Header -->
+            <!-- Page Header with Period Filter (Days, Week, Month) -->
             <div class="row mb-4 align-items-center">
-                <div class="col-12">
+                <div class="col-md-7 col-12 mb-3 mb-md-0">
                     <h4 class="font-weight-bold" style="color:var(--primary-color);">
                         <i class="fas fa-tachometer-alt mr-2 text-primary"></i>Operations &amp; Revenue Dashboard
                     </h4>
-                    <p class="text-muted small mb-0">Live fuel throughput, 7-day net sales, and inventory restock monitor.</p>
+                    <p class="text-muted small mb-0">Live fuel throughput, multi-period analytics, and inventory restock monitor.</p>
                 </div>
-            </div>            <!-- MAIN SECTION: 7-DAY NET SALES BAR CHART -->
+                <div class="col-md-5 col-12 text-md-right text-left">
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-outline-primary dropdown-toggle font-weight-bold px-3 py-2 shadow-sm d-inline-flex align-items-center" type="button" id="periodFilterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="border-color: #04204e; color: #04204e; background: #ffffff; border-radius: 8px;">
+                            <i class="fas fa-calendar-alt mr-2" style="color:#04204e;"></i>Period: <span id="currentPeriodLabel" class="ml-1 font-weight-bold">Days</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="periodFilterDropdown" style="border-radius: 8px; min-width: 170px;">
+                            <h6 class="dropdown-header text-uppercase font-weight-bold small text-muted">Select Period</h6>
+                            <a class="dropdown-item period-select-btn active font-weight-bold py-2" href="javascript:void(0);" data-period="days" data-label="Days">
+                                <i class="fas fa-calendar-day mr-2 text-primary"></i>Days
+                            </a>
+                            <a class="dropdown-item period-select-btn font-weight-bold py-2" href="javascript:void(0);" data-period="weeks" data-label="Week">
+                                <i class="fas fa-calendar-week mr-2 text-info"></i>Week
+                            </a>
+                            <a class="dropdown-item period-select-btn font-weight-bold py-2" href="javascript:void(0);" data-period="months" data-label="Month">
+                                <i class="fas fa-calendar mr-2 text-success"></i>Month
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHARTS SECTION: 4 CHARTS IN 2x2 INLINE GRID -->
+            <!-- ROW 1: Fuel Net Sales & Sales by Payment Channel -->
             <div class="row">
-                <!-- 7-Day Net Sales Bar Chart -->
-                <div class="col-12 mb-4">
+                <!-- Top-Left: Fuel Net Sales Bar Chart -->
+                <div class="col-xl-6 col-lg-6 col-12 mb-4">
                     <div class="chart-card">
-                        <div class="chart-card-header">
+                        <div class="chart-card-header flex-wrap">
                             <div>
                                 <h5 class="mb-0 font-weight-bold" style="color:var(--primary-color);">
-                                    <i class="fas fa-chart-bar mr-2 text-primary"></i>7-Day Net Sales
+                                    <i class="fas fa-chart-bar mr-2 text-primary"></i>Fuel Net Sales
                                 </h5>
-                                <span class="text-muted small">Daily net fuel sales turnover from closed shifts</span>
+                                <span class="text-muted small">Net fuel sales turnover and volume from closed shifts</span>
                             </div>
-                            <span class="badge badge-light border text-navy font-weight-bold px-2 py-1" style="color:var(--primary-color);">
-                                <i class="fas fa-calendar-check mr-1 text-primary"></i>Past 7 Days
-                            </span>
+                            <div class="d-flex align-items-center flex-wrap mt-2 mt-sm-0">
+                                <span class="badge badge-light border text-navy font-weight-bold px-2 py-1 period-badge" style="color:var(--primary-color);">
+                                    <i class="fas fa-calendar-check mr-1 text-primary"></i><span class="period-text">Days</span>
+                                </span>
+                                <span class="badge badge-primary px-2 py-1 text-white ml-2" id="fuelSalesTotalBadge" style="background:#04204e; font-size:11.5px;">
+                                    Total: Rs. <?php echo number_format($init_days_data['total_fuel_revenue'], 2); ?>
+                                </span>
+                            </div>
                         </div>
                         <div class="card-body p-4">
                             <div style="position: relative; height: 320px; width: 100%;">
                                 <canvas id="revenueBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top-Right: Fuel Sales by Payment Channel (Cash, Credit & Card) -->
+                <div class="col-xl-6 col-lg-6 col-12 mb-4">
+                    <div class="chart-card">
+                        <div class="chart-card-header flex-wrap">
+                            <div>
+                                <h5 class="mb-0 font-weight-bold" style="color:var(--primary-color);">
+                                    <i class="fas fa-money-check-alt mr-2 text-primary"></i>Sales by Payment Channel
+                                </h5>
+                                <span class="text-muted small">Fuel sales split across Cash, Credit &amp; Card</span>
+                            </div>
+                            <div class="d-flex align-items-center flex-wrap mt-2 mt-sm-0">
+                                <span class="badge badge-light border text-navy font-weight-bold px-2 py-1 period-badge mr-2" style="color:var(--primary-color);">
+                                    <i class="fas fa-calendar-check mr-1 text-primary"></i><span class="period-text">Days</span>
+                                </span>
+                                <span id="cashBadge" class="badge px-2 py-1 mr-1 text-white" style="background:#2e7d32; font-size:11.5px;" title="Cash: Rs. <?php echo number_format($init_days_data['total_cash'], 2); ?>">
+                                    <i class="fas fa-money-bill-wave mr-1"></i>Cash: <?php echo $init_days_data['cash_percentage']; ?>%
+                                </span>
+                                <span id="creditBadge" class="badge px-2 py-1 mr-1 text-white" style="background:#f57c00; font-size:11.5px;" title="Credit: Rs. <?php echo number_format($init_days_data['total_credit'], 2); ?>">
+                                    <i class="fas fa-file-invoice mr-1"></i>Credit: <?php echo $init_days_data['credit_percentage']; ?>%
+                                </span>
+                                <span id="cardBadge" class="badge px-2 py-1 text-white" style="background:#04204e; font-size:11.5px;" title="Card: Rs. <?php echo number_format($init_days_data['total_card'], 2); ?>">
+                                    <i class="fas fa-credit-card mr-1"></i>Card: <?php echo $init_days_data['card_percentage']; ?>%
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="position: relative; height: 320px; width: 100%;">
+                                <canvas id="paymentChannelsBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ROW 2: Station Operating Expenses & Product / Lubricant Sales -->
+            <div class="row">
+                <!-- Bottom-Left: Station Operating Expenses Bar Chart -->
+                <div class="col-xl-6 col-lg-6 col-12 mb-4">
+                    <div class="chart-card">
+                        <div class="chart-card-header flex-wrap">
+                            <div>
+                                <h5 class="mb-0 font-weight-bold" style="color:#c62828;">
+                                    <i class="fas fa-receipt mr-2 text-danger"></i>Station Operating Expenses
+                                </h5>
+                                <span class="text-muted small">Periodic operational expenditures across all categories</span>
+                            </div>
+                            <div class="d-flex align-items-center flex-wrap mt-2 mt-sm-0">
+                                <span class="badge badge-light border text-danger font-weight-bold px-2 py-1 period-badge" style="color:#c62828;">
+                                    <i class="fas fa-calendar-check mr-1 text-danger"></i><span class="period-text">Days</span>
+                                </span>
+                                <span id="expenseTotalBadge" class="badge badge-danger px-2 py-1 text-white ml-2" style="background:#c62828; font-size:11.5px;">
+                                    <i class="fas fa-wallet mr-1"></i>Total: Rs. <?php echo number_format($init_days_data['total_expenses'], 2); ?>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="position: relative; height: 320px; width: 100%;">
+                                <canvas id="expensesBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom-Right: Product & Lubricant Sales Bar Chart -->
+                <div class="col-xl-6 col-lg-6 col-12 mb-4">
+                    <div class="chart-card">
+                        <div class="chart-card-header flex-wrap">
+                            <div>
+                                <h5 class="mb-0 font-weight-bold" style="color:#4527a0;">
+                                    <i class="fas fa-oil-can mr-2" style="color:#4527a0;"></i>Product &amp; Lubricant Sales
+                                </h5>
+                                <span class="text-muted small">Periodic packaged lubricants and motor oil turnover</span>
+                            </div>
+                            <div class="d-flex align-items-center flex-wrap mt-2 mt-sm-0">
+                                <span class="badge badge-light border font-weight-bold px-2 py-1 period-badge" style="color:#4527a0;">
+                                    <i class="fas fa-calendar-check mr-1" style="color:#4527a0;"></i><span class="period-text">Days</span>
+                                </span>
+                                <span id="productTotalBadge" class="badge px-2 py-1 text-white ml-2" style="background:#4527a0; font-size:11.5px;">
+                                    <i class="fas fa-shopping-bag mr-1"></i>Total: Rs. <?php echo number_format($init_days_data['total_product_sales'], 2); ?>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="position: relative; height: 320px; width: 100%;">
+                                <canvas id="productSalesBarChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -306,24 +439,38 @@ $restock_count = count($restock_items);
             });
         }
 
-        // Initialize 7-Day Net Sales Bar Chart (Chart.js)
-        const ctx = document.getElementById('revenueBarChart');
-        if (ctx) {
-            const chartLabels  = <?php echo json_encode($seven_days['labels']); ?>;
-            const chartRevenue = <?php echo json_encode($seven_days['revenues']); ?>;
-            const chartLitres  = <?php echo json_encode($seven_days['litres']); ?>;
+        // -------------------------------------------------------------
+        // Multi-Period Data Store for All 4 Dashboard Charts
+        // Periods: 'days' (Days), 'weeks' (Week), 'months' (Month)
+        // -------------------------------------------------------------
+        window.dashboardChartsData = <?php echo json_encode($multi_charts_data); ?>;
+        let activePeriod = 'days';
 
-            // Deep Navy Primary Color Palette (#04204e -> #07347a)
-            const primaryNavy = '#04204e';
-            const hoverNavy   = '#07347a';
+        function formatCurrency(val) {
+            return (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
 
-            new Chart(ctx, {
+        // Color Tokens
+        const primaryNavy  = '#04204e';
+        const hoverNavy    = '#07347a';
+        const greenCash    = '#2e7d32';
+        const orangeCredit = '#f57c00';
+        const dangerRed    = '#c62828';
+        const hoverRed     = '#b71c1c';
+        const purpleProd   = '#4527a0';
+        const hoverPurple  = '#311b92';
+
+        // 1. Initialize Chart 1: Fuel Net Sales Bar Chart
+        let fuelChart = null;
+        const ctxFuel = document.getElementById('revenueBarChart');
+        if (ctxFuel && window.dashboardChartsData) {
+            fuelChart = new Chart(ctxFuel, {
                 type: 'bar',
                 data: {
-                    labels: chartLabels,
+                    labels: window.dashboardChartsData.days.labels,
                     datasets: [{
-                        label: 'Net Revenue (PKR)',
-                        data: chartRevenue,
+                        label: 'Net Fuel Revenue (PKR)',
+                        data: window.dashboardChartsData.days.fuel_revenue,
                         backgroundColor: 'rgba(4, 32, 78, 0.85)',
                         borderColor: primaryNavy,
                         borderWidth: 1.5,
@@ -338,9 +485,7 @@ $restock_count = count($restock_items);
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
-                        },
+                        legend: { display: false },
                         tooltip: {
                             backgroundColor: '#04204e',
                             titleFont: { size: 13, weight: 'bold', family: 'Roboto' },
@@ -351,10 +496,11 @@ $restock_count = count($restock_items);
                                 label: function(context) {
                                     const val = context.parsed.y || 0;
                                     const index = context.dataIndex;
-                                    const ltr = chartLitres[index] || 0;
+                                    const currentData = window.dashboardChartsData[activePeriod];
+                                    const ltr = (currentData && currentData.fuel_litres && currentData.fuel_litres[index]) || 0;
                                     return [
-                                        ' Revenue: PKR ' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                                        ' Volume:  ' + ltr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Ltr'
+                                        ' Revenue: PKR ' + formatCurrency(val),
+                                        ' Volume:  ' + formatCurrency(ltr) + ' Ltr'
                                     ];
                                 }
                             }
@@ -362,30 +508,18 @@ $restock_count = count($restock_items);
                     },
                     scales: {
                         x: {
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            },
-                            ticks: {
-                                font: { size: 12, weight: 'bold', family: 'Roboto' },
-                                color: '#4a5568'
-                            }
+                            grid: { display: false, drawBorder: false },
+                            ticks: { font: { size: 12, weight: 'bold', family: 'Roboto' }, color: '#4a5568' }
                         },
                         y: {
                             beginAtZero: true,
-                            grid: {
-                                color: 'rgba(226, 232, 240, 0.8)',
-                                drawBorder: false
-                            },
+                            grid: { color: 'rgba(226, 232, 240, 0.8)', drawBorder: false },
                             ticks: {
                                 font: { size: 11, family: 'Roboto' },
                                 color: '#718096',
                                 callback: function(value) {
-                                    if (value >= 1000000) {
-                                        return 'Rs. ' + (value / 1000000).toFixed(1) + 'M';
-                                    } else if (value >= 1000) {
-                                        return 'Rs. ' + (value / 1000).toFixed(0) + 'k';
-                                    }
+                                    if (value >= 1000000) return 'Rs. ' + (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'Rs. ' + (value / 1000).toFixed(0) + 'k';
                                     return 'Rs. ' + value;
                                 }
                             }
@@ -394,6 +528,300 @@ $restock_count = count($restock_items);
                 }
             });
         }
+
+        // 2. Initialize Chart 2: Fuel Sales by Payment Channel Grouped Bar Chart
+        let paymentChart = null;
+        const ctxPayment = document.getElementById('paymentChannelsBarChart');
+        if (ctxPayment && window.dashboardChartsData) {
+            paymentChart = new Chart(ctxPayment, {
+                type: 'bar',
+                data: {
+                    labels: window.dashboardChartsData.days.labels,
+                    datasets: [
+                        {
+                            label: 'Cash Sale',
+                            data: window.dashboardChartsData.days.cash_series,
+                            backgroundColor: 'rgba(46, 125, 50, 0.85)',
+                            borderColor: greenCash,
+                            borderWidth: 1.5,
+                            borderRadius: 5,
+                            borderSkipped: false,
+                            hoverBackgroundColor: '#1b5e20',
+                            barPercentage: 0.78,
+                            categoryPercentage: 0.72
+                        },
+                        {
+                            label: 'Credit Sale',
+                            data: window.dashboardChartsData.days.credit_series,
+                            backgroundColor: 'rgba(245, 124, 0, 0.85)',
+                            borderColor: orangeCredit,
+                            borderWidth: 1.5,
+                            borderRadius: 5,
+                            borderSkipped: false,
+                            hoverBackgroundColor: '#e65100',
+                            barPercentage: 0.78,
+                            categoryPercentage: 0.72
+                        },
+                        {
+                            label: 'Card Sale',
+                            data: window.dashboardChartsData.days.card_series,
+                            backgroundColor: 'rgba(4, 32, 78, 0.85)',
+                            borderColor: primaryNavy,
+                            borderWidth: 1.5,
+                            borderRadius: 5,
+                            borderSkipped: false,
+                            hoverBackgroundColor: hoverNavy,
+                            barPercentage: 0.78,
+                            categoryPercentage: 0.72
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                boxWidth: 14,
+                                font: { size: 12, weight: 'bold', family: 'Roboto' },
+                                color: '#4a5568',
+                                padding: 16
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#04204e',
+                            titleFont: { size: 13, weight: 'bold', family: 'Roboto' },
+                            bodyFont: { size: 12.5, family: 'Roboto' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed.y || 0;
+                                    const dsLabel = context.dataset.label || '';
+                                    return ' ' + dsLabel + ': PKR ' + formatCurrency(val);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { font: { size: 12, weight: 'bold', family: 'Roboto' }, color: '#4a5568' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(226, 232, 240, 0.8)', drawBorder: false },
+                            ticks: {
+                                font: { size: 11, family: 'Roboto' },
+                                color: '#718096',
+                                callback: function(value) {
+                                    if (value >= 1000000) return 'Rs. ' + (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'Rs. ' + (value / 1000).toFixed(0) + 'k';
+                                    return 'Rs. ' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Initialize Chart 3: Station Operating Expenses Bar Chart
+        let expenseChart = null;
+        const ctxExpense = document.getElementById('expensesBarChart');
+        if (ctxExpense && window.dashboardChartsData) {
+            expenseChart = new Chart(ctxExpense, {
+                type: 'bar',
+                data: {
+                    labels: window.dashboardChartsData.days.labels,
+                    datasets: [{
+                        label: 'Operating Expenses (PKR)',
+                        data: window.dashboardChartsData.days.expense_series,
+                        backgroundColor: 'rgba(198, 40, 40, 0.85)',
+                        borderColor: dangerRed,
+                        borderWidth: 1.5,
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        hoverBackgroundColor: hoverRed,
+                        barPercentage: 0.62,
+                        categoryPercentage: 0.8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#04204e',
+                            titleFont: { size: 13, weight: 'bold', family: 'Roboto' },
+                            bodyFont: { size: 12.5, family: 'Roboto' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed.y || 0;
+                                    return ' Expense: PKR ' + formatCurrency(val);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { font: { size: 12, weight: 'bold', family: 'Roboto' }, color: '#4a5568' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(226, 232, 240, 0.8)', drawBorder: false },
+                            ticks: {
+                                font: { size: 11, family: 'Roboto' },
+                                color: '#718096',
+                                callback: function(value) {
+                                    if (value >= 1000000) return 'Rs. ' + (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'Rs. ' + (value / 1000).toFixed(0) + 'k';
+                                    return 'Rs. ' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 4. Initialize Chart 4: Product & Lubricant Sales Bar Chart
+        let productChart = null;
+        const ctxProduct = document.getElementById('productSalesBarChart');
+        if (ctxProduct && window.dashboardChartsData) {
+            productChart = new Chart(ctxProduct, {
+                type: 'bar',
+                data: {
+                    labels: window.dashboardChartsData.days.labels,
+                    datasets: [{
+                        label: 'Product Sales (PKR)',
+                        data: window.dashboardChartsData.days.product_sales_series,
+                        backgroundColor: 'rgba(69, 39, 160, 0.85)',
+                        borderColor: purpleProd,
+                        borderWidth: 1.5,
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        hoverBackgroundColor: hoverPurple,
+                        barPercentage: 0.62,
+                        categoryPercentage: 0.8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#04204e',
+                            titleFont: { size: 13, weight: 'bold', family: 'Roboto' },
+                            bodyFont: { size: 12.5, family: 'Roboto' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed.y || 0;
+                                    const index = context.dataIndex;
+                                    const currentData = window.dashboardChartsData[activePeriod];
+                                    const qty = (currentData && currentData.product_qty_series && currentData.product_qty_series[index]) || 0;
+                                    return [
+                                        ' Sales: PKR ' + formatCurrency(val),
+                                        ' Units Sold: ' + formatCurrency(qty)
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { font: { size: 12, weight: 'bold', family: 'Roboto' }, color: '#4a5568' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(226, 232, 240, 0.8)', drawBorder: false },
+                            ticks: {
+                                font: { size: 11, family: 'Roboto' },
+                                color: '#718096',
+                                callback: function(value) {
+                                    if (value >= 1000000) return 'Rs. ' + (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return 'Rs. ' + (value / 1000).toFixed(0) + 'k';
+                                    return 'Rs. ' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 5. Dynamic Multi-Period Switcher Handler
+        function updateChartsForPeriod(periodKey, periodDisplay) {
+            if (!window.dashboardChartsData || !window.dashboardChartsData[periodKey]) return;
+            activePeriod = periodKey;
+            const pData = window.dashboardChartsData[periodKey];
+
+            // Update header label and card badges (Strictly "Days", "Week", "Month" without numbers)
+            $('#currentPeriodLabel').text(periodDisplay);
+            $('.period-text').text(periodDisplay);
+
+            // Update Chart 1: Fuel Net Sales
+            if (fuelChart) {
+                fuelChart.data.labels = pData.labels;
+                fuelChart.data.datasets[0].data = pData.fuel_revenue;
+                fuelChart.update();
+            }
+            $('#fuelSalesTotalBadge').text('Total: Rs. ' + formatCurrency(pData.total_fuel_revenue));
+
+            // Update Chart 2: Payment Channels
+            if (paymentChart) {
+                paymentChart.data.labels = pData.labels;
+                paymentChart.data.datasets[0].data = pData.cash_series;
+                paymentChart.data.datasets[1].data = pData.credit_series;
+                paymentChart.data.datasets[2].data = pData.card_series;
+                paymentChart.update();
+            }
+            $('#cashBadge')
+                .html('<i class="fas fa-money-bill-wave mr-1"></i>Cash: ' + pData.cash_percentage + '%')
+                .attr('title', 'Cash: Rs. ' + formatCurrency(pData.total_cash));
+            $('#creditBadge')
+                .html('<i class="fas fa-file-invoice mr-1"></i>Credit: ' + pData.credit_percentage + '%')
+                .attr('title', 'Credit: Rs. ' + formatCurrency(pData.total_credit));
+            $('#cardBadge')
+                .html('<i class="fas fa-credit-card mr-1"></i>Card: ' + pData.card_percentage + '%')
+                .attr('title', 'Card: Rs. ' + formatCurrency(pData.total_card));
+
+            // Update Chart 3: Operating Expenses
+            if (expenseChart) {
+                expenseChart.data.labels = pData.labels;
+                expenseChart.data.datasets[0].data = pData.expense_series;
+                expenseChart.update();
+            }
+            $('#expenseTotalBadge').html('<i class="fas fa-wallet mr-1"></i>Total: Rs. ' + formatCurrency(pData.total_expenses));
+
+            // Update Chart 4: Product Sales
+            if (productChart) {
+                productChart.data.labels = pData.labels;
+                productChart.data.datasets[0].data = pData.product_sales_series;
+                productChart.update();
+            }
+            $('#productTotalBadge').html('<i class="fas fa-shopping-bag mr-1"></i>Total: Rs. ' + formatCurrency(pData.total_product_sales));
+        }
+
+        // Attach click events to period dropdown options
+        $('.period-select-btn').on('click', function(e) {
+            e.preventDefault();
+            const pKey = $(this).data('period');
+            const pLabel = $(this).data('label');
+            $('.period-select-btn').removeClass('active');
+            $(this).addClass('active');
+            updateChartsForPeriod(pKey, pLabel);
+        });
     });
     </script>
 </body>
