@@ -19,12 +19,13 @@ if ($id <= 0) {
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name       = mysqli_real_escape_string($connection, trim($_POST['name'] ?? ''));
-    $phone      = mysqli_real_escape_string($connection, trim($_POST['phone'] ?? ''));
-    $address    = mysqli_real_escape_string($connection, trim($_POST['address'] ?? ''));
-    $fuel_rate  = (isset($_POST['fuel_rate']) && strcasecmp($_POST['fuel_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
-    $other_rate = (isset($_POST['other_rate']) && strcasecmp($_POST['other_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
-    $status     = (isset($_POST['status']) && strcasecmp($_POST['status'], 'Inactive') === 0) ? 'Inactive' : 'Active';
+    $name           = mysqli_real_escape_string($connection, trim($_POST['name'] ?? ''));
+    $phone          = mysqli_real_escape_string($connection, trim($_POST['phone'] ?? ''));
+    $address        = mysqli_real_escape_string($connection, trim($_POST['address'] ?? ''));
+    $attention_line = mysqli_real_escape_string($connection, trim($_POST['attention_line'] ?? ''));
+    $fuel_rate      = (isset($_POST['fuel_rate']) && strcasecmp($_POST['fuel_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
+    $other_rate     = (isset($_POST['other_rate']) && strcasecmp($_POST['other_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
+    $status         = (isset($_POST['status']) && strcasecmp($_POST['status'], 'Inactive') === 0) ? 'Inactive' : 'Active';
 
     if (empty($name)) {
         $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-1"></i> Customer name is required.</div>';
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   name='$name', 
                   phone='$phone', 
                   address='$address', 
+                  attention_line='$attention_line', 
                   fuel_rate='$fuel_rate', 
                   other_rate='$other_rate', 
                   status='$status' 
@@ -120,9 +122,16 @@ if (!$customer) {
                         </div>
 
                         <div class="row">
-                            <div class="col-12 form-group">
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-user-tag mr-1 text-primary"></i>Attention Line / Position / Title
+                                    <small class="text-muted font-weight-normal">(Printed on Monthly Bills)</small>
+                                </label>
+                                <input type="text" name="attention_line" class="form-control" value="<?php echo htmlspecialchars($customer['attention_line'] ?? ''); ?>" placeholder="e.g. The Vice Chancellor, or Managing Director,">
+                            </div>
+                            <div class="col-md-6 form-group">
                                 <label class="font-weight-bold">Address / Location</label>
-                                <textarea name="address" class="form-control" rows="2" placeholder="e.g. Plot # 45, Industrial Area, Karachi"><?php echo htmlspecialchars($customer['address'] ?? ''); ?></textarea>
+                                <textarea name="address" class="form-control" rows="1" placeholder="e.g. Plot # 45, Industrial Area, Karachi"><?php echo htmlspecialchars($customer['address'] ?? ''); ?></textarea>
                             </div>
                         </div>
 

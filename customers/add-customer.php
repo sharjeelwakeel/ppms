@@ -15,6 +15,7 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   `address` TEXT DEFAULT NULL,
+  `attention_line` VARCHAR(255) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `fuel_rate` ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash',
   `other_rate` ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash',
@@ -29,21 +30,27 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
 
+$chk_att = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customers` LIKE 'attention_line'");
+if ($chk_att && mysqli_num_rows($chk_att) == 0) {
+    mysqli_query($connection, "ALTER TABLE `tbl_customers` ADD COLUMN `attention_line` VARCHAR(255) DEFAULT NULL AFTER `address`");
+}
+
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name       = mysqli_real_escape_string($connection, trim($_POST['name'] ?? ''));
-    $phone      = mysqli_real_escape_string($connection, trim($_POST['phone'] ?? ''));
-    $address    = mysqli_real_escape_string($connection, trim($_POST['address'] ?? ''));
-    $fuel_rate  = (isset($_POST['fuel_rate']) && strcasecmp($_POST['fuel_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
-    $other_rate = (isset($_POST['other_rate']) && strcasecmp($_POST['other_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
-    $status     = (isset($_POST['status']) && strcasecmp($_POST['status'], 'Inactive') === 0) ? 'Inactive' : 'Active';
+    $name           = mysqli_real_escape_string($connection, trim($_POST['name'] ?? ''));
+    $phone          = mysqli_real_escape_string($connection, trim($_POST['phone'] ?? ''));
+    $address        = mysqli_real_escape_string($connection, trim($_POST['address'] ?? ''));
+    $attention_line = mysqli_real_escape_string($connection, trim($_POST['attention_line'] ?? ''));
+    $fuel_rate      = (isset($_POST['fuel_rate']) && strcasecmp($_POST['fuel_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
+    $other_rate     = (isset($_POST['other_rate']) && strcasecmp($_POST['other_rate'], 'Credit') === 0) ? 'Credit' : 'Cash';
+    $status         = (isset($_POST['status']) && strcasecmp($_POST['status'], 'Inactive') === 0) ? 'Inactive' : 'Active';
 
     if (empty($name)) {
         $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle mr-1"></i> Please provide a valid customer name.</div>';
     } else {
-        $query = "INSERT INTO tbl_customers (name, phone, address, fuel_rate, other_rate, status) 
-                  VALUES ('$name', '$phone', '$address', '$fuel_rate', '$other_rate', '$status')";
+        $query = "INSERT INTO tbl_customers (name, phone, address, attention_line, fuel_rate, other_rate, status) 
+                  VALUES ('$name', '$phone', '$address', '$attention_line', '$fuel_rate', '$other_rate', '$status')";
         if (mysqli_query($connection, $query)) {
             header('Location: customers-list.php?msg=added');
             exit;
@@ -117,9 +124,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="row">
-                            <div class="col-12 form-group">
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-user-tag mr-1 text-primary"></i>Attention Line / Position / Title
+                                    <small class="text-muted font-weight-normal">(Printed on Monthly Bills)</small>
+                                </label>
+                                <input type="text" name="attention_line" class="form-control" placeholder="e.g. The Vice Chancellor, or Managing Director,">
+                            </div>
+                            <div class="col-md-6 form-group">
                                 <label class="font-weight-bold">Address / Location</label>
-                                <textarea name="address" class="form-control" rows="2" placeholder="e.g. Plot # 45, Industrial Area, Karachi"></textarea>
+                                <textarea name="address" class="form-control" rows="1" placeholder="e.g. Plot # 45, Industrial Area, Karachi"></textarea>
                             </div>
                         </div>
 

@@ -15,6 +15,7 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   `address` TEXT DEFAULT NULL,
+  `attention_line` VARCHAR(255) DEFAULT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `fuel_rate` ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash',
   `other_rate` ENUM('Cash','Credit') NOT NULL DEFAULT 'Cash',
@@ -28,6 +29,12 @@ mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customers` (
   KEY `idx_other_rate` (`other_rate`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;");
+
+// Ensure attention_line column exists
+$colCheck = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customers` LIKE 'attention_line'");
+if ($colCheck && mysqli_num_rows($colCheck) === 0) {
+    @mysqli_query($connection, "ALTER TABLE `tbl_customers` ADD COLUMN `attention_line` VARCHAR(255) DEFAULT NULL AFTER `address`");
+}
 
 mysqli_query($connection, "CREATE TABLE IF NOT EXISTS `tbl_customer_vehicles` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -157,6 +164,9 @@ if (isset($_GET['msg'])) {
                                         $customerNameDisplay = $canEdit 
                                             ? '<a href="edit-customer.php?id='.$row['id'].'" class="font-weight-bold" style="color: var(--primary-color);">'.htmlspecialchars($row['name']).'</a>'
                                             : '<strong>'.htmlspecialchars($row['name']).'</strong>';
+                                        if (!empty($row['attention_line'])) {
+                                            $customerNameDisplay .= '<br><span class="badge badge-light border text-muted mt-1" style="font-size:11px; font-weight:normal;" title="Attention Line"><i class="fas fa-user-tag text-secondary mr-1"></i>'.htmlspecialchars($row['attention_line']).'</span>';
+                                        }
                                         
                                         $fuelBadge = (strcasecmp($row['fuel_rate'], 'Credit') === 0) 
                                             ? '<span class="badge badge-info px-2 py-1"><i class="fas fa-file-invoice mr-1"></i> Credit</span>' 

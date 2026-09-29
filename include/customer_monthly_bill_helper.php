@@ -33,16 +33,45 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
                 `attention_to` VARCHAR(255) DEFAULT NULL,
                 `total_coupons` INT(11) NOT NULL DEFAULT 0,
                 `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                `fuel_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                `lubricant_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                `generated_by` INT(11) DEFAULT NULL,
                 `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                `deleted_at` DATETIME DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 KEY `idx_cust_dates` (`customer_id`, `from_date`, `to_date`),
-                KEY `idx_bill_no` (`bill_no`)
+                KEY `idx_bill_no` (`bill_no`),
+                KEY `idx_deleted_at` (`deleted_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;";
             mysqli_query($connection, $create_sql);
+        } else {
+            // Check for additional snapshot columns
+            $chk_f = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customer_monthly_bills` LIKE 'fuel_amount'");
+            if ($chk_f && mysqli_num_rows($chk_f) == 0) {
+                mysqli_query($connection, "ALTER TABLE `tbl_customer_monthly_bills` ADD COLUMN `fuel_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `total_amount`");
+            }
+            $chk_l = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customer_monthly_bills` LIKE 'lubricant_amount'");
+            if ($chk_l && mysqli_num_rows($chk_l) == 0) {
+                mysqli_query($connection, "ALTER TABLE `tbl_customer_monthly_bills` ADD COLUMN `lubricant_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `fuel_amount`");
+            }
+            $chk_u = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customer_monthly_bills` LIKE 'generated_by'");
+            if ($chk_u && mysqli_num_rows($chk_u) == 0) {
+                mysqli_query($connection, "ALTER TABLE `tbl_customer_monthly_bills` ADD COLUMN `generated_by` INT(11) DEFAULT NULL AFTER `lubricant_amount`");
+            }
+            $chk_d = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customer_monthly_bills` LIKE 'deleted_at'");
+            if ($chk_d && mysqli_num_rows($chk_d) == 0) {
+                mysqli_query($connection, "ALTER TABLE `tbl_customer_monthly_bills` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL AFTER `updated_at`, ADD INDEX `idx_deleted_at` (`deleted_at`)");
+            }
         }
 
-        // 2. Ensure tbl_lubricant_sales.quantity supports decimals (e.g. 1.50 cans)
+        // 2. Ensure tbl_customers has attention_line column
+        $chk_cust = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_customers` LIKE 'attention_line'");
+        if ($chk_cust && mysqli_num_rows($chk_cust) == 0) {
+            mysqli_query($connection, "ALTER TABLE `tbl_customers` ADD COLUMN `attention_line` VARCHAR(255) DEFAULT NULL AFTER `address`");
+        }
+
+        // 3. Ensure tbl_lubricant_sales.quantity supports decimals (e.g. 1.50 cans)
         $q_check = mysqli_query($connection, "SHOW COLUMNS FROM `tbl_lubricant_sales` LIKE 'quantity'");
         if ($q_check && $row = mysqli_fetch_assoc($q_check)) {
             if (stripos($row['Type'], 'int') !== false) {
@@ -287,16 +316,15 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
         $cust_q = mysqli_query($connection, "SELECT * FROM `tbl_customers` WHERE `id` = '$customer_id' LIMIT 1");
         $customer = ($cust_q && mysqli_num_rows($cust_q) > 0) ? mysqli_fetch_assoc($cust_q) : null;
 
-        // Fetch Bill Details if previously recorded
+        // Fetch Attention Line: prioritize customer profile attention_line
+        if (empty($attention_to) && $customer && !empty($customer['attention_line'])) {
+            $attention_to = $customer['attention_line'];
+        }
         if (empty($attention_to)) {
-            $prev_b = mysqli_query($connection, "SELECT attention_to FROM `tbl_customer_monthly_bills` WHERE `customer_id` = '$customer_id' AND `from_date` = '$from_safe' AND `to_date` = '$to_safe' LIMIT 1");
+            $prev_b = mysqli_query($connection, "SELECT attention_to FROM `tbl_customer_monthly_bills` WHERE `customer_id` = '$customer_id' AND `from_date` = '$from_safe' AND `to_date` = '$to_safe' AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') LIMIT 1");
             if ($prev_b && $pb_row = mysqli_fetch_assoc($prev_b)) {
                 $attention_to = $pb_row['attention_to'];
             }
-        }
-        if (empty($attention_to) && $customer) {
-            // Default attention line for corporate/institutional clients
-            $attention_to = "The Vice Chancellor,";
         }
 
         // Get or generate Bill No
@@ -536,13 +564,21 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
         // Update record in tbl_customer_monthly_bills
         $coupons_cnt = count($transactions);
         $tot_amt_db  = round($total_amount, 2);
+        $fuel_amt_db = round(($ordered_categories['Diesel']['amount'] ?? 0.0) + ($ordered_categories['Petrol']['amount'] ?? 0.0), 2);
+        $lub_amt_db  = round($ordered_categories['Others']['amount'] ?? 0.0, 2);
+        $gen_by_db   = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : (isset($_SESSION['account_id']) ? intval($_SESSION['account_id']) : 'NULL');
+        $att_db_safe = mysqli_real_escape_string($connection, $attention_to);
+        $bill_no_safe = mysqli_real_escape_string($connection, $bill_no);
+
         mysqli_query($connection, "UPDATE `tbl_customer_monthly_bills` 
                                    SET `total_coupons` = '$coupons_cnt', 
                                        `total_amount` = '$tot_amt_db',
-                                       `attention_to` = '" . mysqli_real_escape_string($connection, $attention_to) . "' 
-                                   WHERE `customer_id` = '$customer_id' 
-                                     AND `from_date` = '$from_safe' 
-                                     AND `to_date` = '$to_safe'");
+                                       `fuel_amount` = '$fuel_amt_db',
+                                       `lubricant_amount` = '$lub_amt_db',
+                                       `attention_to` = '$att_db_safe',
+                                       `generated_by` = " . ($gen_by_db !== 'NULL' ? "'$gen_by_db'" : "NULL") . " 
+                                   WHERE `bill_no` = '$bill_no_safe' 
+                                     AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')");
 
         return [
             'station'          => $station,
@@ -561,5 +597,90 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
             'transactions'     => $transactions,
             'category_summary' => $ordered_categories
         ];
+    }
+
+    /**
+     * Retrieve list of generated bills with filtering for registry & audit trail
+     */
+    function get_generated_monthly_bills($connection, $filters = []) {
+        auto_migrate_monthly_bill_tables($connection);
+
+        $where = ["(b.deleted_at IS NULL OR b.deleted_at = '0000-00-00 00:00:00')"];
+
+        if (!empty($filters['bill_no'])) {
+            $b_safe = mysqli_real_escape_string($connection, trim($filters['bill_no']));
+            $where[] = "b.bill_no LIKE '%$b_safe%'";
+        }
+
+        if (!empty($filters['customer_id'])) {
+            $cid = intval($filters['customer_id']);
+            $where[] = "b.customer_id = '$cid'";
+        }
+
+        if (!empty($filters['from_date'])) {
+            $fd = mysqli_real_escape_string($connection, trim($filters['from_date']));
+            $where[] = "b.to_date >= '$fd'";
+        }
+
+        if (!empty($filters['to_date'])) {
+            $td = mysqli_real_escape_string($connection, trim($filters['to_date']));
+            $where[] = "b.from_date <= '$td'";
+        }
+
+        if (!empty($filters['search'])) {
+            $s_safe = mysqli_real_escape_string($connection, trim($filters['search']));
+            $where[] = "(b.bill_no LIKE '%$s_safe%' OR c.name LIKE '%$s_safe%' OR b.attention_to LIKE '%$s_safe%')";
+        }
+
+        $sql = "SELECT 
+                    b.*,
+                    c.name AS customer_name,
+                    c.phone AS customer_phone,
+                    c.address AS customer_address,
+                    u.username AS generated_by_user
+                FROM tbl_customer_monthly_bills b
+                JOIN tbl_customers c ON b.customer_id = c.id
+                LEFT JOIN tbl_accounts u ON b.generated_by = u.id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY CAST(b.bill_no AS UNSIGNED) DESC, b.id DESC";
+
+        $res = mysqli_query($connection, $sql);
+        $bills = [];
+        if ($res) {
+            while ($row = mysqli_fetch_assoc($res)) {
+                $bills[] = $row;
+            }
+        }
+        return $bills;
+    }
+
+    /**
+     * Get a specific bill by bill number
+     */
+    function get_monthly_bill_by_number($connection, $bill_no) {
+        auto_migrate_monthly_bill_tables($connection);
+        $b_safe = mysqli_real_escape_string($connection, trim($bill_no));
+        $sql = "SELECT b.*, c.name AS customer_name, c.attention_line 
+                FROM tbl_customer_monthly_bills b
+                JOIN tbl_customers c ON b.customer_id = c.id
+                WHERE b.bill_no = '$b_safe' 
+                  AND (b.deleted_at IS NULL OR b.deleted_at = '0000-00-00 00:00:00')
+                LIMIT 1";
+        $res = mysqli_query($connection, $sql);
+        if ($res && $row = mysqli_fetch_assoc($res)) {
+            return $row;
+        }
+        return null;
+    }
+
+    /**
+     * Soft delete a monthly bill record
+     */
+    function soft_delete_monthly_bill($connection, $bill_id) {
+        auto_migrate_monthly_bill_tables($connection);
+        $id = intval($bill_id);
+        if ($id <= 0) return false;
+        $res = mysqli_query($connection, "UPDATE tbl_customer_monthly_bills SET deleted_at = NOW() WHERE id = '$id'");
+        return $res ? true : false;
     }
 }

@@ -33,8 +33,21 @@ $to_date        = trim($_GET['to_date'] ?? '');
 $bill_no_input  = trim($_GET['bill_no'] ?? '');
 $attention_to   = trim($_GET['attention_to'] ?? '');
 
+// If bill_no is provided without dates, resolve directly from tbl_customer_monthly_bills
+if (!empty($bill_no_input) && ($customer_id <= 0 || empty($from_date) || empty($to_date))) {
+    $found_bill = get_monthly_bill_by_number($connection, $bill_no_input);
+    if ($found_bill) {
+        $customer_id    = intval($found_bill['customer_id']);
+        $from_date      = $found_bill['from_date'];
+        $to_date        = $found_bill['to_date'];
+        $vehicle_number = $found_bill['vehicle_number'] ?? '';
+        $bill_no_input  = $found_bill['bill_no'];
+        $attention_to   = $found_bill['attention_to'] ?? '';
+    }
+}
+
 if ($customer_id <= 0 || empty($from_date) || empty($to_date)) {
-    die("Invalid request: Customer ID, From Date, and To Date are required.");
+    die("Invalid request: Bill not found or invalid customer and date parameters.");
 }
 
 $bill_data = get_customer_monthly_bill_data($connection, $customer_id, $from_date, $to_date, $vehicle_number, [
