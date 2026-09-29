@@ -1,3 +1,9 @@
-./ppsm.sql
-./include/vendor
+ppsm.sql
+include/vendor/
 scratch/
+encryption/
+license.lic
+*.lic
+license.log
+README_LICENSE.md
+markdown/licensing_security.md
