@@ -62,14 +62,39 @@ All primary color definitions are centralized in `include/style.css`.
 - **Table Links**: Use `color: var(--primary-color); font-weight: bold;`
 
 ### E. Typography & Fonts
-- **Font Family**: `'Roboto', sans-serif` (Google Font: weights 300, 400, 500, 700, 900)
-- **Stylesheets Required on Every Page**:
-  ```html
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css">
-  <link rel="stylesheet" href="../include/style.css?v=1.0.1">
-  ```
+- **Font Family**: `'Roboto', sans-serif` (Self-hosted offline WOFF2 webfonts: weights 300, 400, 500, 700, 900)
+- **Stylesheets Required on Every Page (100% Offline / Locally Hosted)**:
+  - Root pages (`depth 0`):
+    ```html
+    <link rel="stylesheet" href="include/css/roboto.css">
+    <link rel="stylesheet" href="include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="include/css/all.min.css">
+    <link rel="stylesheet" href="include/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="include/style.css?v=1.0.1">
+    ```
+  - Subdirectory pages (`depth 1`):
+    ```html
+    <link rel="stylesheet" href="../include/css/roboto.css">
+    <link rel="stylesheet" href="../include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../include/css/all.min.css">
+    <link rel="stylesheet" href="../include/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="../include/style.css?v=1.0.1">
+    ```
+- **Scripts Required on Every Page (100% Offline / Locally Hosted)**:
+  - Root pages:
+    ```html
+    <script src="include/js/jquery.min.js"></script>
+    <script src="include/js/popper.min.js"></script>
+    <script src="include/js/bootstrap.min.js"></script>
+    <script src="include/js/jquery.dataTables.min.js"></script>
+    ```
+  - Subdirectory pages:
+    ```html
+    <script src="../include/js/jquery.min.js"></script>
+    <script src="../include/js/popper.min.js"></script>
+    <script src="../include/js/bootstrap.min.js"></script>
+    <script src="../include/js/jquery.dataTables.min.js"></script>
+    ```
 
 ---
 

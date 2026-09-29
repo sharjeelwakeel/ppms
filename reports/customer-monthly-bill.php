@@ -121,10 +121,10 @@ $page_title = "Customer Overall Monthly Credit Bill";
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($page_title); ?> - PPMS</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../include/css/all.min.css">
+    <link rel="stylesheet" href="../include/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="../include/css/roboto.css">
     <link rel="stylesheet" href="../include/style.css">
     <style>
         .bill-preview-sheet {
@@ -753,9 +753,9 @@ $page_title = "Customer Overall Monthly Credit Bill";
 
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+    <script src="../include/js/jquery.min.js"></script>
+    <script src="../include/js/bootstrap.bundle.min.js"></script>
+    <script src="../include/js/jquery.dataTables.min.js"></script>
     <script>
         $(document).ready(function() {
             if ($('#registryTable').length) {

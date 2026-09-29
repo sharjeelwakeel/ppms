@@ -197,11 +197,11 @@ if ($isSearched) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="../include/css/roboto.css">
+    <link rel="stylesheet" href="../include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../include/css/all.min.css">
+    <link rel="stylesheet" href="../include/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="../include/css/sweetalert2.min.css">
     <link rel="stylesheet" href="../include/style.css?v=1.0.5">
     <title>PPMS - Accounts Receivable (Credit Sales)</title>
     <style>
@@ -739,11 +739,11 @@ if ($isSearched) {
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-    <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="../include/js/jquery.min.js"></script>
+    <script src="../include/js/popper.min.js"></script>
+    <script src="../include/js/bootstrap.min.js"></script>
+    <script src="../include/js/jquery.dataTables.min.js"></script>
+    <script src="../include/js/sweetalert2.all.min.js"></script>
 
     <script>
     var currentDue = 0.00;

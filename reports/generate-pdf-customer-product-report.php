@@ -243,7 +243,7 @@ if ($res) {
 <head>
     <meta charset="utf-8">
     <title>Customer Product Credit Ledger - Statement</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
+    <link rel="stylesheet" href="../include/css/roboto.css">
     <style>
         @page { size: A4 portrait; margin: 10mm; }
         body { font-family: 'Roboto', sans-serif; font-size: 11px; color: #111; background: #fff; margin: 0; padding: 15px; }

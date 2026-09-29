@@ -72,9 +72,9 @@ if ($shiftId > 0) {
 <head>
     <meta charset="utf-8">
     <title>PPMS - Card Recovery & Balance Statement (<?php echo htmlspecialchars($fromDate); ?> to <?php echo htmlspecialchars($toDate); ?>)</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css">
+    <link rel="stylesheet" href="../include/css/roboto.css">
+    <link rel="stylesheet" href="../include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../include/css/all.min.css">
     <style>
         @page {
             size: A4 portrait;

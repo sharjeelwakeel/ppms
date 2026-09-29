@@ -233,7 +233,7 @@ if ($report_res) {
 <head>
     <meta charset="utf-8">
     <title>Customer Credit & Fuel Ledger - PDF Report</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
+    <link rel="stylesheet" href="../include/css/roboto.css">
     <link rel="stylesheet" href="../include/style.css?v=1.0.1">
     <style>
         @page { size: A4 portrait; margin: 10mm; }

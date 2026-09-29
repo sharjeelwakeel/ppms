@@ -80,7 +80,7 @@ if ($res_alloc) {
 <head>
     <meta charset="utf-8">
     <title>Payment Receipt - <?php echo htmlspecialchars($payment['receipt_no']); ?></title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700,900&display=swap">
+    <link rel="stylesheet" href="../include/css/roboto.css">
     <style>
         body {
             font-family: 'Roboto', sans-serif;

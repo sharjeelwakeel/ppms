@@ -107,9 +107,9 @@ $is_confirmed = !empty($payment_record);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salary_Voucher_<?php echo htmlspecialchars($voucher_no); ?>_<?php echo htmlspecialchars($staff_detail['name']); ?></title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="../include/css/roboto.css">
+    <link rel="stylesheet" href="../include/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../include/css/all.min.css">
     <style>
         body {
             background-color: #525659;
