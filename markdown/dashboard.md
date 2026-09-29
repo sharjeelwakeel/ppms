@@ -2,41 +2,28 @@
 
 ## 1. Overview & Purpose
 The **PPMS Executive Dashboard** (`dashboard.php`) is the central intelligence and monitoring center of the Petrol Pump Management System. It provides real-time visibility into station revenue, dispenser meter throughput, and critical inventory alerts:
-1. **Real-Time Today's Revenue & Volume**: Sourced directly from physical dispenser meter readings (`tbl_meter_readings` and `tbl_meter_reading_details`).
-2. **7-Day Net Sales Interactive Bar Chart**: Daily revenue (PKR) and fuel volume (Litres) tracking over the last 7 consecutive calendar days.
-3. **Focused Stock Restock Alerts**: Clean, distraction-free inventory alert section showing strictly the products requiring urgent restocking, eliminating irrelevant global stock counts.
+1. **7-Day Net Sales Interactive Bar Chart**: Daily net fuel sales revenue (PKR) tracking over the last 7 consecutive calendar days spanning full width (`col-12`).
+2. **Focused Stock Restock Alerts**: Clean, distraction-free inventory alert section showing strictly the products requiring urgent restocking, displaying purely essential information without distracting buttons or clutter.
 
 ---
 
 ## 2. Key Business Rules & Calculation Formulas
 
-### 1. Today's Revenue & Volume from Meter Readings
-- **Source Tables**:
-  - `tbl_meter_readings`: Master shift records containing `date`, `shift_id`, `grand_total`, and `deleted_at`.
-  - `tbl_meter_reading_details`: Nozzle breakdown containing `meter_reading_id`, `nozzle_id`, `item_type`, `sale_reading`, `test_reading`, `net_sale`, and `amount`.
-- **Formulas**:
-  $$\text{Today's Revenue} = \sum_{\substack{\text{mr.date} = \text{TODAY} \\ \text{mr.deleted\_at IS NULL}}} \text{mr.grand\_total}$$
-  $$\text{Today's Net Litres} = \sum_{\substack{\text{mr.date} = \text{TODAY} \\ \text{mr.deleted\_at IS NULL}}} \text{mrd.net\_sale}$$
-- **Zero State Handling**: If no shifts have been closed for today yet (e.g., morning shift currently active), displays `Rs. 0.00` and `0.00 Ltr` with an informative badge: `"Shift in progress / Awaiting close"`.
-
-### 2. 7-Day Net Sales Trend (Bar Chart Data)
+### 1. 7-Day Net Sales Trend (Bar Chart Data)
 - **Time Window**: 7 consecutive calendar days from $T-6$ to $T$ (Today).
 - **Chronological Completeness**: All 7 days are strictly represented on the X-axis in chronological order. Days without closed readings are filled with `0.00` to prevent broken axes or misleading trendlines.
 - **Metrics Tracked per Day**:
   1. **Daily Net Revenue (PKR)**: Total monetary value of fuel dispensed.
   2. **Daily Fuel Volume (Litres)**: Total net litres pumped across all nozzles.
   3. **Closed Shifts Count**: Number of shifts finalized on that day.
-- **Summary Metrics**:
-  - **7-Day Cumulative Revenue**: Sum of daily revenues across the 7-day window.
-  - **7-Day Average Daily Revenue**: $\frac{\text{7-Day Cumulative Revenue}}{7}$.
-  - **Peak Sales Day**: The date with the highest net revenue in the 7-day period.
+- **Layout**: Spans full width (`col-12`) for an executive, distraction-free visualization.
 
-### 3. Focused Stock Restock Alerts (Alert & Restock Table Only)
-- **Policy**: Avoid displaying redundant global inventory statistics (such as total registered product counts or global valuation) on the operational dashboard. Focus management attention purely on **what needs to be reordered**.
+### 2. Focused Stock Restock Alerts (Alert & Restock Table Only)
+- **Policy**: Avoid displaying redundant global inventory statistics on the operational dashboard. Focus management attention purely on **what needs to be reordered**.
 - **Restock Condition**:
   $$\text{Restock Required if: } (\text{Current Stock} \le \text{reorder\_level} \text{ and } \text{reorder\_level} > 0) \lor (\text{Current Stock} \le 0)$$
   where $\text{Current Stock} = \sum(\text{Purchases}) - \sum(\text{Sales})$.
-- **Display Rules**:
+- **Display Rules (Pure Information Mode)**:
   - If 1 or more products meet the restock condition:
     - Display the high-priority **Stock Needs Restocking Alert Banner** (`alert-danger`).
     - Display the **Restock Action Table** listing *only* those deficit products with:
@@ -45,9 +32,8 @@ The **PPMS Executive Dashboard** (`dashboard.php`) is the central intelligence a
       - Reorder Level
       - Deficit Units
       - Status (`Out of Stock` or `Reorder Required`)
-      - Quick Action: `[+ Add Purchase]` button routing directly to `lubricants/add-purchase.php?product_id=X`.
   - If 0 products meet the restock condition:
-    - Display a clean confirmation alert: `"All products have sufficient stock (No restock required)"`.
+    - Display a clean confirmation alert: `"All product inventory levels are healthy (No products currently require restocking)"`.
 
 ---
 

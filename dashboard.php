@@ -133,6 +133,29 @@ $restock_count = count($restock_items);
             color: #fff !important;
             font-size: 13px;
         }
+        #restockTable,
+        #restockTable th,
+        #restockTable td {
+            box-sizing: border-box !important;
+        }
+        #restockTable {
+            width: 100% !important;
+            margin: 0 !important;
+        }
+        #restockTable_wrapper {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden;
+        }
+        .restock-card-body .table-responsive {
+            overflow-x: hidden !important;
+        }
+        @media (max-width: 767.98px) {
+            .restock-card-body .table-responsive {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
     </style>
 </head>
 <body>
@@ -143,89 +166,21 @@ $restock_count = count($restock_items);
             
             <!-- Page Header -->
             <div class="row mb-4 align-items-center">
-                <div class="col-md-7">
+                <div class="col-12">
                     <h4 class="font-weight-bold" style="color:var(--primary-color);">
                         <i class="fas fa-tachometer-alt mr-2 text-primary"></i>Operations &amp; Revenue Dashboard
                     </h4>
-                    <p class="text-muted small mb-0">Live fuel throughput, meter reading daily net sales, and inventory restock monitor.</p>
+                    <p class="text-muted small mb-0">Live fuel throughput, 7-day net sales, and inventory restock monitor.</p>
                 </div>
-                <div class="col-md-5 text-md-right mt-3 mt-md-0">
-                    <a href="meter-readings/meter-reading-list.php" class="btn btn-outline-primary btn-sm font-weight-bold mr-2" style="border-radius:6px;">
-                        <i class="fas fa-list-alt mr-1"></i> Meter Readings
-                    </a>
-                    <?php if (has_permission('meter_readings', 'add')): ?>
-                    <a href="meter-readings/add-meter-reading.php" class="btn btn-primary btn-sm font-weight-bold" style="border-radius:6px;">
-                        <i class="fas fa-plus mr-1"></i> New Reading
-                    </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- TOP KPI ROW: Revenue Sourced From Dispenser Meter Readings -->
-            <div class="row">
-                <!-- 1. Overall Today's Revenue -->
-                <div class="col-xl-3 col-md-6 col-sm-12">
-                    <div class="dashboard-card card-bg-primary">
-                        <div class="card-title">Today's Meter Revenue</div>
-                        <div class="card-value">Rs. <?php echo number_format($today_stats['revenue'], 2); ?></div>
-                        <div class="card-subtext">
-                            <i class="fas fa-clock mr-1"></i>
-                            <?php if ($today_stats['shifts_count'] > 0): ?>
-                                <?php echo $today_stats['shifts_count']; ?> Shift<?php echo $today_stats['shifts_count'] > 1 ? 's' : ''; ?> Closed Today
-                            <?php else: ?>
-                                Shift Active / Awaiting Close
-                            <?php endif; ?>
-                        </div>
-                        <i class="fas fa-cash-register card-icon"></i>
-                    </div>
-                </div>
-
-                <!-- 2. Overall Today's Fuel Volume Pumped -->
-                <div class="col-xl-3 col-md-6 col-sm-12">
-                    <div class="dashboard-card card-bg-success">
-                        <div class="card-title">Today's Net Fuel Volume</div>
-                        <div class="card-value"><?php echo number_format($today_stats['litres'], 2); ?> <span style="font-size:18px; font-weight:500;">Ltr</span></div>
-                        <div class="card-subtext">
-                            <i class="fas fa-gas-pump mr-1"></i> Net fuel dispensed across nozzles
-                        </div>
-                        <i class="fas fa-oil-can card-icon"></i>
-                    </div>
-                </div>
-
-                <!-- 3. 7-Day Cumulative Revenue -->
-                <div class="col-xl-3 col-md-6 col-sm-12">
-                    <div class="dashboard-card card-bg-info">
-                        <div class="card-title">7-Day Total Revenue</div>
-                        <div class="card-value">Rs. <?php echo number_format($seven_days['total_revenue'], 2); ?></div>
-                        <div class="card-subtext">
-                            <i class="fas fa-calendar-alt mr-1"></i> <?php echo $seven_days['labels'][0]; ?> — <?php echo end($seven_days['labels']); ?>
-                        </div>
-                        <i class="fas fa-chart-line card-icon"></i>
-                    </div>
-                </div>
-
-                <!-- 4. 7-Day Daily Average -->
-                <div class="col-xl-3 col-md-6 col-sm-12">
-                    <div class="dashboard-card card-bg-warning">
-                        <div class="card-title">7-Day Daily Average</div>
-                        <div class="card-value">Rs. <?php echo number_format($seven_days['avg_daily_revenue'], 2); ?></div>
-                        <div class="card-subtext">
-                            <i class="fas fa-balance-scale mr-1"></i> Avg net sales per day
-                        </div>
-                        <i class="fas fa-coins card-icon"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MAIN SECTION: 7-DAY NET SALES BAR CHART & PERFORMANCE HIGHLIGHTS -->
+            </div>            <!-- MAIN SECTION: 7-DAY NET SALES BAR CHART -->
             <div class="row">
                 <!-- 7-Day Net Sales Bar Chart -->
-                <div class="col-lg-8 mb-4">
-                    <div class="chart-card h-100">
+                <div class="col-12 mb-4">
+                    <div class="chart-card">
                         <div class="chart-card-header">
                             <div>
                                 <h5 class="mb-0 font-weight-bold" style="color:var(--primary-color);">
-                                    <i class="fas fa-chart-bar mr-2 text-primary"></i>7-Day Net Sales Revenue (Meter Readings)
+                                    <i class="fas fa-chart-bar mr-2 text-primary"></i>7-Day Net Sales
                                 </h5>
                                 <span class="text-muted small">Daily net fuel sales turnover from closed shifts</span>
                             </div>
@@ -234,66 +189,8 @@ $restock_count = count($restock_items);
                             </span>
                         </div>
                         <div class="card-body p-4">
-                            <div style="position: relative; height: 310px; width: 100%;">
+                            <div style="position: relative; height: 320px; width: 100%;">
                                 <canvas id="revenueBarChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 7-Day Performance Snapshot -->
-                <div class="col-lg-4 mb-4">
-                    <div class="chart-card h-100">
-                        <div class="chart-card-header">
-                            <h5 class="mb-0 font-weight-bold" style="color:var(--primary-color);">
-                                <i class="fas fa-trophy mr-2 text-warning"></i>7-Day Performance
-                            </h5>
-                            <span class="badge badge-success text-white font-weight-bold px-2 py-1">Audited</span>
-                        </div>
-                        <div class="card-body p-4 d-flex flex-column justify-content-between">
-                            <div>
-                                <!-- Peak Sales Day -->
-                                <div class="kpi-highlight-item" style="border-left: 4px solid var(--primary-color);">
-                                    <div class="text-muted small text-uppercase font-weight-bold mb-1">Peak Sales Day</div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="font-weight-bold" style="color:var(--primary-color); font-size:16px;">
-                                            <?php echo htmlspecialchars($seven_days['peak_day']['label']); ?>
-                                        </div>
-                                        <div class="text-success font-weight-bold" style="font-size:16px;">
-                                            Rs. <?php echo number_format($seven_days['peak_day']['revenue'], 2); ?>
-                                        </div>
-                                    </div>
-                                    <div class="small text-muted mt-1">
-                                        <?php echo number_format($seven_days['peak_day']['litres'], 2); ?> Litres dispensed
-                                    </div>
-                                </div>
-
-                                <!-- 7-Day Volume -->
-                                <div class="kpi-highlight-item" style="border-left: 4px solid #28a745;">
-                                    <div class="text-muted small text-uppercase font-weight-bold mb-1">7-Day Total Fuel Dispensed</div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="font-weight-bold text-dark" style="font-size:16px;">
-                                            <?php echo number_format($seven_days['total_litres'], 2); ?> Ltr
-                                        </div>
-                                        <span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i>Meter Flow</span>
-                                    </div>
-                                    <div class="small text-muted mt-1">Sum of net sales across all nozzles</div>
-                                </div>
-
-                                <!-- Average Daily Revenue -->
-                                <div class="kpi-highlight-item" style="border-left: 4px solid #ffc107;">
-                                    <div class="text-muted small text-uppercase font-weight-bold mb-1">Expected Daily Yield</div>
-                                    <div class="font-weight-bold text-dark" style="font-size:16px;">
-                                        Rs. <?php echo number_format($seven_days['avg_daily_revenue'], 2); ?> / day
-                                    </div>
-                                    <div class="small text-muted mt-1">Rolling average based on last 7 days</div>
-                                </div>
-                            </div>
-
-                            <div class="mt-3 text-center">
-                                <a href="meter-readings/meter-reading-list.php" class="btn btn-outline-primary btn-block font-weight-bold shadow-sm" style="border-radius: 8px;">
-                                    <i class="fas fa-search mr-1"></i> View All Shift Meter Logs
-                                </a>
                             </div>
                         </div>
                     </div>
@@ -313,11 +210,6 @@ $restock_count = count($restock_items);
                     </h5>
                     <span class="text-muted" style="font-size:14px;">The inventory for the products listed below has dropped to or below their designated threshold. Please restock promptly.</span>
                 </div>
-                <div class="ml-3 d-none d-md-block">
-                    <a href="lubricants/stock-report.php" class="btn btn-sm btn-outline-danger font-weight-bold" style="border-radius:6px;">
-                        <i class="fas fa-chart-bar mr-1"></i> Full Stock Report
-                    </a>
-                </div>
             </div>
 
             <!-- Restock Action Table: Shows ONLY products that need restocking -->
@@ -330,9 +222,9 @@ $restock_count = count($restock_items);
                         <?php echo $restock_count; ?> Restock Alert<?php echo $restock_count > 1 ? 's' : ''; ?>
                     </span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table id="restockTable" class="table table-striped table-bordered mb-0">
+                <div class="card-body p-3 restock-card-body">
+                    <div class="table-responsive border-0 mb-0">
+                        <table id="restockTable" class="table table-striped table-bordered mb-0" style="width:100% !important;">
                             <thead>
                                 <tr>
                                     <th style="width: 50px; text-align:center;">#</th>
@@ -341,7 +233,6 @@ $restock_count = count($restock_items);
                                     <th style="text-align:center;">Reorder Level</th>
                                     <th style="text-align:center;">Deficit to Order</th>
                                     <th style="text-align:center;">Status</th>
-                                    <th style="text-align:center; width:160px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -369,11 +260,6 @@ $restock_count = count($restock_items);
                                         <td class="text-center font-weight-bold">' . number_format($reorder, 0) . '</td>
                                         <td class="text-center text-danger font-weight-bold">' . number_format($item['deficit'], 0) . '</td>
                                         <td class="text-center">' . $status . '</td>
-                                        <td class="text-center">
-                                            <a href="lubricants/add-purchase.php?product_id=' . $item['id'] . '" class="btn btn-primary btn-sm px-2 py-1 font-weight-bold" style="border-radius:6px; font-size:12px;">
-                                                <i class="fas fa-plus mr-1"></i> Add Purchase
-                                            </a>
-                                        </td>
                                     </tr>';
                                 }
                                 ?>
@@ -413,6 +299,7 @@ $restock_count = count($restock_items);
             $('#restockTable').DataTable({
                 "order": [[ 4, "desc" ]], // Order by Deficit descending
                 "pageLength": 10,
+                "autoWidth": false,
                 "language": {
                     "emptyTable": "No items currently require restocking."
                 }

@@ -99,14 +99,26 @@ try {
 
     // Verify that the lubricant item shows the category name 'Deo 6000 4L'
     $lub_transaction = null;
+    $fuel_transaction = null;
     foreach ($bill_data['transactions'] as $t) {
         if ($t['coupon'] === '8384') {
             $lub_transaction = $t;
-            break;
+        }
+        if ($t['coupon'] === '1624') {
+            $fuel_transaction = $t;
         }
     }
     assert_true($lub_transaction !== null, "Lubricant transaction #8384 must be present in bill");
     assert_eq($lub_transaction['description'], 'Deo 6000 4L', "Lubricant line item description must display Category Name 'Deo 6000 4L'");
+
+    // Verify Action+ branding for fuel transactions
+    assert_true($fuel_transaction !== null, "Fuel transaction #1624 must be present in bill");
+    assert_eq($fuel_transaction['description'], 'Action+ Diesel', "Fuel line item description must display 'Action+ Diesel'");
+    assert_eq(format_fuel_item_description('petrol'), 'Action+ Petrol', "Raw 'petrol' must format to 'Action+ Petrol'");
+    assert_eq(format_fuel_item_description('diesel'), 'Action+ Diesel', "Raw 'diesel' must format to 'Action+ Diesel'");
+    assert_eq(format_fuel_item_description('diesels'), 'Action+ Diesels', "Raw 'diesels' must dynamically format to 'Action+ Diesels'");
+    assert_eq(format_fuel_item_description('High Octane'), 'Action+ High Octane', "Custom item 'High Octane' must format to 'Action+ High Octane'");
+    assert_eq(format_fuel_item_description('Action+ Diesel'), 'Action+ Diesel', "Existing 'Action+ Diesel' must not duplicate prefix");
 
     // Check Diesel summary
     $diesel = $bill_data['category_summary']['Diesel'];

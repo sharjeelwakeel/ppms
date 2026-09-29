@@ -579,3 +579,20 @@ table thead th,
     border-color: #04204e !important;
     vertical-align: middle !important;
 }
+
+/* Universal DataTables Box-Sizing & Overflow Prevention */
+table.dataTable,
+table.dataTable th,
+table.dataTable td {
+    box-sizing: border-box !important;
+}
+
+.dataTables_wrapper {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.dataTables_wrapper table.dataTable {
+    width: 100% !important;
+    margin: 0 !important;
+}

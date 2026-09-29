@@ -289,6 +289,34 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
     }
 
     /**
+     * Format fuel item description by prepending brand 'Action+' to the item name.
+     * Takes whatever name comes from tbl_items and dynamically adds 'Action+ '
+     * without restricting or overriding specific fuel types.
+     *
+     * @param string|null $raw_name
+     * @return string
+     */
+    function format_fuel_item_description($raw_name) {
+        $trimmed = trim(strval($raw_name));
+        if ($trimmed === '') {
+            return 'Action+ Fuel';
+        }
+
+        // Clean up and preserve existing 'Action+' prefix (case-insensitive)
+        if (stripos($trimmed, 'action+') === 0) {
+            $rest = trim(substr($trimmed, 7));
+            return 'Action+ ' . (empty($rest) ? '' : ucwords($rest));
+        }
+        if (stripos($trimmed, 'action +') === 0) {
+            $rest = trim(substr($trimmed, 8));
+            return 'Action+ ' . (empty($rest) ? '' : ucwords($rest));
+        }
+
+        // Prepend 'Action+ ' to the item name coming from tbl_items
+        return 'Action+ ' . ucwords($trimmed);
+    }
+
+    /**
      * Retrieve aggregated monthly bill data for a specific customer & date range.
      * 
      * @param mysqli $connection
@@ -391,7 +419,7 @@ if (!defined('CUSTOMER_MONTHLY_BILL_HELPER_LOADED')) {
                     'date_formatted' => date('d/m/Y', strtotime($row['slip_date'])),
                     'coupon'         => $row['slip_no'],
                     'vehicle'        => $row['vehicle_number'],
-                    'description'    => $row['product_name'],
+                    'description'    => format_fuel_item_description($row['product_name']),
                     'quantity'       => floatval($row['quantity']),
                     'rate'           => floatval($row['rate']),
                     'amount'         => $charge,

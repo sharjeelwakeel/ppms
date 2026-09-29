@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS `tbl_customer_monthly_bills` (
 ### Main Transaction Grid
 - Columns: `S.No.` | `Date` (DD/MM/YYYY) | `Coupon` | `Description` | `Quantity` | `Rate` | `Amount`.
 - **Description Mapping**:
-  - For Fuel: Product name from `tbl_items.name` (e.g. `Action+ Diesel`).
+  - For Fuel: Automatically prepends the commercial brand prefix `Action+ ` directly to whatever product name is configured in `tbl_items.name` via `format_fuel_item_description()` (e.g. `diesels` -> `Action+ Diesels`, `petrol` -> `Action+ Petrol`, `High Octane` -> `Action+ High Octane`, preserving any existing `Action+` prefix without duplication).
   - For Lubricants / Products: Prioritizes Category Name from `tbl_product_categories.name` (e.g. `Deo 6000 4L`), falling back to `tbl_lubricant_products.name` if unassigned. This ensures bills faithfully display commercial product categories as printed on official vouchers.
 
 ### Category Summary Box (Bottom Left)
