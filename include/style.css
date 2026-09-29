@@ -571,6 +571,29 @@ body {
     box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
 }
 
+.btn-outline-primary i,
+.btn-outline-primary .fas,
+.btn-outline-primary .far,
+.btn-outline-primary .fa {
+    color: inherit;
+    transition: color 0.2s ease;
+}
+
+.btn-outline-primary:hover i,
+.btn-outline-primary:focus i,
+.btn-outline-primary:active i,
+.btn-outline-primary.active i,
+.btn-outline-primary:hover .fas,
+.btn-outline-primary:focus .fas,
+.btn-outline-primary:active .fas,
+.btn-outline-primary.active .fas,
+.btn-outline-primary:hover .far,
+.btn-outline-primary:focus .far,
+.btn-outline-primary:active .far,
+.btn-outline-primary.active .far {
+    color: #ffffff !important;
+}
+
 /* Centralized Table Header Styling */
 table thead th,
 .table thead th {

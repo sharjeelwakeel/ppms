@@ -171,6 +171,32 @@ $restock_count = count($restock_items);
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch;
             }
+        #periodFilterDropdown {
+            border-color: #04204e !important;
+            color: #04204e !important;
+            background: #ffffff !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease;
+        }
+        #periodFilterDropdown i {
+            color: #04204e;
+            transition: color 0.2s ease;
+        }
+        #periodFilterDropdown:hover,
+        #periodFilterDropdown:focus,
+        #periodFilterDropdown:active,
+        #periodFilterDropdown[aria-expanded="true"] {
+            background-color: #04204e !important;
+            background: var(--primary-gradient) !important;
+            color: #ffffff !important;
+            border-color: #04204e !important;
+            box-shadow: 0 4px 12px rgba(4, 32, 78, 0.2);
+        }
+        #periodFilterDropdown:hover i,
+        #periodFilterDropdown:focus i,
+        #periodFilterDropdown:active i,
+        #periodFilterDropdown[aria-expanded="true"] i {
+            color: #ffffff !important;
         }
     </style>
 </head>
@@ -190,8 +216,8 @@ $restock_count = count($restock_items);
                 </div>
                 <div class="col-md-5 col-12 text-md-right text-left">
                     <div class="dropdown d-inline-block">
-                        <button class="btn btn-outline-primary dropdown-toggle font-weight-bold px-3 py-2 shadow-sm d-inline-flex align-items-center" type="button" id="periodFilterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="border-color: #04204e; color: #04204e; background: #ffffff; border-radius: 8px;">
-                            <i class="fas fa-calendar-alt mr-2" style="color:#04204e;"></i>Period: <span id="currentPeriodLabel" class="ml-1 font-weight-bold">Days</span>
+                        <button class="btn btn-outline-primary dropdown-toggle font-weight-bold px-3 py-2 shadow-sm d-inline-flex align-items-center" type="button" id="periodFilterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-calendar-alt mr-2"></i>Period: <span id="currentPeriodLabel" class="ml-1 font-weight-bold">Days</span>
                         </button>
                         <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="periodFilterDropdown" style="border-radius: 8px; min-width: 170px;">
                             <h6 class="dropdown-header text-uppercase font-weight-bold small text-muted">Select Period</h6>
